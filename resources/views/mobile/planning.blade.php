@@ -1,0 +1,301 @@
+@extends('layouts.mobile')
+
+@section('content')
+<div class="space-y-8 pb-10" x-data="planningApp()">
+    <!-- Header Block -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-3xl font-900 text-slate-800 tracking-tighter">Planning Hub</h2>
+            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Material resource planning</p>
+        </div>
+        <button @click="resetForm" class="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100/50 transition-all active:scale-90 shadow-sm">
+            <i class="fas fa-rotate-right text-sm"></i>
+        </button>
+    </div>
+
+    <!-- Planning Form -->
+    <div class="space-y-6">
+        @if(Auth::user()->hasFeature('mobile_planning', 'type_filter'))
+        <!-- Category Filter -->
+        <div class="glass-premium p-6 rounded-[2.5rem] border border-white/80">
+            <div class="flex items-center gap-3 ml-1 mb-3">
+                <i class="fas fa-filter text-indigo-500 text-[10px]"></i>
+                <label class="text-[9px] font-black text-slate-800 uppercase tracking-[0.2em]">Filter Category</label>
+            </div>
+            <div class="relative">
+                <select 
+                    x-model="selectedTypeId" 
+                    class="w-full bg-slate-50/50 border-none rounded-2xl py-3.5 px-6 text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 appearance-none shadow-sm"
+                >
+                    <option value="">All Categories</option>
+                    @foreach($types as $type)
+                    <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[10px]"></i>
+                </div>
+            </div>
+        </div>
+        @endif
+
+        <div class="glass-premium p-8 rounded-[3rem] space-y-8 border border-white/80">
+        <div class="flex items-center gap-3 ml-1">
+            <i class="fas fa-bullseye text-emerald-500 text-xs"></i>
+            <label class="text-[9px] font-black text-slate-800 uppercase tracking-[0.2em]">Target Production Load</label>
+        </div>
+        
+        <div class="space-y-5">
+            <template x-for="(row, index) in form.products" :key="index">
+                <div class="p-6 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100/50 space-y-4 relative group">
+                    <div class="space-y-3">
+                        <div class="relative">
+                            <select 
+                                x-model="row.id" 
+                                class="w-full bg-white border-none rounded-xl py-3.5 px-5 text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none shadow-sm"
+                            >
+                                <option value="">Select Finished Item...</option>
+                                <template x-for="product in filteredProducts" :key="product.id">
+                                    <option :value="product.id" x-text="product.name + ' (' + product.pack_name + ')'"></option>
+                                </template>
+                            </select>
+                            <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                                <i class="fas fa-box text-[10px]"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="relative">
+                            <input 
+                                type="number" 
+                                x-model="row.demand_qty" 
+                                placeholder="Target Box Qty" 
+                                class="w-full bg-white border-none rounded-xl py-3.5 px-5 text-[11px] font-black text-slate-800 focus:ring-2 focus:ring-emerald-500 shadow-sm placeholder:text-slate-200"
+                            >
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-emerald-400 uppercase tracking-widest">BOXES</span>
+                        </div>
+                    </div>
+                    
+                    <button 
+                        x-show="form.products.length > 1" 
+                        @click="removeRow(index)" 
+                        class="absolute -top-3 -right-3 w-8 h-8 grad-rose rounded-full flex items-center justify-center text-white shadow-lg border-2 border-white transition-transform active:scale-90"
+                    >
+                        <i class="fas fa-times text-[10px]"></i>
+                    </button>
+                </div>
+            </template>
+        </div>
+
+        <button 
+            @click="addRow" 
+            class="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] hover:border-emerald-200 hover:text-emerald-500 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+        >
+            <i class="fas fa-plus-circle text-xs"></i>
+            <span>Add Target Product</span>
+        </button>
+
+        <!-- Branch Selection -->
+        <div class="space-y-3 pt-4 border-t border-slate-100">
+            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Inventory Source</label>
+            <div class="relative">
+                <select 
+                    x-model="form.branch_code" 
+                    class="w-full bg-slate-50/50 border-none rounded-2xl py-4 px-6 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none"
+                >
+                    <option value="">Global Stock (All Branches)</option>
+                    @foreach($branches as $branch)
+                    <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-warehouse text-[10px]"></i>
+                </div>
+            </div>
+        </div>
+
+        <button 
+            @click="calculate" 
+            :disabled="loading"
+            class="w-full grad-emerald p-1 rounded-[2.5rem] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] disabled:opacity-50"
+        >
+            <div class="bg-white/10 p-5 rounded-[2.4rem] flex items-center justify-center gap-4 text-white font-900 italic tracking-tight uppercase text-sm border border-white/20">
+                <template x-if="!loading">
+                    <div class="flex items-center gap-4">
+                        <i class="fas fa-bolt-lightning text-emerald-200"></i>
+                        <span>Generate Requirements</span>
+                    </div>
+                </template>
+                <template x-if="loading">
+                    <div class="flex items-center gap-4">
+                        <i class="fas fa-dna fa-spin"></i>
+                        <span>Exploding Recipes...</span>
+                    </div>
+                </template>
+            </div>
+        </button>
+    </div>
+
+    <!-- Results Section -->
+    <div x-show="results.length > 0" x-cloak class="space-y-8 animate-in fade-in slide-in-from-bottom duration-700" x-transition>
+        <div class="flex items-center justify-between px-3">
+            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Material Analytics</h3>
+            <button 
+                @click="exportToExcel" 
+                class="bg-emerald-50/80 text-emerald-600 text-[9px] font-black py-2.5 px-5 rounded-xl flex items-center gap-3 border border-emerald-100/50 shadow-sm active:scale-95 transition-all"
+            >
+                <i class="fas fa-file-export text-xs"></i>
+                <span>GET EXCEL</span>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5">
+            <template x-for="rm in results" :key="rm.item_code">
+                <div class="glass-premium p-6 rounded-[2.5rem] flex items-center justify-between relative overflow-hidden border border-white/80 group active:scale-[0.98] transition-transform">
+                    <div class="absolute top-0 left-0 w-2 h-full" :class="rm.shortfall > 0 ? 'bg-rose-500' : 'grad-emerald'"></div>
+                    
+                    <div class="flex-1 min-w-0 pr-5">
+                        <div class="text-[12px] font-900 text-slate-800 truncate uppercase" x-text="rm.name"></div>
+                        <div class="flex items-center gap-3 mt-2">
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded" x-text="rm.item_code"></span>
+                            <div class="text-[9px] font-black uppercase tracking-tight" :class="rm.current_stock <= 0 ? 'text-rose-400' : 'text-indigo-500'" x-text="'Stock: ' + parseFloat(rm.current_stock).toFixed(2) + ' ' + rm.uom"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right shrink-0">
+                        <div class="text-[9px] font-black text-slate-300 uppercase tracking-widest" x-text="'Demand: ' + parseFloat(rm.required_qty).toFixed(2)"></div>
+                        <div 
+                            class="text-sm font-900 tracking-tighter mt-1" 
+                            :class="rm.shortfall > 0 ? 'text-rose-600' : 'text-emerald-600'" 
+                        >
+                            <span x-show="rm.shortfall > 0" x-text="'Short ' + parseFloat(rm.shortfall).toFixed(2)"></span>
+                            <span x-show="rm.shortfall <= 0" class="flex items-center gap-1 justify-end"><i class="fas fa-check-circle"></i> VALID</span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Calculation Summary Box -->
+        <div class="grad-indigo p-1 rounded-[3rem] shadow-2xl shadow-indigo-100">
+            <div class="bg-slate-900/90 backdrop-blur-md p-8 rounded-[2.9rem] border border-white/10">
+                <div class="flex items-center gap-5 mb-8">
+                    <div class="w-14 h-14 bg-white/10 rounded-3xl flex items-center justify-center text-white border border-white/5 ring-4 ring-white/5 shadow-inner">
+                        <i class="fas fa-wand-magic-sparkles text-xl text-indigo-300"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-white text-lg font-900 tracking-tighter italic leading-none">Scenario Ready</h4>
+                        <p class="text-[9px] text-indigo-300 font-bold uppercase tracking-[0.2em] mt-2">Yield Projection Summary</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-3 bg-white/5 p-6 rounded-[2rem] border border-white/5">
+                    <template x-for="item in summary" :key="item.id">
+                        <div class="flex items-center justify-between py-1 group">
+                            <span class="text-[11px] text-slate-400 font-bold uppercase tracking-tight group-hover:text-white transition-colors" x-text="item.name"></span>
+                            <div class="flex-1 border-b border-dashed border-white/10 mx-3 mb-1"></div>
+                            <span class="text-[11px] text-indigo-300 font-900" x-text="item.quantity + ' BOX'"></span>
+                        </div>
+                    </template>
+                </div>
+                
+                <button @click="resetForm" class="w-full mt-8 py-4 bg-white/10 hover:bg-white/20 rounded-2xl text-[9px] font-black text-white uppercase tracking-[0.2em] transition-all border border-white/10 active:scale-95">
+                    Clear Workspace & Redesign Plan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function planningApp() {
+        return {
+            loading: false,
+            form: {
+                branch_code: '',
+                products: [
+                    { id: '', demand_qty: '' }
+                ]
+            },
+            results: [],
+            summary: [],
+            selectedTypeId: '',
+            allProducts: @json($products),
+            get filteredProducts() {
+                if (!this.selectedTypeId) return this.allProducts;
+                return this.allProducts.filter(p => p.product_type_id == this.selectedTypeId);
+            },
+            addRow() {
+                this.form.products.push({ id: '', demand_qty: '' });
+            },
+            removeRow(index) {
+                this.form.products.splice(index, 1);
+            },
+            resetForm() {
+                this.form.products = [{ id: '', demand_qty: '' }];
+                this.results = [];
+                this.summary = [];
+            },
+            async calculate() {
+                if (this.form.products.some(p => !p.id || !p.demand_qty)) {
+                    alert('Kindly populate all target fields.');
+                    return;
+                }
+                
+                this.loading = true;
+                try {
+                    const response = await fetch("{{ route('mobile.planning.calculate') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify(this.form)
+                    });
+
+                    const res = await response.json();
+                    if (res.success) {
+                        this.results = res.data;
+                        this.summary = res.summary;
+                    } else {
+                        alert(res.message);
+                    }
+                } catch (e) {
+                    alert('Synchronisation failure. Please retry.');
+                } finally {
+                    this.loading = false;
+                }
+            },
+            exportToExcel() {
+                if (this.form.products.length === 0) return;
+
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = "{{ route('planning.export') }}";
+                form.style.display = 'none';
+
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_token';
+                csrfInput.value = "{{ csrf_token() }}";
+                form.appendChild(csrfInput);
+
+                const dataInput = document.createElement('input');
+                dataInput.type = 'hidden';
+                dataInput.name = 'products_json';
+                dataInput.value = JSON.stringify(this.form.products);
+                form.appendChild(dataInput);
+
+                const branchInput = document.createElement('input');
+                branchInput.type = 'hidden';
+                branchInput.name = 'branch_code';
+                branchInput.value = this.form.branch_code;
+                form.appendChild(branchInput);
+
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            }
+        }
+    }
+</script>
+@endsection

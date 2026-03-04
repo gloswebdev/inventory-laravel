@@ -1,0 +1,48 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Product extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name',
+        'alias_name',
+        'uom', // Mapped from WEIGHT(IN)
+        'price',
+        'group_id',
+        'product_type_id',
+        'low_alert_quantity',
+        'current_stock',
+        // New Excel Columns
+        'item_code',
+        'category',
+        'form',
+        'technical_name',
+        'rm_type',
+        'pack_name',
+        'unit_box',
+        'weight_unit',
+        'weight_in',
+    ];
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(ProductGroup::class);
+    }
+
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class, 'product_type_id');
+    }
+
+    public function recipes()
+    {
+        return $this->hasMany(Recipe::class, 'finished_product_id');
+    }
+}

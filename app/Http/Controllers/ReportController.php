@@ -1,0 +1,284 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\StockLedger;
+use App\Models\Product;
+use App\Models\Branch;
+use App\Models\ProductType;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+
+class ReportController extends Controller
+{
+    public function stockLedger(Request $request)
+    {
+        $query = StockLedger::with('product')->orderByDesc('created_at');
+
+        if ($request->has('product_id') && $request->product_id) {
+            $query->where('product_id', $request->product_id);
+        }
+
+        // Filter the ledger by permitted products
+        $user = Auth::user();
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $permittedRMTypes = $user->getPermittedRMTypes();
+            
+            $query->whereHas('product', function($q) use ($permittedTypeIds, $permittedRMTypes) {
+                $q->whereIn('product_type_id', $permittedTypeIds)
+                  ->where(function($sq) use ($permittedRMTypes) {
+                      $sq->whereIn('rm_type', $permittedRMTypes)
+                        ->orWhereNull('rm_type')
+                        ->orWhere('rm_type', '');
+                  });
+            });
+        }
+
+        $ledger = $query->limit(100)->get();
+        
+        $productsQuery = Product::orderBy('name');
+        if ($user->role !== 'admin') {
+            $this->applyTypeFilters($productsQuery);
+        }
+        $products = $productsQuery->get();
+        
+        return view('reports.stock_ledger', compact('ledger', 'products'));
+    }
+
+    public function liveStock(Request $request)
+    {
+        $branches = Branch::orderBy('code')->get();
+        $types = ProductType::orderBy('type_name')->get();
+        $rmTypes = Product::whereNotNull('rm_type')->distinct()->pluck('rm_type');
+        $displayUnit = $request->get('display_unit', 'unit'); // 'unit' or 'kg'
+        $perPage = $request->get('per_page', 20);
+
+        $query = Product::with('type')->orderBy('name');
+
+        // Apply Access Control
+        $this->applyTypeFilters($query);
+
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('item_code', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->filled('type_id')) {
+            $query->where('product_type_id', $request->type_id);
+        }
+
+        if ($request->filled('rm_type')) {
+            $query->where('rm_type', $request->rm_type);
+        }
+
+        if ($perPage === 'all') {
+            $products = $query->get();
+        } else {
+            $products = $query->paginate($perPage)->withQueryString();
+        }
+
+        $externalStock = $this->getExternalStock();
+
+        $reportData = [];
+        foreach ($products as $product) {
+            $branchStocks = [];
+            $totalQty = 0;
+
+            foreach ($branches as $branch) {
+                $qty = $externalStock[$branch->code][$product->item_code] ?? 0;
+                $unitPerBox = (float)($product->unit_box ?: 1);
+                $weightPerUnit = (float)($product->weight_unit ?: 1);
+                
+                $displayQty = ($displayUnit === 'kg') ? ($qty * $weightPerUnit) : $qty;
+
+                $branchStocks[$branch->code] = [
+                    'qty' => $displayQty,
+                    'boxes' => $qty / $unitPerBox
+                ];
+                $totalQty += $qty;
+            }
+
+            // Apply Stock Filter: Ignore Zero Stock
+            if ($request->get('stock_filter') === 'ignore_zero' && $totalQty <= 0) {
+                continue;
+            }
+
+            $unitPerBox = (float)($product->unit_box ?: 1);
+            $weightPerUnit = (float)($product->weight_unit ?: 1);
+            
+            $totalDisplayQty = ($displayUnit === 'kg') ? ($totalQty * $weightPerUnit) : $totalQty;
+
+            $reportData[] = [
+                'product' => $product,
+                'branch_stocks' => $branchStocks,
+                'total_qty' => $totalDisplayQty,
+                'total_boxes' => $totalQty / $unitPerBox
+            ];
+        }
+
+        return view('reports.live_stock', compact('reportData', 'products', 'branches', 'types', 'rmTypes', 'displayUnit'));
+    }
+
+    public function exportLiveStockExcel(Request $request)
+    {
+        if (!auth()->user()->hasPermission('reports', 'excel')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $displayUnit = $request->get('display_unit', 'unit');
+        $externalStock = $this->getExternalStock();
+        $branches = Branch::orderBy('code')->get();
+
+        $query = Product::with('type')->orderBy('name');
+        
+        // Apply Access Control
+        $this->applyTypeFilters($query);
+
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('item_code', 'like', '%' . $request->search . '%');
+            });
+        }
+        if ($request->filled('type_id')) {
+            $query->where('product_type_id', $request->type_id);
+        }
+        if ($request->filled('rm_type')) {
+            $query->where('rm_type', $request->rm_type);
+        }
+
+        $products = $query->get();
+
+        if ($request->get('stock_filter') === 'ignore_zero') {
+            $products = $products->filter(function($product) use ($externalStock) {
+                $total = 0;
+                foreach ($this->getExternalStock() as $branchStock) {
+                    $total += ($branchStock[$product->item_code] ?? 0);
+                }
+                return $total > 0;
+            });
+        }
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\LiveStockExport($products, $branches, $externalStock, $displayUnit), 
+            "Live_Stock_Report_" . now()->format('Y-m-d_His') . ".xlsx"
+        );
+    }
+
+    public function exportLiveStockPdf(Request $request)
+    {
+        if (!auth()->user()->hasPermission('reports', 'pdf')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $displayUnit = $request->get('display_unit', 'unit');
+        $externalStock = $this->getExternalStock();
+        $branches = Branch::orderBy('code')->get();
+
+        $query = Product::with('type')->orderBy('name');
+
+        // Apply Access Control
+        $this->applyTypeFilters($query);
+
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('item_code', 'like', '%' . $request->search . '%');
+            });
+        }
+        if ($request->filled('type_id')) {
+            $query->where('product_type_id', $request->type_id);
+        }
+        if ($request->filled('rm_type')) {
+            $query->where('rm_type', $request->rm_type);
+        }
+
+        $products = $query->get();
+        
+        $reportData = [];
+        foreach ($products as $product) {
+            $branchStocks = [];
+            $totalQty = 0;
+            foreach ($branches as $branch) {
+                $qty = $externalStock[$branch->code][$product->item_code] ?? 0;
+                $unitPerBox = (float)($product->unit_box ?: 1);
+                $weightPerUnit = (float)($product->weight_unit ?: 1);
+                $displayQty = ($displayUnit === 'kg') ? ($qty * $weightPerUnit) : $qty;
+                $branchStocks[$branch->code] = ['qty' => $displayQty, 'boxes' => $qty / $unitPerBox];
+                $totalQty += $qty;
+            }
+
+            // Apply Stock Filter: Ignore Zero Stock
+            if ($request->get('stock_filter') === 'ignore_zero' && $totalQty <= 0) {
+                continue;
+            }
+
+            $weightPerUnit = (float)($product->weight_unit ?: 1);
+            $totalDisplayQty = ($displayUnit === 'kg') ? ($totalQty * $weightPerUnit) : $totalQty;
+            $reportData[] = [
+                'product' => $product,
+                'branch_stocks' => $branchStocks,
+                'total_qty' => $totalDisplayQty,
+                'total_boxes' => $totalQty / ($product->unit_box ?: 1)
+            ];
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.live_stock_pdf', compact('reportData', 'branches', 'displayUnit'))
+                  ->setPaper('a4', 'landscape');
+        
+        return $pdf->download("Live_Stock_Report_" . now()->format('Y-m-d_His') . ".pdf");
+    }
+
+    private function getExternalStock()
+    {
+        return Cache::remember('external_stock_data_grouped', 300, function () {
+            try {
+                $response = Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
+                    "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",
+                    "Branch" => "ALL",
+                    "Item" => "ALL"
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+                        $stockMap = [];
+                        foreach ($data['resultdata'] as $item) {
+                            $bCode = $item['Branch_Code'];
+                            $iCode = $item['User_Code'];
+                            $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
+                        }
+                        return $stockMap;
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error('External Stock API Error (Desktop): ' . $e->getMessage());
+            }
+            return [];
+        });
+    }
+
+    protected function applyTypeFilters($query)
+    {
+        $user = Auth::user();
+        if ($user->role === 'admin') {
+            return $query;
+        }
+
+        $permittedTypeIds = $user->getPermittedProductTypeIds();
+        $permittedRMTypes = $user->getPermittedRMTypes();
+
+        return $query->whereIn('product_type_id', $permittedTypeIds)
+            ->where(function ($q) use ($permittedRMTypes) {
+                $q->whereIn('rm_type', $permittedRMTypes)
+                    ->orWhereNull('rm_type')
+                    ->orWhere('rm_type', '');
+            });
+    }
+}

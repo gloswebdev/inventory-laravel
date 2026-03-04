@@ -1,0 +1,576 @@
+@extends('layouts.app')
+
+@section('header', 'Product Master')
+
+@section('content')
+<div class="bg-white rounded shadow-md p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-lg font-bold text-gray-700">Product List</h3>
+        <div class="flex gap-2">
+            @if(Auth::user()->hasPermission('products', 'edit'))
+            <button onclick="document.getElementById('typeModal').classList.remove('hidden')" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-tags mr-2"></i> Type
+            </button>
+            <button onclick="document.getElementById('groupModal').classList.remove('hidden')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-layer-group mr-2"></i> Group
+            </button>
+             <button onclick="document.getElementById('categoryModal').classList.remove('hidden')" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-list mr-2"></i> Cat
+            </button>
+             <button onclick="document.getElementById('formModal').classList.remove('hidden')" class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-shapes mr-2"></i> Form
+            </button>
+             <button onclick="document.getElementById('rmTypeModal').classList.remove('hidden')" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-flask mr-2"></i> RM
+            </button>
+             <button onclick="document.getElementById('packNameModal').classList.remove('hidden')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-box mr-2"></i> Pack
+            </button>
+            @endif
+            <a href="{{ route('products.export', request()->query()) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-file-download mr-2"></i> Download
+            </a>
+            @if(Auth::user()->hasPermission('products', 'create'))
+            <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-file-excel mr-2"></i> Import
+            </button>
+            <button onclick="document.getElementById('productModal').classList.remove('hidden')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                <i class="fas fa-plus mr-2"></i> Add
+            </button>
+            @endif
+        </div>
+    </div>
+    
+    
+    {{-- Search & Filter Form --}}
+    <div class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <form action="{{ route('products.index') }}" method="GET" class="flex flex-wrap gap-4 items-end">
+            <div class="flex-grow min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by Name, Code, Tech Name..." class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+            </div>
+            
+            <div class="w-full sm:w-48">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Group</label>
+                <select name="group_id" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                    <option value="">All Groups</option>
+                    @foreach($groups as $group)
+                        <option value="{{ $group->id }}" {{ request('group_id') == $group->id ? 'selected' : '' }}>
+                            {{ $group->group_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="w-full sm:w-48">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Type</label>
+                <select name="product_type_id" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                    <option value="">All Types</option>
+                    @foreach($types as $type)
+                        <option value="{{ $type->id }}" {{ request('product_type_id') == $type->id ? 'selected' : '' }}>
+                            {{ $type->type_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="w-full sm:w-48">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filter by RM Type</label>
+                <select name="rm_type" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                    <option value="">All RM Types</option>
+                    @foreach($rmTypes as $rm)
+                        <option value="{{ $rm }}" {{ request('rm_type') == $rm ? 'selected' : '' }}>
+                            {{ $rm }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="w-full sm:w-32">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
+                <select name="per_page" onchange="this.form.submit()" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                    <option value="50" {{ request('per_page', 50) == '50' ? 'selected' : '' }}>50</option>
+                    <option value="100" {{ request('per_page') == '100' ? 'selected' : '' }}>100</option>
+                    <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
+                </select>
+            </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow">
+                    <i class="fas fa-filter mr-1"></i> Filter
+                </button>
+                @if(request()->hasAny(['search', 'group_id', 'product_type_id']))
+                <a href="{{ route('products.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow">
+                    Clear
+                </a>
+                @endif
+            </div>
+        </form>
+    </div>
+
+    @if(Auth::user()->hasPermission('products', 'delete'))
+    <div class="mb-4">
+        <button type="button" onclick="submitBulkDelete()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed" id="bulkDeleteBtn" disabled>
+            <i class="fas fa-trash-alt mr-2"></i> Bulk Delete
+        </button>
+    </div>
+    @endif
+
+    <form id="bulkDeleteForm" action="{{ route('products.bulk_delete') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete selected products?');">
+        @csrf
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                        <th class="py-3 px-6 text-left"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                        <th class="py-3 px-6 text-left">Item Code</th>
+                        <th class="py-3 px-6 text-left">Product Name</th>
+                        <th class="py-3 px-6 text-left">Category</th>
+                        <th class="py-3 px-6 text-left">Form</th>
+                        <th class="py-3 px-6 text-left">Technical Name</th>
+                        <th class="py-3 px-6 text-left">RM Type</th>
+                        <th class="py-3 px-6 text-left">Type</th>
+                        <th class="py-3 px-6 text-left">Pack Name</th>
+                        <th class="py-3 px-6 text-left">Unit/Box</th>
+                        <th class="py-3 px-6 text-left">Weight/Unit</th>
+                        <th class="py-3 px-6 text-left">UOM</th>
+                        <th class="py-3 px-6 text-left">Price</th>
+                        <th class="py-3 px-6 text-center">Stock</th>
+                        <th class="py-3 px-6 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-600 text-sm font-light">
+                    @foreach($products as $product)
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td class="py-3 px-6 text-left"><input type="checkbox" name="product_ids[]" value="{{ $product->id }}" class="product-checkbox" onclick="updateBulkBtn()"></td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->item_code ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap font-medium">{{ $product->name }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->group->group_name ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->form ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->technical_name ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->rm_type ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">
+                            <span class="bg-{{ optional($product->type)->type_name == 'Finished Good' ? 'green' : 'yellow' }}-200 text-{{ optional($product->type)->type_name == 'Finished Good' ? 'green' : 'yellow' }}-700 py-1 px-3 rounded-full text-xs">
+                                {{ optional($product->type)->type_name ?? 'N/A' }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->pack_name ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->unit_box ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->weight_unit ?? '-' }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->uom }}</td>
+                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ number_format($product->price, 2) }}</td>
+                        <td class="py-3 px-6 text-center font-bold">{{ $product->current_stock }}</td>
+                        <td class="py-3 px-6 text-center">
+                            <div class="flex item-center justify-center">
+                                {{-- Edit Button (Trigger Modal with data) --}}
+                                @if(Auth::user()->hasPermission('products', 'edit'))
+                                <button type="button" 
+                                    data-product='@json($product)'
+                                    onclick="editProduct(this)" 
+                                    class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                @endif
+                                
+                                {{-- Delete Button --}}
+                                @if(Auth::user()->hasPermission('products', 'delete'))
+                                <button type="button" onclick="if(confirm('Delete {{ addslashes($product->name) }}?')) { document.getElementById('delete-form-{{ $product->id }}').submit(); }" class="w-4 transform hover:text-red-500 hover:scale-110">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-4 px-4 pb-4">
+            {{ $products->links() }}
+        </div>
+    </form>
+    
+    {{-- Individual Delete Forms (Hidden) --}}
+    @foreach($products as $product)
+        <form id="delete-form-{{ $product->id }}" action="{{ route('products.destroy', $product->id) }}" method="POST" style="display: none;">
+            @csrf
+            @method('DELETE')
+        </form>
+    @endforeach
+</div>
+
+{{-- Product Modal --}}
+<div id="productModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modalTitle">Add Product</h3>
+            <form id="productForm" method="POST" action="{{ route('products.store') }}" class="mt-2 text-left">
+                @csrf
+                <input type="hidden" name="_method" id="methodField" value="POST">
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Name</label>
+                    <input type="text" name="name" id="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+
+                {{-- Group & Type Selects would need data passed to view or fetched via AJAX if strictly keeping single view. 
+                     For simplicity, we should pass $groups and $types from controller to index.
+                --}}
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Group</label>
+                    <select name="group_id" id="group_id" class="shadow border rounded w-full py-2 px-3 text-gray-700">
+                        <option value="">Select Group</option>
+                        @foreach($groups as $group)
+                            <option value="{{ $group->id }}">{{ $group->group_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Type</label>
+                    <select name="product_type_id" id="product_type_id" class="shadow border rounded w-full py-2 px-3 text-gray-700" required>
+                        @foreach($types as $type)
+                            <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                 <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">UOM</label>
+                    <input type="text" name="uom" id="uom" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+
+                 <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Price</label>
+                    <input type="number" step="0.01" name="price" id="price" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Item Code</label>
+                        <input type="text" name="item_code" id="item_code" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                     <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Category</label>
+                        <input type="text" list="categoryList" name="category" id="category" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" autocomplete="off">
+                        <datalist id="categoryList">
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat->value }}">
+                            @endforeach
+                        </datalist>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Form</label>
+                        <input type="text" list="formList" name="form" id="form" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" autocomplete="off">
+                        <datalist id="formList">
+                            @foreach($forms as $f)
+                                <option value="{{ $f->value }}">
+                            @endforeach
+                        </datalist>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Technical Name</label>
+                        <input type="text" name="technical_name" id="technical_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                     <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">RM Type</label>
+                        <input type="text" list="rmTypeList" name="rm_type" id="rm_type" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" autocomplete="off">
+                        <datalist id="rmTypeList">
+                            @foreach($rmTypes as $rm)
+                                <option value="{{ $rm->value }}">
+                            @endforeach
+                        </datalist>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Pack Name</label>
+                        <input type="text" list="packNameList" name="pack_name" id="pack_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" autocomplete="off">
+                        <datalist id="packNameList">
+                            @foreach($packNames as $pack)
+                                <option value="{{ $pack->value }}">
+                            @endforeach
+                        </datalist>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Unit/Box</label>
+                        <input type="text" name="unit_box" id="unit_box" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Weight/Unit</label>
+                        <input type="text" name="weight_unit" id="weight_unit" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                    <div class="mb-4">
+                         <label class="block text-gray-700 text-sm font-bold mb-2">Weight (In)</label>
+                        <input type="text" name="weight_in" id="weight_in" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Low Stock Alert</label>
+                    <input type="number" step="0.001" name="low_alert_quantity" id="low_alert_quantity" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+
+                <div class="flex items-center justify-between mt-4">
+                    <button type="button" onclick="document.getElementById('productModal').classList.add('hidden'); resetForm();" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Cancel
+                    </button>
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- Group Modal --}}
+<div id="groupModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Manage Groups</h3>
+        <form action="{{ route('product-groups.store') }}" method="POST" class="mb-4">
+            @csrf
+            <div class="flex gap-2">
+                <input type="text" name="group_name" placeholder="New Group Name" class="border rounded px-2 py-1 flex-grow" required>
+                <button type="submit" class="bg-blue-500 text-white px-3 py-1 rounded">Add</button>
+            </div>
+        </form>
+        <ul class="max-h-40 overflow-y-auto">
+            @foreach($groups as $group)
+            <li class="flex justify-between py-1 border-b">
+                <span>{{ $group->group_name }}</span>
+                <form action="{{ route('product-groups.destroy', $group->id) }}" method="POST" onsubmit="return confirm('Delete group? Products will be ungrouped.');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-red-500"><i class="fas fa-trash"></i></button>
+                </form>
+            </li>
+            @endforeach
+        </ul>
+        <button onclick="document.getElementById('groupModal').classList.add('hidden')" class="mt-4 text-gray-500">Close</button>
+    </div>
+</div>
+
+{{-- Type Modal --}}
+<div id="typeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Manage Types</h3>
+        <form action="{{ route('product-types.store') }}" method="POST" class="mb-4">
+            @csrf
+            <div class="flex gap-2">
+                <input type="text" name="type_name" placeholder="New Type Name" class="border rounded px-2 py-1 flex-grow" required>
+                <button type="submit" class="bg-purple-500 text-white px-3 py-1 rounded">Add</button>
+            </div>
+        </form>
+        <ul class="max-h-40 overflow-y-auto">
+            @foreach($types as $type)
+            <li class="flex justify-between py-1 border-b">
+                <span>{{ $type->type_name }}</span>
+                <form action="{{ route('product-types.destroy', $type->id) }}" method="POST" onsubmit="return confirm('Delete type?');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-red-500"><i class="fas fa-trash"></i></button>
+                </form>
+            </li>
+            @endforeach
+        </ul>
+        <button onclick="document.getElementById('typeModal').classList.add('hidden')" class="mt-4 text-gray-500">Close</button>
+    </div>
+</div>
+
+{{-- Import Modal --}}
+<div id="importModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Import Products</h3>
+        <form action="{{ route('products.import') }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-sm font-bold">Excel/CSV File</label>
+                    <a href="{{ route('products.import.template') }}" class="text-blue-500 text-sm hover:underline">
+                        <i class="fas fa-download mr-1"></i> Download Template
+                    </a>
+                </div>
+                <input type="file" name="excel_file" accept=".xlsx,.csv" required class="w-full">
+                <p class="text-xs text-gray-500 mt-1">Format: SNO, ITEM CODE, CATEGORY, FORM, TECHNICAL NAME, RM TYPE, TYPE, ITEM NAME, PACK NAME, UNIT/BOX, WEIGHT/UNIT, WEIGHT(IN)</p>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+{{-- Category Modal --}}
+<div id="categoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Manage Categories</h3>
+        <form action="{{ route('product-attributes.store') }}" method="POST" class="mb-4">
+            @csrf
+            <input type="hidden" name="type" value="category">
+            <div class="flex gap-2">
+                <input type="text" name="value" placeholder="New Category" class="border rounded px-2 py-1 flex-grow" required>
+                <button type="submit" class="bg-indigo-500 text-white px-3 py-1 rounded">Add</button>
+            </div>
+        </form>
+        <ul class="max-h-40 overflow-y-auto">
+            @foreach($categories as $cat)
+            <li class="flex justify-between py-1 border-b">
+                <span>{{ $cat->value }}</span>
+                <form action="{{ route('product-attributes.destroy', $cat->id) }}" method="POST" onsubmit="return confirm('Delete? Products with this category will be set to null.');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-red-500"><i class="fas fa-trash"></i></button>
+                </form>
+            </li>
+            @endforeach
+        </ul>
+        <button onclick="document.getElementById('categoryModal').classList.add('hidden')" class="mt-4 text-gray-500">Close</button>
+    </div>
+</div>
+
+{{-- Form Modal --}}
+<div id="formModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Manage Forms</h3>
+        <form action="{{ route('product-attributes.store') }}" method="POST" class="mb-4">
+            @csrf
+            <input type="hidden" name="type" value="form">
+            <div class="flex gap-2">
+                <input type="text" name="value" placeholder="New Form" class="border rounded px-2 py-1 flex-grow" required>
+                <button type="submit" class="bg-pink-500 text-white px-3 py-1 rounded">Add</button>
+            </div>
+        </form>
+        <ul class="max-h-40 overflow-y-auto">
+            @foreach($forms as $f)
+            <li class="flex justify-between py-1 border-b">
+                <span>{{ $f->value }}</span>
+                <form action="{{ route('product-attributes.destroy', $f->id) }}" method="POST" onsubmit="return confirm('Delete?');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-red-500"><i class="fas fa-trash"></i></button>
+                </form>
+            </li>
+            @endforeach
+        </ul>
+        <button onclick="document.getElementById('formModal').classList.add('hidden')" class="mt-4 text-gray-500">Close</button>
+    </div>
+</div>
+
+{{-- RM Type Modal --}}
+<div id="rmTypeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Manage RM Types</h3>
+        <form action="{{ route('product-attributes.store') }}" method="POST" class="mb-4">
+            @csrf
+            <input type="hidden" name="type" value="rm_type">
+            <div class="flex gap-2">
+                <input type="text" name="value" placeholder="New RM Type" class="border rounded px-2 py-1 flex-grow" required>
+                <button type="submit" class="bg-teal-500 text-white px-3 py-1 rounded">Add</button>
+            </div>
+        </form>
+        <ul class="max-h-40 overflow-y-auto">
+            @foreach($rmTypes as $rm)
+            <li class="flex justify-between py-1 border-b">
+                <span>{{ $rm->value }}</span>
+                <form action="{{ route('product-attributes.destroy', $rm->id) }}" method="POST" onsubmit="return confirm('Delete?');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-red-500"><i class="fas fa-trash"></i></button>
+                </form>
+            </li>
+            @endforeach
+        </ul>
+        <button onclick="document.getElementById('rmTypeModal').classList.add('hidden')" class="mt-4 text-gray-500">Close</button>
+    </div>
+</div>
+
+{{-- Pack Name Modal --}}
+<div id="packNameModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-bold mb-4">Manage Pack Names</h3>
+        <form action="{{ route('product-attributes.store') }}" method="POST" class="mb-4">
+            @csrf
+            <input type="hidden" name="type" value="pack_name">
+            <div class="flex gap-2">
+                <input type="text" name="value" placeholder="New Pack Name" class="border rounded px-2 py-1 flex-grow" required>
+                <button type="submit" class="bg-orange-500 text-white px-3 py-1 rounded">Add</button>
+            </div>
+        </form>
+        <ul class="max-h-40 overflow-y-auto">
+            @foreach($packNames as $pack)
+            <li class="flex justify-between py-1 border-b">
+                <span>{{ $pack->value }}</span>
+                <form action="{{ route('product-attributes.destroy', $pack->id) }}" method="POST" onsubmit="return confirm('Delete?');">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-red-500"><i class="fas fa-trash"></i></button>
+                </form>
+            </li>
+            @endforeach
+        </ul>
+        <button onclick="document.getElementById('packNameModal').classList.add('hidden')" class="mt-4 text-gray-500">Close</button>
+    </div>
+</div>
+
+<script>
+    function toggleSelectAll() {
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        const selectAll = document.getElementById('selectAll');
+        checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        updateBulkBtn();
+    }
+
+    function updateBulkBtn() {
+        const checked = document.querySelectorAll('.product-checkbox:checked').length;
+        const btn = document.getElementById('bulkDeleteBtn');
+        btn.disabled = checked === 0;
+    }
+
+    function submitBulkDelete() {
+        document.getElementById('bulkDeleteForm').submit();
+    }
+
+    function editProduct(btn) {
+        const product = JSON.parse(btn.getAttribute('data-product'));
+        
+        document.getElementById('productModal').classList.remove('hidden');
+        document.getElementById('modalTitle').innerText = 'Edit Product';
+        
+        // Update Form Action
+        let form = document.getElementById('productForm');
+        form.action = `{{ url('products') }}/${product.id}`;
+        document.getElementById('methodField').value = 'PUT';
+
+        // Populate fields
+        document.getElementById('name').value = product.name;
+        document.getElementById('group_id').value = product.group_id || '';
+        document.getElementById('product_type_id').value = product.product_type_id;
+        document.getElementById('uom').value = product.uom;
+        document.getElementById('price').value = product.price;
+        document.getElementById('low_alert_quantity').value = product.low_alert_quantity;
+        
+        // New Fields
+        document.getElementById('item_code').value = product.item_code || '';
+        document.getElementById('category').value = product.category || '';
+        document.getElementById('form').value = product.form || '';
+        document.getElementById('technical_name').value = product.technical_name || '';
+        document.getElementById('rm_type').value = product.rm_type || '';
+        document.getElementById('pack_name').value = product.pack_name || '';
+        document.getElementById('unit_box').value = product.unit_box || '';
+        document.getElementById('weight_unit').value = product.weight_unit || '';
+        document.getElementById('weight_in').value = product.weight_in || '';
+    }
+
+    function resetForm() {
+        let form = document.getElementById('productForm');
+        form.action = "{{ route('products.store') }}";
+        document.getElementById('methodField').value = 'POST';
+        form.reset();
+        document.getElementById('modalTitle').innerText = 'Add Product';
+    }
+</script>
+@endsection
