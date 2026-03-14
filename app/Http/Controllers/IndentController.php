@@ -349,7 +349,7 @@ class IndentController extends Controller
 
     private function getExternalStock()
     {
-        return \Illuminate\Support\Facades\Cache::remember('external_stock_data_grouped', 300, function () {
+        return \Illuminate\Support\Facades\Cache::remember('external_stock_data_grouped', 3600, function () {
             try {
                 $response = \Illuminate\Support\Facades\Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
                     "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14", "Branch" => "ALL", "Item" => "ALL"

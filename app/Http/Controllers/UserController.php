@@ -64,7 +64,8 @@ class UserController extends Controller
             'bulk_add' => 'Bulk Add Modal',
             'branch_select' => 'Stock Location Toggle',
             'type_filter' => 'Type Filter',
-            'clone' => 'Clone Indent'
+            'clone' => 'Clone Indent',
+            'branch_reorder' => 'Reorder Branch Columns'
         ],
         'production' => [
             'history' => 'View Production History',

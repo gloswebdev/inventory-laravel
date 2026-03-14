@@ -53,7 +53,9 @@ class ReportController extends Controller
     {
         $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $types = ProductType::orderBy('type_name')->get();
-        $rmTypes = Product::whereNotNull('rm_type')->distinct()->pluck('rm_type');
+        $rmTypes = Cache::remember('distinct_rm_types', 3600, function() {
+            return Product::whereNotNull('rm_type')->where('rm_type', '!=', '')->distinct()->pluck('rm_type');
+        });
         $displayUnit = $request->get('display_unit', 'unit'); // 'unit' or 'kg'
         $perPage = $request->get('per_page', 20);
 
@@ -157,7 +159,7 @@ class ReportController extends Controller
         if ($request->get('stock_filter') === 'ignore_zero') {
             $products = $products->filter(function($product) use ($externalStock) {
                 $total = 0;
-                foreach ($this->getExternalStock() as $branchStock) {
+                foreach ($externalStock as $branchStock) {
                     $total += ($branchStock[$product->item_code] ?? 0);
                 }
                 return $total > 0;
@@ -236,7 +238,7 @@ class ReportController extends Controller
 
     private function getExternalStock()
     {
-        return Cache::remember('external_stock_data_grouped', 300, function () {
+        return Cache::remember('external_stock_data_grouped', 3600, function () {
             try {
                 $response = Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
                     "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",

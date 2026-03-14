@@ -153,21 +153,23 @@ class MobileController extends Controller implements HasMiddleware
 
         $permittedBranches = $user->getPermittedBranchCodes();
 
-        $stats = [
-            'products' => Product::count(),
-            'today_indents' => Indent::whereDate('created_at', today())->count(),
-            'pending_indents' => Indent::where('status', 'pending')->count(),
-            'total_stock' => (float)Product::sum('current_stock'),
-            'permitted_branches' => $permittedBranches,
-            'finished_goods' => Product::where('product_type_id', 1)->count(), // Assuming 1 is FG
-            'raw_materials' => Product::where('product_type_id', 2)->count(),  // Assuming 2 is RM
-            'last_production' => \App\Models\StockLedger::where('transaction_type', 'production_add')->latest()->first()?->created_at?->diffForHumans() ?? 'No records',
-            'low_stock_count' => Product::whereColumn('current_stock', '<=', 'low_alert_quantity')->count(),
-            'today_production_boxes' => \App\Models\ProductionItem::whereHas('production', function($q) use ($permittedBranches) {
-                $q->whereIn('branch_code', $permittedBranches)
-                  ->whereDate('production_date', today());
-            })->sum('quantity_box'),
-        ];
+        $stats = Cache::remember('mobile_dashboard_stats_' . $user->id, 600, function() use ($permittedBranches) {
+            return [
+                'products' => Product::count(),
+                'today_indents' => Indent::whereDate('created_at', today())->count(),
+                'pending_indents' => Indent::where('status', 'pending')->count(),
+                'total_stock' => (float)Product::sum('current_stock'),
+                'finished_goods' => Product::where('product_type_id', 1)->count(), // Assuming 1 is FG
+                'raw_materials' => Product::where('product_type_id', 2)->count(),  // Assuming 2 is RM
+                'last_production' => \App\Models\StockLedger::where('transaction_type', 'production_add')->latest()->first()?->created_at?->diffForHumans() ?? 'No records',
+                'low_stock_count' => Product::whereColumn('current_stock', '<=', 'low_alert_quantity')->count(),
+                'today_production_boxes' => \App\Models\ProductionItem::whereHas('production', function($q) use ($permittedBranches) {
+                    $q->whereIn('branch_code', $permittedBranches)
+                      ->whereDate('production_date', today());
+                })->sum('quantity_box'),
+            ];
+        });
+        $stats['permitted_branches'] = $permittedBranches;
 
         // Fetch Recent Combined Activity (Indents + Production)
         $recentIndents = Indent::whereIn('branch_code', $permittedBranches)
@@ -182,7 +184,8 @@ class MobileController extends Controller implements HasMiddleware
                     'subtitle' => $i->branch_name,
                     'time' => $i->created_at->diffForHumans(),
                     'icon' => 'fas fa-file-invoice',
-                    'color' => 'bg-blue-500'
+                    'color' => 'bg-blue-500',
+                    'raw_time' => $i->created_at
                 ];
             });
 
@@ -203,13 +206,12 @@ class MobileController extends Controller implements HasMiddleware
                     'subtitle' => $p->branch_name ?? $p->branch_code,
                     'time' => $p->created_at->diffForHumans(),
                     'icon' => 'fas fa-industry',
-                    'color' => 'bg-green-500'
+                    'color' => 'bg-green-500',
+                    'raw_time' => $p->created_at
                 ];
             });
 
-        $activities = $recentIndents->concat($recentProduction)->sortByDesc(function($a) {
-            return $a['time']; // Approximation, but works for limited items
-        })->take(5);
+        $activities = $recentIndents->concat($recentProduction)->sortByDesc('raw_time')->take(5);
 
         return view('mobile.dashboard', compact('modules', 'stats', 'activities'));
     }

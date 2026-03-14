@@ -63,6 +63,13 @@ class SettingController extends Controller
 
     public function reorder(Request $request)
     {
+        if (auth()->user()->role !== 'admin' && 
+            !auth()->user()->hasFeature('reports', 'branch_reorder') && 
+            !auth()->user()->hasFeature('indent', 'branch_reorder') &&
+            !auth()->user()->hasFeature('mobile_indents', 'branch_reorder')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $request->validate([
             'order' => 'required|array',
             'order.*' => 'required|integer', // IDs of branches in order
