@@ -45,7 +45,8 @@ class UserController extends Controller
             'display_unit' => 'Unit Toggle (KG/Units)',
             'stock_filter' => 'Zero Stock Filter',
             'search' => 'Search Bar',
-            'category_filter' => 'Type/RM Category Filters'
+            'category_filter' => 'Type/RM Category Filters',
+            'branch_reorder' => 'Reorder Branch Columns'
         ],
         'mobile_stock' => [
             'display_unit' => 'Unit Toggle (KG/Units)',
@@ -82,7 +83,8 @@ class UserController extends Controller
             'unit_toggle' => 'BOX/KG Unit Toggle',
             'clone' => 'Clone Indent',
             'delete' => 'Delete Indent',
-            'edit' => 'Edit Indent'
+            'edit' => 'Edit Indent',
+            'branch_reorder' => 'Reorder Branch Columns'
         ],
         'mobile_recipes' => [
             'view' => 'View Recipes',

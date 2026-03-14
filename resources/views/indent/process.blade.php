@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{ showCompletionModal: false }" class="min-h-screen bg-[#f8fafc] py-8">
+<div x-data="{ showCompletionModal: false, showReorderModal: false }" class="min-h-screen bg-[#f8fafc] py-8">
     <div class="max-w-[95%] mx-auto">
         <!-- Header Card -->
         <div class="bg-white rounded-[2.5rem] shadow-xl shadow-indigo-100/50 p-8 mb-8 border border-indigo-50/50 overflow-hidden relative">
@@ -22,7 +22,13 @@
                         @elseif($indent->status == 'partly completed')
                         <span class="bg-blue-500 text-white px-2 py-0.5 rounded-full text-[8px] font-black italic">PARTLY COMPLETED</span>
                         @else
-                        <span class="bg-amber-500 text-white px-2 py-0.5 rounded-full text-[8px] font-black italic uppercase">PENDING</span>
+                        <span class="bg-amber-500 text-white px-2 py-0.5 rounded-full text-[8px] font-black italic uppercase tracking-tighter shadow-sm shadow-amber-100">PENDING</span>
+                        @endif
+
+                        @if(Auth::user()->hasFeature('indent', 'branch_reorder'))
+                        <button type="button" @click="showReorderModal = true" class="ml-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-indigo-100 transition-all flex items-center gap-2 shadow-sm">
+                            <i class="fas fa-sort"></i> Reorder Columns
+                        </button>
                         @endif
                     </p>
                 </div>
@@ -209,7 +215,53 @@
             </form>
         </div>
     </div>
+
+    {{-- Reorder Branches Modal --}}
+    <div x-show="showReorderModal" 
+         class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+        
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+             @click.away="showReorderModal = false">
+            <div class="bg-indigo-600 p-8 text-white relative">
+                <h2 class="text-xl font-black italic tracking-tighter uppercase">Set Column Order</h2>
+                <p class="text-indigo-100 font-bold text-[10px] uppercase tracking-widest mt-1">Drag branches to rearrange grid columns</p>
+                <button @click="showReorderModal = false" class="absolute top-8 right-8 text-white/50 hover:text-white transition">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <div class="p-8">
+                <ul id="sortableBranches" class="space-y-3">
+                    @foreach($branches as $branch)
+                    <li data-id="{{ $branch->id }}" class="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-move hover:bg-indigo-50 hover:border-indigo-100 transition-all group">
+                        <i class="fas fa-grip-lines text-gray-300 group-hover:text-indigo-300"></i>
+                        <span class="text-sm font-bold text-gray-700 italic">{{ $branch->name }}</span>
+                        <span class="ml-auto text-[9px] font-black text-gray-400 uppercase tracking-widest">{{ $branch->code }}</span>
+                    </li>
+                    @endforeach
+                </ul>
+
+                <div class="mt-8 flex gap-4">
+                    <button type="button" onclick="saveNewOrder()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 uppercase">
+                        Confirm Arrangement
+                    </button>
+                    <button type="button" @click="showReorderModal = false" class="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black italic tracking-tighter hover:bg-gray-200 transition uppercase">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
     .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
@@ -236,6 +288,43 @@
             inputs.forEach(input => {
                 input.value = 0;
             });
+        }
+    }
+
+    // Initialize Sortable
+    document.addEventListener('DOMContentLoaded', function() {
+        const el = document.getElementById('sortableBranches');
+        if (el) {
+            new Sortable(el, {
+                animation: 150,
+                ghostClass: 'bg-indigo-50'
+            });
+        }
+    });
+
+    async function saveNewOrder() {
+        const list = document.getElementById('sortableBranches');
+        const items = list.querySelectorAll('li');
+        const order = Array.from(items).map(item => item.dataset.id);
+
+        try {
+            const response = await fetch("{{ route('settings.branches.reorder') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ order })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error updating order');
+            }
+        } catch (e) {
+            alert('System error. Please try again.');
         }
     }
 </script>

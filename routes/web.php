@@ -102,6 +102,11 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::delete('settings/branches/{branch}', [App\Http\Controllers\SettingController::class, 'deleteBranch'])->name('settings.branches.destroy');
 });
 
+// Shared Settings (Accessible by both interfaces)
+Route::middleware(['auth'])->group(function() {
+    Route::post('settings/branches/reorder', [App\Http\Controllers\SettingController::class, 'reorder'])->name('settings.branches.reorder');
+});
+
 // Mobile PWA Interface
 // Indent Shared API (Accessible by both Mobile & Desktop)
 Route::prefix('indent-api')->middleware(['auth'])->group(function() {

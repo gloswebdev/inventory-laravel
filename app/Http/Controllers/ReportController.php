@@ -51,7 +51,7 @@ class ReportController extends Controller
 
     public function liveStock(Request $request)
     {
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $types = ProductType::orderBy('type_name')->get();
         $rmTypes = Product::whereNotNull('rm_type')->distinct()->pluck('rm_type');
         $displayUnit = $request->get('display_unit', 'unit'); // 'unit' or 'kg'
@@ -132,7 +132,7 @@ class ReportController extends Controller
 
         $displayUnit = $request->get('display_unit', 'unit');
         $externalStock = $this->getExternalStock();
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
 
         $query = Product::with('type')->orderBy('name');
         
@@ -178,7 +178,7 @@ class ReportController extends Controller
 
         $displayUnit = $request->get('display_unit', 'unit');
         $externalStock = $this->getExternalStock();
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
 
         $query = Product::with('type')->orderBy('name');
 

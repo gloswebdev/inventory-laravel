@@ -202,7 +202,7 @@ class IndentController extends Controller
     public function process(Indent $indent)
     {
         $indent->load('items.product', 'user');
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         return view('indent.process', compact('indent', 'branches', 'branchStocks'));
@@ -219,7 +219,7 @@ class IndentController extends Controller
         if ($request->filled('status')) $query->where('status', $request->status);
 
         $history = $query->orderByDesc('created_at')->get();
-        $branches = Branch::orderBy('name')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $users = \App\Models\User::orderBy('name')->get();
 
         return view('indent.list', compact('history', 'branches', 'users'));
@@ -228,7 +228,7 @@ class IndentController extends Controller
     public function exportProcessExcel(Indent $indent)
     {
         $indent->load('items.product', 'user');
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         return \Maatwebsite\Excel\Facades\Excel::download(

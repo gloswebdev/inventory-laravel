@@ -79,18 +79,99 @@
         </form>
     </div>
 
-    <div class="flex justify-end gap-2 mb-4">
-        @if(Auth::user()->hasPermission('reports', 'excel'))
-        <a href="{{ route('reports.live-stock.excel', request()->query()) }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
-            <i class="fas fa-file-excel mr-2"></i> EXCEL
-        </a>
-        @endif
-        @if(Auth::user()->hasPermission('reports', 'pdf'))
-        <a href="{{ route('reports.live-stock.pdf', request()->query()) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
-            <i class="fas fa-file-pdf mr-2"></i> PDF
-        </a>
-        @endif
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            @if(Auth::user()->hasFeature('reports', 'branch_reorder'))
+            <button type="button" onclick="openReorderModal()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold py-2 px-4 rounded shadow-sm text-sm flex items-center">
+                <i class="fas fa-sort mr-2"></i> Reorder Branches
+            </button>
+            @endif
+        </div>
+        <div class="flex gap-2">
+            @if(Auth::user()->hasPermission('reports', 'excel'))
+            <a href="{{ route('reports.live-stock.excel', request()->query()) }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
+                <i class="fas fa-file-excel mr-2"></i> EXCEL
+            </a>
+            @endif
+            @if(Auth::user()->hasPermission('reports', 'pdf'))
+            <a href="{{ route('reports.live-stock.pdf', request()->query()) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
+                <i class="fas fa-file-pdf mr-2"></i> PDF
+            </a>
+            @endif
+        </div>
     </div>
+
+    {{-- Reorder Modal --}}
+    <div id="reorderModal" class="fixed inset-0 bg-black bg-opacity-50 z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-lg font-black text-gray-800 uppercase tracking-tighter">Set Branch Order</h3>
+                <button onclick="closeReorderModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6">
+                <p class="text-xs text-gray-500 mb-4 italic">Drag and drop branches to change their display order in reports.</p>
+                <ul id="sortableBranches" class="space-y-2">
+                    @foreach($branches as $branch)
+                    <li data-id="{{ $branch->id }}" class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-move hover:bg-indigo-50 hover:border-indigo-100 transition-all group">
+                        <i class="fas fa-grip-lines text-gray-300 group-hover:text-indigo-300"></i>
+                        <span class="text-sm font-bold text-gray-700">{{ $branch->name }}</span>
+                        <span class="ml-auto text-[10px] font-black text-gray-300 uppercase">{{ $branch->code }}</span>
+                    </li>
+                    @endforeach
+                </ul>
+                <div class="mt-8 flex gap-3">
+                    <button onclick="saveNewOrder()" class="flex-grow bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-100 text-sm uppercase tracking-widest italic">
+                        Confirm & Update
+                    </button>
+                    <button onclick="closeReorderModal()" class="px-6 py-4 bg-gray-100 text-gray-500 font-bold rounded-xl text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>
+        function openReorderModal() {
+            document.getElementById('reorderModal').classList.remove('hidden');
+            document.getElementById('reorderModal').classList.add('flex');
+            
+            new Sortable(document.getElementById('sortableBranches'), {
+                animation: 150,
+                ghostClass: 'bg-indigo-100'
+            });
+        }
+
+        function closeReorderModal() {
+            document.getElementById('reorderModal').classList.add('hidden');
+            document.getElementById('reorderModal').classList.remove('flex');
+        }
+
+        async function saveNewOrder() {
+            const list = document.getElementById('sortableBranches');
+            const items = list.querySelectorAll('li');
+            const order = Array.from(items).map(item => item.dataset.id);
+
+            try {
+                const response = await fetch("{{ route('settings.branches.reorder') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ order })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error updating order');
+                }
+            } catch (e) {
+                alert('System error. Please try again.');
+            }
+        }
+    </script>
 
     <div class="overflow-x-auto">
         <table class="min-w-full bg-white border border-gray-300">

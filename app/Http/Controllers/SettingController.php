@@ -61,6 +61,20 @@ class SettingController extends Controller
         return redirect()->back()->with('success', 'Branch added successfully!');
     }
 
+    public function reorder(Request $request)
+    {
+        $request->validate([
+            'order' => 'required|array',
+            'order.*' => 'required|integer', // IDs of branches in order
+        ]);
+
+        foreach ($request->order as $index => $branchId) {
+            Branch::where('id', $branchId)->update(['sort_order' => $index]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     public function deleteBranch(Branch $branch)
     {
         $branch->delete();

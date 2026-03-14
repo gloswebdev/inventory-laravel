@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Branch extends Model
 {
-    protected $fillable = ['code', 'name'];
+    protected $fillable = ['code', 'name', 'sort_order'];
 
     public function users(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {

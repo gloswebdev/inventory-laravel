@@ -19,7 +19,7 @@ class PlanningController extends Controller
         $this->applyTypeFilters($productsQuery);
         $finishedGoods = $productsQuery->get();
         
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
 
         // Fetch Indents for "Plan by Indent" feature
@@ -154,7 +154,7 @@ class PlanningController extends Controller
 
     private function getExternalStock()
     {
-        return \Illuminate\Support\Facades\Cache::remember('external_stock_data_grouped', 300, function () {
+        return Cache::remember('external_stock_data_grouped', 3600, function () {
             try {
                 $response = \Illuminate\Support\Facades\Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
                     "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",

@@ -105,16 +105,16 @@
                         <i class="fas fa-box-open text-xs"></i>
                     </div>
                     <div>
-                        <div class="text-[11px] font-900 text-slate-800 truncate max-w-[150px] uppercase tracking-tighter">{{ $item->product ? $item->product->name : 'Unknown' }}</div>
+                        <div class="text-[11px] font-900 text-slate-800 truncate max-w-[150px] uppercase tracking-tighter">{{ $item->product_name ?? ($item->product ? $item->product->name : 'Unknown') }}</div>
                         <div class="flex items-center gap-2 mt-1">
-                            <span class="text-[8px] font-black text-indigo-400 uppercase">{{ $item->branch_code }}</span>
+                            <span class="text-[8px] font-black text-indigo-400 uppercase">{{ $item->production->branch_code ?? 'N/A' }}</span>
                             <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
                             <span class="text-[8px] text-slate-400 font-bold">{{ $item->created_at->diffForHumans() }}</span>
                         </div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm font-900 text-slate-800 tracking-tighter">+{{ number_format($item->quantity, 2) }}</div>
+                    <div class="text-sm font-900 text-slate-800 tracking-tighter">+{{ number_format($item->quantity_box, 2) }}</div>
                     <div class="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Yield Posted</div>
                 </div>
             </div>

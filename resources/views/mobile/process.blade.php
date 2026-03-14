@@ -9,9 +9,16 @@
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">
                 Ref: #IND-{{ $indent->id }} • {{ $indent->branch_name }}
             </p>
-            <p class="text-[8px] font-black text-indigo-500 uppercase tracking-widest mt-1">
-                <i class="fas fa-user-circle mr-1"></i> BY: {{ $indent->user->name ?? 'SYSTEM' }}
-            </p>
+            <div class="flex items-center gap-2 mt-2">
+                <p class="text-[8px] font-black text-indigo-500 uppercase tracking-widest">
+                    <i class="fas fa-user-circle mr-1 text-[7px]"></i> BY: {{ $indent->user->name ?? 'SYSTEM' }}
+                </p>
+                @if(Auth::user()->hasFeature('mobile_indents', 'branch_reorder'))
+                <button @click="showReorderModal = true" class="px-3 py-1 bg-white/60 border border-slate-100 rounded-full text-[7px] font-black uppercase tracking-widest text-indigo-500 shadow-sm active:scale-95 transition-all">
+                    <i class="fas fa-sort mr-1"></i> Reorder
+                </button>
+                @endif
+            </div>
         </div>
         <div class="flex flex-col items-end gap-3">
             <div class="flex items-center gap-2">
@@ -62,7 +69,10 @@
                         <th class="px-6 py-4 text-[9px] font-black text-green-500 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">Stock at<br>Entry</th>
                         <th class="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-slate-50 whitespace-nowrap text-center">Indent<br>Box</th>
                         @foreach($branches as $branch)
-                        <th class="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">{{ $branch->code }}</th>
+                        <th class="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">
+                            {{ $branch->code }}<br>
+                            <span class="text-[7px] text-indigo-300 lowercase italic">{{ $branch->name }}</span>
+                        </th>
                         @endforeach
                     </tr>
                 </thead>
@@ -155,6 +165,19 @@
         </button>
     </div>
 
+    <!-- Quick Info -->
+    <div class="grad-cyan p-0.5 rounded-[2.5rem] opacity-80">
+        <div class="bg-white/90 backdrop-blur-sm p-6 rounded-[2.4rem] flex items-start gap-5">
+            <div class="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center text-cyan-600 shrink-0 border border-cyan-100 shadow-inner">
+                <i class="fas fa-wand-magic-sparkles"></i>
+            </div>
+            <div>
+                <h4 class="text-[11px] font-900 text-slate-700 uppercase tracking-tighter italic">Automatic Sync</h4>
+                <p class="text-[10px] text-slate-500 leading-relaxed mt-1 font-bold">Yield submission triggers real-time stock deduction for raw materials based on the master recipe profile.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Alert Box -->
     <div class="grad-emerald p-0.5 rounded-[2.5rem] opacity-90 shadow-lg shadow-emerald-50">
         <div class="bg-white/95 backdrop-blur-md p-6 rounded-[2.4rem] flex items-start gap-5">
@@ -164,6 +187,46 @@
             <div>
                 <h4 class="text-[11px] font-900 text-slate-700 uppercase tracking-tighter italic leading-none">Status Intelligence</h4>
                 <p class="text-[10px] text-slate-500 leading-relaxed mt-2 font-bold">Registering fulfillments will dynamically update the indent status to 'Partial' or 'Completed' based on quantity parity.</p>
+            </div>
+        </div>
+    </div>
+
+    {{-- Reorder Branches Modal --}}
+    <div x-show="showReorderModal" 
+         class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md"
+         x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-on:show-reorder="..."
+         x-init="$watch('showReorderModal', value => { if(value) initMobileSortable() })"
+    >
+        <div class="bg-white w-full rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]" @click.away="showReorderModal = false">
+            <div class="grad-indigo p-8 text-white relative">
+                <h2 class="text-xl font-900 italic tracking-tighter uppercase">Set Column Order</h2>
+                <p class="text-indigo-100 font-bold text-[9px] uppercase tracking-widest mt-1">Drag branches to rearrange grid</p>
+                <button @click="showReorderModal = false" class="absolute top-8 right-8 text-white/50">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-8 overflow-y-auto flex-1 custom-scrollbar">
+                <ul id="mobileSortableBranches" class="space-y-3">
+                    @foreach($branches as $branch)
+                    <li data-id="{{ $branch->id }}" class="flex items-center gap-4 p-5 bg-slate-50 rounded-[1.5rem] border border-slate-100 cursor-move active:bg-indigo-50 transition-all">
+                        <i class="fas fa-grip-lines text-slate-300"></i>
+                        <span class="text-sm font-bold text-slate-700 uppercase tracking-tighter italic">{{ $branch->name }}</span>
+                        <span class="ml-auto text-[8px] font-black text-slate-300 uppercase">{{ $branch->code }}</span>
+                    </li>
+                    @endforeach
+                </ul>
+            </div>
+
+            <div class="p-8 border-t border-slate-50 flex gap-3">
+                <button onclick="saveMobileOrder()" class="flex-1 grad-indigo p-4 rounded-[1.5rem] text-white font-900 italic text-sm uppercase tracking-widest shadow-lg shadow-indigo-100">
+                    Update Order
+                </button>
+                <button @click="showReorderModal = false" class="px-6 py-4 bg-slate-50 text-slate-400 font-bold rounded-[1.5rem] text-xs">Close</button>
             </div>
         </div>
     </div>
@@ -196,6 +259,7 @@
     function processApp() {
         return {
             loading: false,
+            showReorderModal: false,
             form: {
                 completed_qty: {
                     @foreach($indent->items as $item)
@@ -232,6 +296,57 @@
                     this.loading = false;
                 }
             }
+        }
+    }
+
+    // Mobile specific sortable init
+    let mobileSortable = null;
+    function initMobileSortable() {
+        setTimeout(() => {
+            const el = document.getElementById('mobileSortableBranches');
+            if (el && !mobileSortable) {
+                mobileSortable = new Sortable(el, {
+                    animation: 200,
+                    ghostClass: 'opacity-50',
+                    delay: 50, // Slight delay to prevent accidental drags during scroll
+                    delayOnTouchOnly: true,
+                    touchStartThreshold: 5,
+                    fallbackTolerance: 3
+                });
+            }
+        }, 100);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fallback init
+        if (window.Alpine && window.Alpine.store('reorderModal')) {
+            // ...
+        }
+    });
+
+    async function saveMobileOrder() {
+        const list = document.getElementById('mobileSortableBranches');
+        const items = list.querySelectorAll('li');
+        const order = Array.from(items).map(item => item.dataset.id);
+
+        try {
+            const response = await fetch("{{ route('settings.branches.reorder') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ order })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Connection glitch. Try again.');
+            }
+        } catch (e) {
+            alert('Cloud sync failed.');
         }
     }
 </script>

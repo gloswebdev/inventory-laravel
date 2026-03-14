@@ -259,7 +259,7 @@ class MobileController extends Controller implements HasMiddleware
         $paginatedProducts = $productsQuery->paginate(20);
         $products = $paginatedProducts->items();
         
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $selectedBranch = $request->get('branch');
         
         // If selected branch is not in permitted list, reset it
@@ -491,11 +491,12 @@ class MobileController extends Controller implements HasMiddleware
         }
 
         $products = $productsQuery->get();
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         
-        $history = \App\Models\StockLedger::where('type', 'production')
-            ->whereIn('branch_code', $permittedCodes)
-            ->with(['product', 'user'])
+        $history = \App\Models\ProductionItem::whereHas('production', function($q) use ($permittedCodes) {
+                $q->whereIn('branch_code', $permittedCodes);
+            })
+            ->with(['product', 'production'])
             ->orderByDesc('created_at')
             ->limit(10)
             ->get();
@@ -527,7 +528,7 @@ class MobileController extends Controller implements HasMiddleware
         }
         
         $products = $productsQuery->get();
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $types = \App\Models\ProductType::orderBy('type_name')->get();
 
         // Fetch recent indents for "Plan by Indent" feature
@@ -693,7 +694,7 @@ class MobileController extends Controller implements HasMiddleware
         }
         
         $products = $productsQuery->get();
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $users = \App\Models\User::orderBy('name')->get(); // For filtering
 
         return view('mobile.indents', compact('indents', 'products', 'branches', 'users'));
@@ -816,7 +817,7 @@ class MobileController extends Controller implements HasMiddleware
         $permittedCodes = $user->getPermittedBranchCodes();
         
         $indent->load('items.product', 'user');
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         return view('mobile.process', compact('indent', 'branches', 'branchStocks'));
@@ -852,7 +853,7 @@ class MobileController extends Controller implements HasMiddleware
         $permittedCodes = $user->getPermittedBranchCodes();
         
         $indent->load('items.product', 'user');
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -870,7 +871,7 @@ class MobileController extends Controller implements HasMiddleware
         $permittedCodes = $user->getPermittedBranchCodes();
         
         $indent->load('items.product', 'user');
-        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         $pdf = Pdf::loadView('planning.process_pdf', compact('indent', 'branches', 'branchStocks'))
@@ -940,7 +941,7 @@ class MobileController extends Controller implements HasMiddleware
      */
     private function getExternalStock()
     {
-        return Cache::remember('external_stock_data_grouped', 300, function () {
+        return Cache::remember('external_stock_data_grouped', 3600, function () {
             try {
                 $response = Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
                     "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",
