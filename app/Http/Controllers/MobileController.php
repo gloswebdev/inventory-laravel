@@ -302,12 +302,26 @@ class MobileController extends Controller implements HasMiddleware
             $unitPerBox = (float)($product->unit_box ?: 1);
             $weightPerUnit = (float)($product->weight_unit ?: 1);
             
+            // Convert to display unit
+            $unitPerBox = (float)($product->unit_box ?: 1);
+            
+            $branchBreakdown = [];
+            foreach ($branches as $branch) {
+                $bQty = $externalStock[$branch->code][$product->item_code] ?? 0;
+                if ($displayUnit === 'kg') {
+                    $branchBreakdown[$branch->code] = $bQty * $product->weight_multiplier;
+                } else {
+                    $branchBreakdown[$branch->code] = $bQty / $unitPerBox;
+                }
+            }
+            
             if ($displayUnit === 'kg') {
                 $stocks[$product->id] = $qty * $product->weight_multiplier;
             } else {
                 $stocks[$product->id] = $qty / $unitPerBox;
             }
             
+            $product->branch_stocks = $branchBreakdown;
             $filteredProducts[] = $product;
         }
 

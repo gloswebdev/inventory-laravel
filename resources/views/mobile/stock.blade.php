@@ -136,28 +136,46 @@
     <div class="glass-premium overflow-hidden rounded-[2.5rem] border border-white/50">
         <div class="divide-y divide-slate-100">
             <template x-for="product in products" :key="product.id">
-                <div class="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-all active:scale-[0.98]">
-                    <div class="flex-1 min-w-0 pr-4">
-                        <div class="text-[13px] font-900 text-slate-800 truncate uppercase tracking-tight" x-text="product.name"></div>
-                        <div class="flex items-center gap-2 mt-1.5">
-                            <div class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[8px] font-black uppercase tracking-widest" x-text="product.pack_name"></div>
-                            <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
-                            <div class="text-[9px] font-black text-indigo-400 uppercase tracking-widest" x-text="product.item_code"></div>
+                <div class="group flex flex-col hover:bg-slate-50/50 transition-all">
+                    <div class="p-6 flex items-center justify-between active:scale-[0.98]">
+                        <div class="flex-1 min-w-0 pr-4">
+                            <div class="text-[13px] font-900 text-slate-800 truncate uppercase tracking-tight" x-text="product.name"></div>
+                            <div class="flex items-center gap-2 mt-1.5">
+                                <div class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[8px] font-black uppercase tracking-widest" x-text="product.pack_name"></div>
+                                <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                <div class="text-[9px] font-black text-indigo-400 uppercase tracking-widest" x-text="product.item_code"></div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <template x-if="displayUnit === 'kg'">
+                                <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity * (product.weight_multiplier || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
+                            </template>
+                            <template x-if="displayUnit !== 'kg'">
+                                <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity / (product.unit_box || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
+                            </template>
+                            <div class="text-[8px] font-black uppercase tracking-[0.1em] mt-0.5" :class="stocks[product.id] <= 0 ? 'text-slate-300' : 'text-indigo-500'" x-text="displayUnit === 'kg' ? (product.uom === 'Ltr' ? 'Units (LTR)' : 'Units (KG)') : 'Boxes'"></div>
                         </div>
                     </div>
-                    <div class="text-right shrink-0">
-                        @php
-                            // Note: In mobile, displayUnit affects what is stored in 'stocks'
-                            // We'll calculate the limit check in Alpine.js
-                        @endphp
-                        <template x-if="displayUnit === 'kg'">
-                            <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity * (product.weight_multiplier || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
-                        </template>
-                        <template x-if="displayUnit !== 'kg'">
-                            <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity / (product.unit_box || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
-                        </template>
-                        <div class="text-[8px] font-black uppercase tracking-[0.1em] mt-0.5" :class="stocks[product.id] <= 0 ? 'text-slate-300' : 'text-indigo-500'" x-text="displayUnit === 'kg' ? (product.uom === 'Ltr' ? 'Units (LTR)' : 'Units (KG)') : 'Boxes'"></div>
-                    </div>
+                    
+                    <!-- Branch Breakdown (Only for Global View) -->
+                    <template x-if="!selectedBranch && product.branch_stocks">
+                        <div class="px-6 pb-6 pt-0">
+                            <div class="bg-white/40 rounded-2xl p-4 border border-slate-100/50">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i class="fas fa-map-marker-alt text-[8px] text-slate-300"></i>
+                                    <span class="text-[7px] font-black uppercase tracking-[0.2em] text-slate-400">Branch Distribution</span>
+                                </div>
+                                <div class="flex overflow-x-auto gap-3 pb-2 custom-scrollbar">
+                                    <template x-for="branch in branches" :key="branch.code">
+                                        <div class="shrink-0 flex flex-col gap-1 bg-slate-50/50 px-3 py-2 rounded-xl border border-slate-100 min-w-[70px]">
+                                            <div class="text-[7px] font-black text-slate-400 uppercase tracking-tighter truncate w-16" x-text="branch.name"></div>
+                                            <div class="text-[10px] font-900 text-slate-700" x-text="product.branch_stocks[branch.code] > 0 ? (Number.isInteger(product.branch_stocks[branch.code]) ? product.branch_stocks[branch.code] : parseFloat(product.branch_stocks[branch.code]).toFixed(1)) : '-'"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </template>
             
@@ -204,6 +222,7 @@
             rmType: '{{ request('rm_type') }}',
             products: @json($products),
             stocks: @json($stocks),
+            branches: @json($branches),
             hasMore: @json($hasMore),
             nextPage: 2,
             loading: false,
