@@ -88,6 +88,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
         Route::post('/show/{indent}/complete', [App\Http\Controllers\IndentController::class, 'updateCompletion'])->name('complete');
     });
 
+
     // Reports
     Route::get('reports/stock-ledger', [ReportController::class, 'stockLedger'])->name('reports.stock-ledger');
     Route::get('reports/live-stock', [ReportController::class, 'liveStock'])->name('reports.live-stock');
@@ -102,6 +103,14 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
 });
 
 // Mobile PWA Interface
+// Indent Shared API (Accessible by both Mobile & Desktop)
+Route::prefix('indent-api')->middleware(['auth'])->group(function() {
+    Route::get('/show/{indent}', [App\Http\Controllers\IndentController::class, 'show'])->name('indent.api.show');
+    Route::delete('/show/{indent}', [App\Http\Controllers\IndentController::class, 'destroy'])->name('indent.api.destroy');
+    Route::post('/show/{indent}/clone', [App\Http\Controllers\IndentController::class, 'clone'])->name('indent.api.clone');
+    Route::post('/show/{indent}/update', [App\Http\Controllers\IndentController::class, 'update'])->name('indent.api.update');
+});
+
 Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(function () {
     Route::get('/', [App\Http\Controllers\MobileController::class, 'index'])->name('mobile.dashboard');
     Route::get('/stock', [App\Http\Controllers\MobileController::class, 'stock'])->name('mobile.stock');
@@ -113,6 +122,7 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::post('/indents-store', [App\Http\Controllers\MobileController::class, 'storeIndent'])->name('mobile.indents.store');
     Route::post('/fg-stock', [App\Http\Controllers\MobileController::class, 'getFGStock'])->name('mobile.fg-stock');
     Route::get('/indent/show/{indent}', [App\Http\Controllers\IndentController::class, 'show'])->name('mobile.indent.show');
+    Route::get('/indents/{indent}/print', [App\Http\Controllers\IndentController::class, 'print'])->name('mobile.indents.print');
     Route::get('/indents/{indent}/process', [App\Http\Controllers\MobileController::class, 'process'])->name('mobile.indents.process');
     Route::post('/indents/{indent}/completion', [App\Http\Controllers\MobileController::class, 'updateCompletion'])->name('mobile.indents.completion');
     Route::get('/indents/{indent}/excel', [App\Http\Controllers\MobileController::class, 'exportExcel'])->name('mobile.indents.excel');
@@ -121,6 +131,36 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/indents/{indent}/process/pdf', [App\Http\Controllers\MobileController::class, 'exportProcessPdf'])->name('mobile.indents.process.pdf');
     Route::get('/stock/excel', [App\Http\Controllers\MobileController::class, 'exportStockExcel'])->name('mobile.stock.excel');
     Route::get('/stock/pdf', [App\Http\Controllers\MobileController::class, 'exportStockPdf'])->name('mobile.stock.pdf');
+    // Recipes
+    Route::get('/recipes', [App\Http\Controllers\MobileController::class, 'recipes'])->name('mobile.recipes');
+    Route::get('/recipes/{recipe}', [App\Http\Controllers\MobileController::class, 'showRecipe'])->name('mobile.recipes.show');
+    Route::post('/recipes-store', [App\Http\Controllers\MobileController::class, 'storeRecipe'])->name('mobile.recipes.store');
+    Route::post('/recipes/{recipe}/update', [App\Http\Controllers\MobileController::class, 'updateRecipe'])->name('mobile.recipes.update');
+    Route::delete('/recipes/{recipe}', [App\Http\Controllers\MobileController::class, 'deleteRecipe'])->name('mobile.recipes.destroy');
+    // Adjustments
+    Route::get('/adjustments', [App\Http\Controllers\MobileController::class, 'adjustments'])->name('mobile.adjustments');
+    Route::post('/adjustments', [App\Http\Controllers\MobileController::class, 'storeAdjustment'])->name('mobile.adjustments.store');
+    // Ledger
+    Route::get('/ledger', [App\Http\Controllers\MobileController::class, 'ledger'])->name('mobile.ledger');
+    // Product Master
+    Route::get('/products', [App\Http\Controllers\MobileController::class, 'products'])->name('mobile.products');
+    Route::post('/products', [App\Http\Controllers\MobileController::class, 'storeProduct'])->name('mobile.products.store');
+    Route::post('/products/{product}/update', [App\Http\Controllers\MobileController::class, 'updateProduct'])->name('mobile.products.update');
+    Route::get('/products-sync', [App\Http\Controllers\MobileController::class, 'syncProducts'])->name('mobile.products.sync');
+    // User Management
+    Route::get('/users', [App\Http\Controllers\MobileController::class, 'users'])->name('mobile.users');
+    Route::post('/users', [App\Http\Controllers\MobileController::class, 'storeUser'])->name('mobile.users.store');
+    Route::post('/users/{user}/permissions', [App\Http\Controllers\MobileController::class, 'updateUserPermissions'])->name('mobile.users.permissions');
+    // Settings & Master
+    Route::get('/settings', [App\Http\Controllers\MobileController::class, 'settings'])->name('mobile.settings');
+    Route::post('/settings/branch', [App\Http\Controllers\MobileController::class, 'storeBranch'])->name('mobile.settings.branch.store');
+    Route::delete('/settings/branch/{branch}', [App\Http\Controllers\MobileController::class, 'deleteBranch'])->name('mobile.settings.branch.delete');
+    Route::get('/settings/product-types', [App\Http\Controllers\MobileController::class, 'productTypes'])->name('mobile.settings.product-types');
+    Route::post('/settings/product-types', [App\Http\Controllers\MobileController::class, 'storeProductType'])->name('mobile.settings.product-types.store');
+    Route::get('/settings/product-groups', [App\Http\Controllers\MobileController::class, 'productGroups'])->name('mobile.settings.product-groups');
+    Route::post('/settings/product-groups', [App\Http\Controllers\MobileController::class, 'storeProductGroup'])->name('mobile.settings.product-groups.store');
+    // Export Planning (MRP)
+    Route::post('/planning/export', [App\Http\Controllers\MobileController::class, 'exportPlanning'])->name('mobile.planning.pdf');
 });
 
 require __DIR__.'/auth.php';

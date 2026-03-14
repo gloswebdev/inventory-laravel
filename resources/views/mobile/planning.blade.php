@@ -13,15 +13,26 @@
                 <i class="fas fa-file-invoice text-xs"></i>
                 <span class="text-[9px] font-black uppercase tracking-widest">Plan by Indent</span>
             </button>
-            <button @click="resetForm" class="w-11 h-11 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 border border-rose-100/50 transition-all active:scale-90 shadow-sm">
+        <div class="flex items-center gap-2">
+            <template x-if="results.length > 0">
+                <form action="{{ route('mobile.planning.pdf') }}" method="POST" target="_blank">
+                    @csrf
+                    <input type="hidden" name="data" :value="JSON.stringify(form.products)">
+                    <button type="submit" class="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg active:scale-95">
+                        <i class="fas fa-file-pdf text-xs"></i>
+                    </button>
+                </form>
+            </template>
+            <button @click="resetForm" class="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-100 transition-all active:scale-90 shadow-sm">
                 <i class="fas fa-rotate-right text-xs"></i>
             </button>
+        </div>
         </div>
     </div>
 
     <!-- Planning Form -->
     <div class="space-y-6">
-        @if(Auth::user()->hasPermission('mobile_planning', 'type_filter'))
+        @if(Auth::user()->hasFeature('mobile_planning', 'type_filter'))
         <!-- Category Filter -->
         <div class="glass-premium p-6 rounded-[2.5rem] border border-white/80">
             <div class="flex items-center gap-3 ml-1 mb-3">
@@ -100,6 +111,7 @@
             <span>Add Target Product</span>
         </button>
 
+        @if(Auth::user()->hasFeature('mobile_planning', 'branch_select'))
         <!-- Branch Selection -->
         <div class="space-y-3 pt-4 border-t border-slate-100">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Inventory Source</label>
@@ -118,6 +130,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         <button 
             @click="calculate" 

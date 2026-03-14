@@ -29,8 +29,9 @@ class PlanningController extends Controller
             ->get();
             
         $users = \App\Models\User::orderBy('name')->get();
+        $history = $indents;
 
-        return view('planning.index', compact('finishedGoods', 'branches', 'productTypes', 'indents', 'users'));
+        return view('planning.index', compact('finishedGoods', 'branches', 'productTypes', 'indents', 'users', 'history'));
     }
 
     /**

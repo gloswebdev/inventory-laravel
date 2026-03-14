@@ -29,6 +29,11 @@
 
                 <div class="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 flex items-center gap-8">
                     <div class="text-center">
+                        <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Indent ID</div>
+                        <div class="text-lg font-black text-indigo-600 italic tracking-tighter">#IND-{{ $indent->id }}</div>
+                    </div>
+                    <div class="w-px h-10 bg-indigo-200"></div>
+                    <div class="text-center">
                         <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Target Branch</div>
                         <div class="text-lg font-black text-gray-800 italic">{{ $indent->branch_name }}</div>
                     </div>

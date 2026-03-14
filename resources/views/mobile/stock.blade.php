@@ -6,21 +6,21 @@
     <div class="flex items-center justify-between">
         <div>
             <h2 class="text-3xl font-900 text-slate-800 tracking-tighter">Live Stock</h2>
-            <div class="flex items-center gap-3 mt-1">
-                @if(Auth::user()->hasPermission('mobile_stock', 'excel'))
-                <button @click="exportStock('excel')" class="text-emerald-500 hover:text-emerald-600 transition-colors">
-                    <i class="fas fa-file-excel"></i>
-                </button>
-                @endif
-                @if(Auth::user()->hasPermission('mobile_stock', 'pdf'))
-                <button @click="exportStock('pdf')" class="text-rose-500 hover:text-rose-600 transition-colors">
-                    <i class="fas fa-file-pdf"></i>
-                </button>
-                @endif
-                <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Real-time inventory</p>
-            </div>
+            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Real-time inventory insights</p>
         </div>
-        <div class="w-12 h-12 grad-cyan rounded-2xl flex items-center justify-center text-white shadow-lg shadow-cyan-100 border-2 border-white italic font-black text-xs" x-text="displayUnit === 'kg' ? 'KG' : 'BOX'"></div>
+        <div class="flex items-center gap-2">
+            @if(Auth::user()->hasPermission('mobile_stock', 'excel'))
+            <button @click="exportStock('excel')" class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 border border-slate-100 shadow-sm active:scale-90 transition-all">
+                <i class="fas fa-file-excel text-xs"></i>
+            </button>
+            @endif
+            @if(Auth::user()->hasPermission('mobile_stock', 'pdf'))
+            <button @click="exportStock('pdf')" class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-rose-500 border border-slate-100 shadow-sm active:scale-90 transition-all">
+                <i class="fas fa-file-pdf text-xs"></i>
+            </button>
+            @endif
+            <div class="w-10 h-10 grad-cyan rounded-xl flex items-center justify-center text-white shadow-lg shadow-cyan-100 border-2 border-white italic font-black text-[9px]" x-text="displayUnit === 'kg' ? 'KG' : 'BX'"></div>
+        </div>
     </div>
 
     <!-- Filters Section -->

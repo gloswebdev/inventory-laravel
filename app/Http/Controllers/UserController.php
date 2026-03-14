@@ -29,6 +29,12 @@ class UserController extends Controller
         'mobile_production' => 'Mobile: Production',
         'mobile_planning' => 'Mobile: Planning',
         'mobile_indents' => 'Mobile: Indents Manager',
+        'mobile_recipes' => 'Mobile: Recipes',
+        'mobile_adjustments' => 'Mobile: Stock Adjustments',
+        'mobile_ledger' => 'Mobile: Stock Ledger',
+        'mobile_products' => 'Mobile: Product Master',
+        'mobile_users' => 'Mobile: User Manager',
+        'mobile_settings' => 'Mobile: System Settings',
     ];
 
     /**
@@ -48,10 +54,16 @@ class UserController extends Controller
             'category_filter' => 'Type/RM Category Filters',
             'search' => 'Search Bar'
         ],
+        'mobile_production' => [
+            'history' => 'Production History',
+            'management' => 'Record New Production',
+            'type_filter' => 'Type Filter'
+        ],
         'indent' => [
             'bulk_add' => 'Bulk Add Modal',
             'branch_select' => 'Stock Location Toggle',
-            'type_filter' => 'Type Filter'
+            'type_filter' => 'Type Filter',
+            'clone' => 'Clone Indent'
         ],
         'production' => [
             'history' => 'View Production History',
@@ -61,6 +73,43 @@ class UserController extends Controller
         'mobile_planning' => [
             'type_filter' => 'Product Type Filter',
             'branch_select' => 'Branch Selection'
+        ],
+        'mobile_indents' => [
+            'bulk_entry' => 'New Indent (Bulk)',
+            'history' => 'Transaction History',
+            'process' => 'Comparison View',
+            'user_filter' => 'Multi-User Filter',
+            'unit_toggle' => 'BOX/KG Unit Toggle',
+            'clone' => 'Clone Indent',
+            'delete' => 'Delete Indent',
+            'edit' => 'Edit Indent'
+        ],
+        'mobile_recipes' => [
+            'view' => 'View Recipes',
+            'search' => 'Search Recipes',
+            'edit' => 'Edit Recipes',
+            'delete' => 'Delete Recipes'
+        ],
+        'mobile_adjustments' => [
+            'view' => 'View Adjustments',
+            'create' => 'Record Adjustment'
+        ],
+        'mobile_ledger' => [
+            'view' => 'View Ledger',
+            'search' => 'Search Logs'
+        ],
+        'mobile_products' => [
+            'view' => 'View Products',
+            'edit' => 'Edit Basics',
+            'sync' => 'API Sync'
+        ],
+        'mobile_users' => [
+            'view' => 'View Users',
+            'create' => 'Add New User',
+            'edit' => 'Update Permissions'
+        ],
+        'mobile_settings' => [
+            'management' => 'Branch Mapping Management'
         ]
     ];
 

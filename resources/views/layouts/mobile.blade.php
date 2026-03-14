@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -65,6 +65,7 @@
         .grad-rose { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
         .grad-cyan { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
         .grad-violet { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .grad-slate { background: linear-gradient(135deg, #475569 0%, #1e293b 100%); }
 
         @keyframes blob-bounce {
             0%, 100% { transform: translate(0, 0) scale(1); }
@@ -151,7 +152,7 @@
             @if(Auth::user()->hasPermission('mobile_indents', 'view'))
             <a href="{{ route('mobile.indents') }}" class="flex flex-col items-center p-2 rounded-2xl transition-all {{ request()->routeIs('mobile.indents') ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-400 hover:text-slate-600' }}">
                 <i class="fas fa-list-ul text-xl"></i>
-                <span class="text-[8px] font-black uppercase tracking-widest mt-1">Orders</span>
+                <span class="text-[8px] font-black uppercase tracking-widest mt-1">Indents</span>
             </a>
             @endif
         </div>

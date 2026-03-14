@@ -9,6 +9,7 @@ use App\Models\IndentItem;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class IndentController extends Controller
 {
@@ -235,7 +236,6 @@ class IndentController extends Controller
             "Process_Matrix_{$indent->branch_code}_{$indent->indent_date}.xlsx"
         );
     }
-
     public function updateCompletion(Request $request, Indent $indent)
     {
         $quantities = $request->input('completed_qty', []);
@@ -253,6 +253,83 @@ class IndentController extends Controller
         $indent->update(['status' => $status]);
 
         return redirect()->back()->with('success', 'Status updated to ' . strtoupper($status));
+    }
+
+    public function destroy(Indent $indent)
+    {
+        $indent->items()->delete();
+        $indent->delete();
+        return response()->json(['success' => true, 'message' => 'Indent deleted successfully!']);
+    }
+
+    public function clone(Indent $indent)
+    {
+        try {
+            return DB::transaction(function () use ($indent) {
+                $newIndent = $indent->replicate();
+                $newIndent->status = 'pending';
+                $newIndent->created_at = now();
+                $newIndent->save();
+
+                foreach ($indent->items as $item) {
+                    $newItem = $item->replicate();
+                    $newItem->indent_id = $newIndent->id;
+                    $newItem->completed_qty = 0;
+                    $newItem->save();
+                }
+
+                return response()->json(['success' => true, 'message' => 'Indent cloned successfully!', 'id' => $newIndent->id]);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error cloning: ' . $e->getMessage()]);
+        }
+    }
+
+    public function update(Request $request, Indent $indent)
+    {
+        $request->validate([
+            'branch_code' => 'sometimes|string',
+            'indent_date' => 'sometimes|date',
+            'products' => 'required|array|min:1',
+        ]);
+
+        try {
+            return DB::transaction(function () use ($request, $indent) {
+                if ($request->has('indent_date')) $indent->indent_date = $request->indent_date;
+                if ($request->has('branch_code')) {
+                    $branch = Branch::where('code', $request->branch_code)->first();
+                    $indent->branch_code = $request->branch_code;
+                    $indent->branch_name = $branch ? $branch->name : 'Consolidated';
+                }
+                
+                $indent->items()->delete();
+                $totalBoxes = 0;
+
+                foreach ($request->products as $pData) {
+                    $product = Product::find($pData['id']);
+                    if (!$product) continue;
+
+                    \App\Models\IndentItem::create([
+                        'indent_id' => $indent->id,
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'demand_qty' => $pData['demand_qty'],
+                        'demand_unit' => $pData['unit'] ?? 'box',
+                        'final_qty_box' => $pData['final_qty_box'] ?? $pData['demand_qty'],
+                        'stock_box' => $pData['stock_box'] ?? 0,
+                        'stock_kg' => $pData['stock_kg'] ?? 0,
+                    ]);
+                    $totalBoxes += ($pData['final_qty_box'] ?? $pData['demand_qty']);
+                }
+
+                $indent->total_boxes = $totalBoxes;
+                $indent->save();
+
+                return response()->json(['success' => true, 'message' => 'Indent updated successfully!']);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error updating: ' . $e->getMessage()]);
+        }
     }
 
     private function getBranchStocksForIndent($indent, $branches)

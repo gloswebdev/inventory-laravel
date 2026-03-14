@@ -14,6 +14,7 @@
         </div>
     </div>
     
+    @if(Auth::user()->hasFeature('mobile_production', 'management'))
     <!-- Entry Form -->
     <div class="glass-premium p-8 rounded-[3rem] space-y-8 border border-white/80">
         <!-- Branch Context -->
@@ -79,6 +80,54 @@
             </div>
         </button>
     </div>
+    @else
+    <div class="glass-premium p-10 rounded-[3rem] text-center border-2 border-dashed border-slate-100">
+        <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-lock text-slate-200 text-2xl"></i>
+        </div>
+        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recording Restricted</p>
+    </div>
+    @endif
+
+    @if(Auth::user()->hasFeature('mobile_production', 'history'))
+    <!-- History Section -->
+    <div class="space-y-6">
+        <div class="flex items-center justify-between px-3">
+            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Transaction History</h3>
+            <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest">Last 10 Logs</span>
+        </div>
+
+        <div class="space-y-4">
+            @foreach($history as $item)
+            <div class="glass-premium p-5 rounded-[2rem] border border-white/80 flex items-center justify-between group active:scale-[0.98] transition-all">
+                <div class="flex items-center gap-4">
+                    <div class="w-11 h-11 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-100/50">
+                        <i class="fas fa-box-open text-xs"></i>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-900 text-slate-800 truncate max-w-[150px] uppercase tracking-tighter">{{ $item->product ? $item->product->name : 'Unknown' }}</div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[8px] font-black text-indigo-400 uppercase">{{ $item->branch_code }}</span>
+                            <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
+                            <span class="text-[8px] text-slate-400 font-bold">{{ $item->created_at->diffForHumans() }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-900 text-slate-800 tracking-tighter">+{{ number_format($item->quantity, 2) }}</div>
+                    <div class="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Yield Posted</div>
+                </div>
+            </div>
+            @endforeach
+
+            @if(count($history) === 0)
+            <div class="p-10 text-center opacity-40 italic text-[10px] font-bold text-slate-400">
+                No recent production logs found.
+            </div>
+            @endif
+        </div>
+    </div>
+    @endif
 
     <!-- Feedback Toast -->
     <div 

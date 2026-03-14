@@ -9,9 +9,15 @@
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">
                 Ref: #IND-{{ $indent->id }} • {{ $indent->branch_name }}
             </p>
+            <p class="text-[8px] font-black text-indigo-500 uppercase tracking-widest mt-1">
+                <i class="fas fa-user-circle mr-1"></i> BY: {{ $indent->user->name ?? 'SYSTEM' }}
+            </p>
         </div>
         <div class="flex flex-col items-end gap-3">
             <div class="flex items-center gap-2">
+                <a href="javascript:window.print()" class="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100 shadow-sm transition-all active:scale-90 hover:grad-blue hover:text-white">
+                    <i class="fas fa-print text-xs"></i>
+                </a>
                 <a href="{{ route('mobile.indents.process.excel', $indent->id) }}" class="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm transition-all active:scale-90 hover:grad-emerald hover:text-white">
                     <i class="fas fa-file-excel text-xs"></i>
                 </a>
@@ -53,7 +59,8 @@
                 <thead>
                     <tr class="bg-indigo-50/20">
                         <th class="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 sticky left-0 bg-white/95 backdrop-blur-md z-10 w-44">Product Profile</th>
-                        <th class="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-slate-50 whitespace-nowrap">Target</th>
+                        <th class="px-6 py-4 text-[9px] font-black text-green-500 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">Stock at<br>Entry</th>
+                        <th class="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-slate-50 whitespace-nowrap text-center">Indent<br>Box</th>
                         @foreach($branches as $branch)
                         <th class="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">{{ $branch->code }}</th>
                         @endforeach
@@ -66,8 +73,14 @@
                             <div class="text-[12px] font-900 text-slate-800 leading-tight uppercase tracking-tighter">{{ $item->product ? $item->product->name : 'Unknown' }}</div>
                             <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{{ $item->product ? $item->product->pack_name : '-' }}</div>
                         </td>
-                        <td class="px-6 py-5">
-                            <div class="text-sm font-900 text-indigo-600 tracking-tighter whitespace-nowrap">
+                        <td class="px-6 py-5 text-center">
+                            <div class="text-[11px] font-black text-green-600 tracking-tighter whitespace-nowrap">
+                                {{ number_format($item->stock_box, 0) }}
+                                <span class="text-[8px] opacity-60 ml-0.5">BOX</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-5 text-center">
+                            <div class="text-[11px] font-900 text-indigo-600 tracking-tighter whitespace-nowrap">
                                 {{ number_format($item->final_qty_box, 0) }}
                                 <span class="text-[8px] opacity-60 ml-0.5">BOX</span>
                             </div>

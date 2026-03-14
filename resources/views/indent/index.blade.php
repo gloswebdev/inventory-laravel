@@ -10,9 +10,13 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
                 <h3 class="text-white font-bold flex items-center italic">
-                    <i class="fas fa-list-check mr-2"></i> BULK INDENT ENTRY
+                    <i class="fas fa-list-check mr-2"></i> 
+                    <span id="entryTitle">BULK INDENT ENTRY</span>
                 </h3>
-                <div class="bg-white/20 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                <div id="editBadge" class="hidden bg-white/20 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                    Editing Mode
+                </div>
+                <div id="createBadge" class="bg-white/20 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
                     Step 1: Enter Demand
                 </div>
             </div>
@@ -247,6 +251,7 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-gray-50/50">
+                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Indent ID</th>
                             <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Indent Date</th>
                             <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Branch</th>
                             <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">User</th>
@@ -259,6 +264,7 @@
                     <tbody class="divide-y divide-gray-50">
                         @forelse($history as $indent)
                         <tr class="hover:bg-indigo-50/20 transition-colors group">
+                            <td class="px-8 py-4 font-black text-indigo-600 italic tracking-tighter">#IND-{{ $indent->id }}</td>
                             <td class="px-8 py-4 font-bold text-gray-700">{{ date('d M, Y', strtotime($indent->indent_date)) }}</td>
                             <td class="px-8 py-4">
                                 <span class="bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-lg text-xs">
@@ -305,6 +311,18 @@
 
                                     @if(Auth::user()->hasPermission('planning_process', 'edit'))
                                     <a href="{{ route('indent.process', $indent->id) }}" title="Process" class="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-600 hover:text-white transition"><i class="fas fa-cog text-xs"></i></a>
+                                    @endif
+
+                                    @if(Auth::user()->hasFeature('indent', 'clone'))
+                                    <button onclick="cloneIndent({{ $indent->id }})" title="Clone" class="bg-violet-100 text-violet-600 p-2 rounded-lg hover:bg-violet-600 hover:text-white transition"><i class="fas fa-copy text-xs"></i></button>
+                                    @endif
+
+                                    @if(Auth::user()->hasPermission('indent', 'edit'))
+                                    <button onclick="editIndent({{ $indent->id }})" title="Edit" class="bg-slate-100 text-slate-600 p-2 rounded-lg hover:bg-slate-600 hover:text-white transition"><i class="fas fa-edit text-xs"></i></button>
+                                    @endif
+
+                                    @if(Auth::user()->hasPermission('indent', 'delete'))
+                                    <button onclick="deleteIndent({{ $indent->id }})" title="Delete" class="bg-rose-100 text-rose-600 p-2 rounded-lg hover:bg-rose-600 hover:text-white transition"><i class="fas fa-trash text-xs"></i></button>
                                     @endif
                                 </div>
                             </td>
@@ -564,7 +582,7 @@
         document.getElementById('modalTableBody').innerHTML = loader;
         modal.classList.remove('hidden');
 
-        fetch(`{{ url('indent/show') }}/${id}`)
+        fetch(`{{ url('indent-api/show') }}/${id}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -614,8 +632,10 @@
         modal.classList.remove('hidden');
 
         try {
-            const baseUrl = "{{ url('indent/show') }}";
-            const res = await fetch(`${baseUrl}/${id}`);
+            const baseUrl = "{{ url('indent-api/show') }}";
+            const res = await fetch(`${baseUrl}/${id}`, {
+                headers: { 'Accept': 'application/json' }
+            });
             
             if (!res.ok) {
                 const errorText = await res.text();
@@ -717,14 +737,22 @@
         };
 
         try {
-            const res = await fetch('{{ route("indent.store") }}', {
+            const url = editingIndentId 
+                ? `{{ url('indent-api/show') }}/${editingIndentId}/update` 
+                : '{{ route("indent.store") }}';
+            
+            const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}' 
+                },
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (data.success) {
-                alert('Indent saved successfully!');
+                alert(editingIndentId ? 'Indent updated successfully!' : 'Indent saved successfully!');
                 location.reload();
             } else {
                 alert('Error: ' + (data.message || 'Failed to save indent'));
@@ -733,5 +761,110 @@
             alert('Communication error with server.');
         }
     }
+
+    let editingIndentId = null;
+
+    async function editIndent(id) {
+        if(!confirm('This will populate the form with historical data and switch to Edit Mode. Continue?')) return;
+        
+        try {
+            const res = await fetch(`{{ url('indent-api/show') }}/${id}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if(!data.success) throw new Error(data.message);
+            
+            const indent = data.indent;
+            editingIndentId = id;
+            
+            // UI Updates
+            document.getElementById('entryTitle').innerText = `EDIT INDENT #IND-${id}`;
+            document.getElementById('editBadge').classList.remove('hidden');
+            document.getElementById('createBadge').classList.add('hidden');
+            document.getElementById('branch_code').value = indent.branch_code;
+            document.getElementById('indent_date').value = indent.indent_date;
+            
+            // Clear current inputs
+            document.querySelectorAll('.product-qty').forEach(input => input.value = '');
+            
+            // Populate inputs
+            indent.items.forEach(item => {
+                const row = document.querySelector(`.product-row[data-id="${item.product_id}"]`);
+                if(row) {
+                    const input = row.querySelector('.product-qty');
+                    input.value = item.demand_qty;
+                }
+            });
+            
+            updateAllStock();
+            alert('Form populated! You can now modify and update.');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+        } catch(e) {
+            alert('Error loading indent: ' + e.message);
+        }
+    }
+
+    async function deleteIndent(id) {
+        if(!confirm('Are you sure you want to PERMANENTLY delete this indent and all its items? This action cannot be undone.')) return;
+        
+        try {
+            const res = await fetch(`{{ url('indent-api/show') }}/${id}`, {
+                method: 'DELETE',
+                headers: { 
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if(data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Delete failed');
+            }
+        } catch(e) {
+            console.error(e);
+            alert('Delete failed: ' + e.message);
+        }
+    }
+
+    async function cloneIndent(id) {
+        if(!confirm('Create a new draft indent based on this one?')) return;
+        
+        try {
+            const res = await fetch(`{{ url('indent-api/show') }}/${id}/clone`, {
+                method: 'POST',
+                headers: { 
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if(data.success) {
+                alert('Indent cloned! Redirecting...');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch(e) {
+            alert('Failed to clone indent');
+        }
+    }
+
+    // Auto-refresh when tab is focused or every 30 seconds to sync with mobile changes
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !editingIndentId) {
+            // Check if any quantity is entered before refreshing
+            const hasData = Array.from(document.querySelectorAll('.product-qty')).some(i => i.value > 0);
+            if (!hasData) location.reload();
+        }
+    });
+
+    setInterval(() => {
+        if (document.visibilityState === 'visible' && !editingIndentId) {
+            const hasData = Array.from(document.querySelectorAll('.product-qty')).some(i => i.value > 0);
+            if (!hasData) location.reload();
+        }
+    }, 30000);
 </script>
 @endsection

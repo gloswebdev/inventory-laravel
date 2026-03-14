@@ -10,6 +10,10 @@ use App\Models\Branch;
 use App\Models\Recipe;
 use App\Models\Production;
 use App\Models\ProductionItem;
+use App\Models\Adjustment;
+use App\Models\ProductType;
+use App\Models\ProductGroup;
+use App\Models\ProductSyncLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -98,6 +102,48 @@ class MobileController extends Controller implements HasMiddleware
                 'color' => 'bg-blue-500',
                 'permission' => 'mobile_indents'
             ],
+            [
+                'name' => 'Recipes',
+                'icon' => 'fas fa-flask',
+                'route' => 'mobile.recipes',
+                'color' => 'bg-indigo-600',
+                'permission' => 'mobile_recipes'
+            ],
+            [
+                'name' => 'Adjustments',
+                'icon' => 'fas fa-sliders',
+                'route' => 'mobile.adjustments',
+                'color' => 'bg-emerald-600',
+                'permission' => 'mobile_adjustments'
+            ],
+            [
+                'name' => 'Ledger',
+                'icon' => 'fas fa-book',
+                'route' => 'mobile.ledger',
+                'color' => 'bg-rose-600',
+                'permission' => 'mobile_ledger'
+            ],
+            [
+                'name' => 'Products',
+                'icon' => 'fas fa-boxes-stacked',
+                'route' => 'mobile.products',
+                'color' => 'bg-slate-700',
+                'permission' => 'mobile_products'
+            ],
+            [
+                'name' => 'Users',
+                'icon' => 'fas fa-users-gear',
+                'route' => 'mobile.users',
+                'color' => 'bg-violet-600',
+                'permission' => 'mobile_users'
+            ],
+            [
+                'name' => 'Settings',
+                'icon' => 'fas fa-gears',
+                'route' => 'mobile.settings',
+                'color' => 'bg-cyan-600',
+                'permission' => 'mobile_settings'
+            ],
         ];
 
         // Filter modules based on permissions
@@ -105,18 +151,67 @@ class MobileController extends Controller implements HasMiddleware
             return $user->hasPermission($m['permission'], 'view');
         }));
 
+        $permittedBranches = $user->getPermittedBranchCodes();
+
         $stats = [
             'products' => Product::count(),
             'today_indents' => Indent::whereDate('created_at', today())->count(),
             'pending_indents' => Indent::where('status', 'pending')->count(),
             'total_stock' => (float)Product::sum('current_stock'),
-            'permitted_branches' => $user->getPermittedBranchCodes(),
+            'permitted_branches' => $permittedBranches,
             'finished_goods' => Product::where('product_type_id', 1)->count(), // Assuming 1 is FG
             'raw_materials' => Product::where('product_type_id', 2)->count(),  // Assuming 2 is RM
             'last_production' => \App\Models\StockLedger::where('transaction_type', 'production_add')->latest()->first()?->created_at?->diffForHumans() ?? 'No records',
+            'low_stock_count' => Product::whereColumn('current_stock', '<=', 'low_alert_quantity')->count(),
+            'today_production_boxes' => \App\Models\ProductionItem::whereHas('production', function($q) use ($permittedBranches) {
+                $q->whereIn('branch_code', $permittedBranches)
+                  ->whereDate('production_date', today());
+            })->sum('quantity_box'),
         ];
 
-        return view('mobile.dashboard', compact('modules', 'stats'));
+        // Fetch Recent Combined Activity (Indents + Production)
+        $recentIndents = Indent::whereIn('branch_code', $permittedBranches)
+            ->with('user')
+            ->latest()
+            ->limit(5)
+            ->get()
+            ->map(function($i) {
+                return [
+                    'type' => 'Indent',
+                    'title' => "New Indent: #IND-" . str_pad($i->id, 4, '0', STR_PAD_LEFT),
+                    'subtitle' => $i->branch_name,
+                    'time' => $i->created_at->diffForHumans(),
+                    'icon' => 'fas fa-file-invoice',
+                    'color' => 'bg-blue-500'
+                ];
+            });
+
+        $recentProduction = \App\Models\Production::whereIn('branch_code', $permittedBranches)
+            ->with(['items.product', 'user'])
+            ->latest()
+            ->limit(5)
+            ->get()
+            ->map(function($p) {
+                $firstItem = $p->items->first();
+                $count = $p->items->count();
+                $title = "Produced: " . ($firstItem->product->name ?? 'Mixed Items');
+                if($count > 1) $title .= " +" . ($count - 1) . " more";
+
+                return [
+                    'type' => 'Production',
+                    'title' => $title,
+                    'subtitle' => $p->branch_name ?? $p->branch_code,
+                    'time' => $p->created_at->diffForHumans(),
+                    'icon' => 'fas fa-industry',
+                    'color' => 'bg-green-500'
+                ];
+            });
+
+        $activities = $recentIndents->concat($recentProduction)->sortByDesc(function($a) {
+            return $a['time']; // Approximation, but works for limited items
+        })->take(5);
+
+        return view('mobile.dashboard', compact('modules', 'stats', 'activities'));
     }
 
     /**
@@ -397,7 +492,15 @@ class MobileController extends Controller implements HasMiddleware
 
         $products = $productsQuery->get();
         $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
-        return view('mobile.production', compact('products', 'branches'));
+        
+        $history = \App\Models\StockLedger::where('type', 'production')
+            ->whereIn('branch_code', $permittedCodes)
+            ->with(['product', 'user'])
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        return view('mobile.production', compact('products', 'branches', 'history'));
     }
 
     /**
@@ -709,8 +812,11 @@ class MobileController extends Controller implements HasMiddleware
      */
     public function process(Indent $indent)
     {
+        $user = Auth::user();
+        $permittedCodes = $user->getPermittedBranchCodes();
+        
         $indent->load('items.product', 'user');
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         return view('mobile.process', compact('indent', 'branches', 'branchStocks'));
@@ -742,8 +848,11 @@ class MobileController extends Controller implements HasMiddleware
      */
     public function exportProcessExcel(Indent $indent)
     {
+        $user = Auth::user();
+        $permittedCodes = $user->getPermittedBranchCodes();
+        
         $indent->load('items.product', 'user');
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -757,13 +866,15 @@ class MobileController extends Controller implements HasMiddleware
      */
     public function exportProcessPdf(Indent $indent)
     {
+        $user = Auth::user();
+        $permittedCodes = $user->getPermittedBranchCodes();
+        
         $indent->load('items.product', 'user');
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
         $pdf = Pdf::loadView('planning.process_pdf', compact('indent', 'branches', 'branchStocks'))
                   ->setPaper('a4', 'landscape');
-        
         return $pdf->download("Process_Matrix_{$indent->id}_{$indent->indent_date}.pdf");
     }
 
@@ -880,7 +991,6 @@ class MobileController extends Controller implements HasMiddleware
 
                 $product = Product::find($request->product_id);
                 
-                // Server-side permission check
                 if (auth()->user()->role !== 'admin') {
                     $permittedTypeIds = auth()->user()->getPermittedProductTypeIds();
                     if (!in_array($product->product_type_id, $permittedTypeIds)) {
@@ -923,10 +1033,581 @@ class MobileController extends Controller implements HasMiddleware
                     }
                 }
             });
-
             return response()->json(['success' => true, 'message' => 'Production recorded successfully!']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile Stock Ledger
+     */
+    public function ledger(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_ledger', 'view')) abort(403);
+
+        $query = StockLedger::with('product')->orderByDesc('created_at');
+
+        if ($request->filled('product_id')) {
+            $query->where('product_id', $request->product_id);
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $permittedRMTypes = $user->getPermittedRMTypes();
+            
+            $query->whereHas('product', function($q) use ($permittedTypeIds, $permittedRMTypes) {
+                $q->whereIn('product_type_id', $permittedTypeIds)
+                  ->where(function($sq) use ($permittedRMTypes) {
+                      $sq->whereIn('rm_type', $permittedRMTypes)
+                        ->orWhereNull('rm_type')
+                        ->orWhere('rm_type', '');
+                  });
+            });
+        }
+
+        $ledger = $query->limit(100)->get();
+        
+        $productsQuery = Product::orderBy('name');
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $productsQuery->whereIn('product_type_id', $permittedTypeIds);
+        }
+        $products = $productsQuery->get();
+        
+        return view('mobile.ledger', compact('ledger', 'products'));
+    }
+
+    /**
+     * Mobile Stock Adjustments
+     */
+    public function adjustments()
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_adjustments', 'view')) abort(403);
+
+        $query = Adjustment::with('product')->orderByDesc('created_at');
+
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $permittedRMTypes = $user->getPermittedRMTypes();
+            
+            $query->whereHas('product', function($q) use ($permittedTypeIds, $permittedRMTypes) {
+                $q->whereIn('product_type_id', $permittedTypeIds)
+                  ->where(function($sq) use ($permittedRMTypes) {
+                      $sq->whereIn('rm_type', $permittedRMTypes)
+                        ->orWhereNull('rm_type')
+                        ->orWhere('rm_type', '');
+                  });
+            });
+        }
+
+        $adjustments = $query->limit(50)->get();
+        
+        $productsQuery = Product::orderBy('name');
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $productsQuery->whereIn('product_type_id', $permittedTypeIds);
+        }
+        $products = $productsQuery->get();
+        
+        return view('mobile.adjustments', compact('adjustments', 'products'));
+    }
+
+    /**
+     * Store Mobile Stock Adjustment
+     */
+    public function storeAdjustment(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_adjustments', 'create')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'adjustment_type' => 'required|in:add,deduct',
+            'quantity' => 'required|numeric|min:0.001',
+            'reason' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $product = Product::lockForUpdate()->find($validated['product_id']);
+
+                if ($validated['adjustment_type'] === 'deduct' && $product->current_stock < $validated['quantity']) {
+                    throw new \Exception("Insufficient current stock. Available: {$product->current_stock}");
+                }
+
+                $adjustment = Adjustment::create($validated);
+                $changeQty = $validated['adjustment_type'] === 'add' ? $validated['quantity'] : -$validated['quantity'];
+                
+                if ($validated['adjustment_type'] === 'add') {
+                    $product->increment('current_stock', $validated['quantity']);
+                } else {
+                    $product->decrement('current_stock', $validated['quantity']);
+                }
+
+                StockLedger::create([
+                    'product_id' => $product->id,
+                    'transaction_type' => 'adjustment_' . $validated['adjustment_type'],
+                    'transaction_id' => $adjustment->id,
+                    'change_quantity' => $changeQty,
+                    'new_stock' => $product->current_stock,
+                ]);
+            });
+
+            return response()->json(['success' => true, 'message' => 'Adjustment saved successfully!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile Recipe Master
+     */
+    public function recipes(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_recipes', 'view')) abort(403);
+
+        $query = Recipe::with(['finishedProduct.type', 'items.rawMaterial']);
+
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $query->whereHas('finishedProduct', function($q) use ($permittedTypeIds) {
+                $q->whereIn('product_type_id', $permittedTypeIds);
+            });
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('finishedProduct', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")->orWhere('item_code', 'like', "%{$search}%");
+            });
+        }
+
+        $recipes = $query->orderBy('created_at', 'desc')->paginate(20)->withQueryString();
+        $types = ProductType::orderBy('type_name')->get();
+
+        $fgQuery = Product::orderBy('name');
+        $rmQuery = Product::orderBy('name');
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $fgQuery->whereIn('product_type_id', $permittedTypeIds);
+            $rmQuery->whereIn('product_type_id', $permittedTypeIds);
+        }
+        $finishedGoods = $fgQuery->get();
+        $rawMaterials = $rmQuery->get();
+
+        return view('mobile.recipes', compact('recipes', 'types', 'finishedGoods', 'rawMaterials'));
+    }
+
+    /**
+     * Mobile Product Master List
+     */
+    public function products(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_products', 'view')) abort(403);
+
+        $query = Product::with('type')->orderBy('name');
+
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $query->whereIn('product_type_id', $permittedTypeIds);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")->orWhere('item_code', 'like', "%{$search}%");
+            });
+        }
+
+        $products = $query->paginate(30)->withQueryString();
+        $types = ProductType::orderBy('type_name')->get();
+
+        return view('mobile.products', compact('products', 'types'));
+    }
+
+    /**
+     * Update Product Basics from Mobile
+     */
+    public function updateProduct(Request $request, Product $product)
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_products', 'edit')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'low_alert_quantity' => 'numeric|min:0',
+            'product_type_id' => 'required|exists:product_types,id',
+        ]);
+
+        $product->update($validated);
+
+        return response()->json(['success' => true, 'message' => 'Product updated!']);
+    }
+
+    /**
+     * Trigger Product Sync from Mobile
+     */
+    public function syncProducts()
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_products', 'sync')) abort(403);
+
+        // We can redirect to the desktop sync route if we want to share logic, 
+        // or just call the sync logic here. I'll use redirect for simplicity and logic reuse.
+        return (new ProductController())->syncFromApi();
+    }
+
+    /**
+     * Mobile User Manager
+     */
+    public function users()
+    {
+        if (!Auth::user()->hasFeature('mobile_users', 'view')) abort(403);
+
+        $users = \App\Models\User::with(['permissions', 'branches', 'productTypes'])->orderBy('name')->get();
+        $branches = \App\Models\Branch::orderBy('name')->get();
+        $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
+        $rmTypes = \App\Models\ProductAttribute::where('type', 'rm_type')->orderBy('value')->get();
+
+        // Pass module definition from UserController for permission toggles
+        $userController = new UserController();
+        $modules = (new \ReflectionClass($userController))->getProperty('modules')->getValue($userController);
+        $moduleFeatures = (new \ReflectionClass($userController))->getProperty('moduleFeatures')->getValue($userController);
+
+        return view('mobile.users', compact('users', 'branches', 'productTypes', 'rmTypes', 'modules', 'moduleFeatures'));
+    }
+
+    /**
+     * Store Mobile User
+     */
+    public function storeUser(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_users', 'create')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users',
+            'role' => 'required|in:user,admin',
+            'interface_type' => 'required|in:desktop,mobile',
+            'password' => 'required|min:4',
+        ]);
+
+        try {
+            \App\Models\User::create([
+                'name' => $request->name,
+                'username' => $request->username,
+                'role' => $request->role,
+                'interface_type' => $request->interface_type,
+                'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'User created successfully!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Update User Permissions from Mobile
+     */
+    public function updateUserPermissions(Request $request, \App\Models\User $user)
+    {
+        if (!Auth::user()->hasFeature('mobile_users', 'edit')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        try {
+            DB::transaction(function () use ($request, $user) {
+                // Sync Branches
+                if ($request->has('branches')) {
+                    $user->branches()->sync($request->branches);
+                }
+
+                // Sync Product Types
+                if ($request->has('product_types')) {
+                    $user->productTypes()->sync($request->product_types);
+                }
+
+                // Sync Features (via UserPermission model)
+                if ($request->has('features')) {
+                    \App\Models\UserPermission::where('user_id', $user->id)->delete();
+                    foreach ($request->features as $module => $features) {
+                        foreach ($features as $feature => $allowed) {
+                            if ($allowed) {
+                                \App\Models\UserPermission::create([
+                                    'user_id' => $user->id,
+                                    'module' => $module,
+                                    'feature' => $feature,
+                                    'is_allowed' => true
+                                ]);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return response()->json(['success' => true, 'message' => 'Permissions updated!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile Settings
+     */
+    public function settings()
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+
+        $branches = Branch::orderBy('code')->get();
+        return view('mobile.settings', compact('branches'));
+    }
+
+    /**
+     * Store Branch from Mobile Settings
+     */
+    public function storeBranch(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+
+        $request->validate([
+            'code' => 'required|string|unique:branches,code',
+            'name' => 'required|string',
+        ]);
+
+        Branch::create($request->all());
+
+        return response()->json(['success' => true, 'message' => 'Branch added successfully!']);
+    }
+
+    /**
+     * Delete Branch
+     */
+    public function deleteBranch(Branch $branch)
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+
+        $branch->delete();
+        return response()->json(['success' => true, 'message' => 'Branch deleted!']);
+    }
+
+    /**
+     * Mobile Product Types
+     */
+    public function productTypes()
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+        $types = \App\Models\ProductType::orderBy('type_name')->get();
+        return response()->json(['success' => true, 'types' => $types]);
+    }
+
+    /**
+     * Mobile Store Product Type
+     */
+    public function storeProductType(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+        $request->validate(['type_name' => 'required|string|unique:product_types,type_name']);
+        $type = \App\Models\ProductType::create($request->all());
+        return response()->json(['success' => true, 'message' => 'Type added!', 'type' => $type]);
+    }
+
+    /**
+     * Mobile Product Groups
+     */
+    public function productGroups()
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+        $groups = \App\Models\ProductGroup::orderBy('group_name')->get();
+        return response()->json(['success' => true, 'groups' => $groups]);
+    }
+
+    /**
+     * Mobile Store Product Group
+     */
+    public function storeProductGroup(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_settings', 'management')) abort(403);
+        $request->validate(['group_name' => 'required|string|unique:product_groups,group_name']);
+        $group = \App\Models\ProductGroup::create($request->all());
+        return response()->json(['success' => true, 'message' => 'Group added!', 'group' => $group]);
+    }
+
+    /**
+     * Mobile Store Product
+     */
+    public function storeProduct(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_products', 'edit')) abort(403);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'item_code' => 'required|string|unique:products,item_code',
+            'product_type_id' => 'required|exists:product_types,id',
+            'uom' => 'nullable|string',
+            'unit_box' => 'nullable|numeric|min:1',
+            'weight_unit' => 'nullable|numeric|min:0.001',
+        ]);
+
+        try {
+            $product = Product::create($validated);
+            return response()->json(['success' => true, 'message' => 'Product created successfully!', 'product' => $product]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile Export Planning
+     */
+    public function exportPlanning(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_planning', 'view')) abort(403);
+        
+        $productsInput = json_decode($request->input('data'), true);
+        if (empty($productsInput)) return redirect()->back();
+
+        $results = $this->getConsolidatedRequirementsMRP($productsInput);
+        $summary = $this->getProductionSummaryMRP($productsInput);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('planning.mrp_pdf', [
+            'results' => $results,
+            'summary' => $summary,
+            'branch' => 'All Branches'
+        ]);
+
+        return $pdf->download('MRP_Report_' . now()->format('Ymd_His') . '.pdf');
+    }
+
+    /**
+     * Mobile Show Recipe Details
+     */
+    public function showRecipe(Recipe $recipe)
+    {
+        if (!Auth::user()->hasFeature('mobile_recipes', 'view')) abort(403);
+        return response()->json([
+            'success' => true,
+            'recipe' => $recipe->load('items.rawMaterial')
+        ]);
+    }
+
+    /**
+     * Mobile Store Recipe
+     */
+    public function storeRecipe(Request $request)
+    {
+        if (!Auth::user()->hasFeature('mobile_recipes', 'edit')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'finished_product_id' => 'required|exists:products,id|unique:recipes,finished_product_id',
+            'yield_quantity' => 'required|numeric|min:0.001',
+            'yield_uom' => 'required|string|max:50',
+            'items' => 'required|array|min:1',
+            'items.*.raw_material_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.001',
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $recipe = Recipe::create([
+                    'finished_product_id' => $validated['finished_product_id'],
+                    'yield_quantity' => $validated['yield_quantity'],
+                    'yield_uom' => $validated['yield_uom'],
+                ]);
+
+                foreach ($validated['items'] as $item) {
+                    \App\Models\RecipeItem::create([
+                        'recipe_id' => $recipe->id,
+                        'raw_material_id' => $item['raw_material_id'],
+                        'quantity' => $item['quantity'],
+                    ]);
+                }
+            });
+
+            return response()->json(['success' => true, 'message' => 'Recipe created successfully!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile Update Recipe
+     */
+    public function updateRecipe(Request $request, Recipe $recipe)
+    {
+        if (!Auth::user()->hasFeature('mobile_recipes', 'edit')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'finished_product_id' => 'required|exists:products,id|unique:recipes,finished_product_id,' . $recipe->id,
+            'yield_quantity' => 'required|numeric|min:0.001',
+            'yield_uom' => 'required|string|max:50',
+            'items' => 'required|array|min:1',
+            'items.*.raw_material_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.001',
+        ]);
+
+        try {
+            DB::transaction(function () use ($recipe, $validated) {
+                $recipe->update([
+                    'finished_product_id' => $validated['finished_product_id'],
+                    'yield_quantity' => $validated['yield_quantity'],
+                    'yield_uom' => $validated['yield_uom'],
+                ]);
+
+                $recipe->items()->delete();
+
+                foreach ($validated['items'] as $item) {
+                    \App\Models\RecipeItem::create([
+                        'recipe_id' => $recipe->id,
+                        'raw_material_id' => $item['raw_material_id'],
+                        'quantity' => $item['quantity'],
+                    ]);
+                }
+            });
+
+            return response()->json(['success' => true, 'message' => 'Recipe updated successfully!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile Delete Recipe
+     */
+    public function deleteRecipe(Recipe $recipe)
+    {
+        if (!Auth::user()->hasFeature('mobile_recipes', 'delete')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        try {
+            $recipe->delete();
+            return response()->json(['success' => true, 'message' => 'Recipe deleted successfully!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 }
