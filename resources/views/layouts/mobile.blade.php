@@ -128,10 +128,12 @@
                 <i class="fas fa-home-alt text-xl"></i>
                 <span class="text-[8px] font-black uppercase tracking-widest mt-1">Home</span>
             </a>
+            @if(Auth::user()->hasPermission('mobile_stock', 'view'))
             <a href="{{ route('mobile.stock') }}" class="flex flex-col items-center p-2 rounded-2xl transition-all {{ request()->routeIs('mobile.stock') ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-400 hover:text-slate-600' }}">
                 <i class="fas fa-boxes text-xl"></i>
                 <span class="text-[8px] font-black uppercase tracking-widest mt-1">Stock</span>
             </a>
+            @endif
             
             @if(Auth::user()->hasPermission('mobile_production', 'view'))
             <a href="{{ route('mobile.production') }}" class="flex flex-col items-center justify-center w-14 h-14 grad-indigo rounded-2xl text-white shadow-xl shadow-indigo-200 border-2 border-white transform transition active:scale-90 -mt-8">
@@ -224,6 +226,19 @@
                         @endif
                     </div>
                 </div>
+
+                <div id="installAppContainer" class="hidden space-y-3 pt-6 border-t border-slate-100">
+                    <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Web App</div>
+                    <button id="installAppBtn" class="w-full p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between group active:scale-95 transition-all text-left">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg grad-indigo flex items-center justify-center text-white">
+                                <i class="fas fa-download text-[10px]"></i>
+                            </div>
+                            <div class="text-[10px] font-black italic uppercase text-indigo-700 tracking-tight">Install InvoFlow App</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-[10px] text-indigo-300 group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </div>
             </div>
 
             <div class="p-6 border-t bg-slate-50">
@@ -236,13 +251,63 @@
 
     <script>
         // PWA Service Worker Registration
+        let deferredPrompt;
+        
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/inventorymanager/inventory-laravel/public/service-worker.js')
-                    .then(reg => console.log('Waaah! Service Worker registered!', reg))
-                    .catch(err => console.log('Opps! Service Worker failed!', err));
+                navigator.serviceWorker.register("{{ asset('service-worker.js') }}")
+                    .then(reg => {
+                        console.log('PWA: Service Worker registered!', reg);
+                        
+                        // Check for updates
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('PWA: New content is available; please refresh.');
+                                }
+                            });
+                        });
+                    })
+                    .catch(err => console.error('PWA: Service Worker failed!', err));
             });
         }
+
+        // Handle PWA Installation Prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent Chrome 67 and earlier from automatically showing the prompt
+            e.preventDefault();
+            // Stash the event so it can be triggered later.
+            deferredPrompt = e;
+            console.log('PWA: Install prompt stashed');
+
+            // Show install button in UI
+            const installBtnCont = document.getElementById('installAppContainer');
+            if (installBtnCont) {
+                installBtnCont.classList.remove('hidden');
+            }
+        });
+
+        const installBtn = document.getElementById('installAppBtn');
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`PWA: User response to install prompt: ${outcome}`);
+                    deferredPrompt = null;
+                    document.getElementById('installAppContainer').classList.add('hidden');
+                }
+            });
+        }
+
+        window.addEventListener('appinstalled', (evt) => {
+            console.log('PWA: App installed successfully');
+            const installBtnCont = document.getElementById('installAppContainer');
+            if (installBtnCont) {
+                installBtnCont.classList.add('hidden');
+            }
+        });
     </script>
     </div>
 </body>

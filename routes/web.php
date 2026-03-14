@@ -47,6 +47,8 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::resource('product-groups', App\Http\Controllers\ProductGroupController::class)->only(['store', 'destroy']);
     Route::resource('product-attributes', App\Http\Controllers\ProductAttributeController::class)->only(['store', 'destroy']);
     Route::get('products/export', [ProductController::class, 'export'])->name('products.export');
+    Route::post('products/sync-api', [ProductController::class, 'syncFromApi'])->name('products.sync-api');
+    Route::get('products/sync-report/{id}', [ProductController::class, 'syncReport'])->name('products.sync-report');
     Route::resource('products', ProductController::class);
     Route::get('recipes/export', [RecipeController::class, 'export'])->name('recipes.export');
     Route::get('recipes/import-template', [RecipeController::class, 'importTemplate'])->name('recipes.import-template');
@@ -61,28 +63,29 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::resource('users', UserController::class);
     Route::post('users/{user}/toggle-permission', [UserController::class, 'togglePermission'])->name('users.toggle-permission');
 
-    // Calculators
+    // Production Planning (MRP Calculator)
     Route::prefix('planning')->name('planning.')->group(function() {
-        Route::get('/', [App\Http\Controllers\IndentController::class, 'index'])->name('index');
-        Route::post('/calculate', [App\Http\Controllers\IndentController::class, 'calculate'])->name('calculate');
-        Route::post('/export', [App\Http\Controllers\IndentController::class, 'export'])->name('export');
+        Route::get('/', [App\Http\Controllers\PlanningController::class, 'index'])->name('index');
+        Route::post('/calculate', [App\Http\Controllers\PlanningController::class, 'calculate'])->name('calculate');
+        Route::post('/export', [App\Http\Controllers\PlanningController::class, 'export'])->name('export');
     });
 
+    // Indent Manager (Bulk Entry, History, Processing)
     Route::prefix('indent')->name('indent.')->group(function() {
-        Route::get('/', [App\Http\Controllers\PlanningController::class, 'index'])->name('index');
-        Route::post('/calculate', [App\Http\Controllers\PlanningController::class, 'calculate'])->name('calculate_inner');
-        Route::post('/store', [App\Http\Controllers\PlanningController::class, 'store'])->name('store');
-        Route::get('/get-stock', [App\Http\Controllers\PlanningController::class, 'getStock'])->name('get-stock');
-        Route::get('/bulk-stock', [App\Http\Controllers\PlanningController::class, 'getBulkStock'])->name('bulk-stock');
-        Route::get('/show/{indent}', [App\Http\Controllers\PlanningController::class, 'show'])->name('show');
-        Route::get('/show/{indent}/print', [App\Http\Controllers\PlanningController::class, 'print'])->name('print');
-        Route::get('/show/{indent}/excel', [App\Http\Controllers\PlanningController::class, 'exportExcel'])->name('excel');
-        Route::get('/show/{indent}/pdf', [App\Http\Controllers\PlanningController::class, 'exportPdf'])->name('pdf');
-        Route::get('/show/{indent}/process', [App\Http\Controllers\PlanningController::class, 'process'])->name('process');
-        Route::get('/process-list', [App\Http\Controllers\PlanningController::class, 'processList'])->name('process.list');
-        Route::get('/show/{indent}/process/excel', [App\Http\Controllers\PlanningController::class, 'exportProcessExcel'])->name('process.excel');
-        Route::get('/show/{indent}/process/pdf', [App\Http\Controllers\PlanningController::class, 'exportProcessPdf'])->name('process.pdf');
-        Route::post('/show/{indent}/complete', [App\Http\Controllers\PlanningController::class, 'updateCompletion'])->name('complete');
+        Route::get('/', [App\Http\Controllers\IndentController::class, 'index'])->name('index');
+        Route::post('/calculate', [App\Http\Controllers\IndentController::class, 'calculate'])->name('calculate_inner'); // For draft preview
+        Route::post('/store', [App\Http\Controllers\IndentController::class, 'store'])->name('store');
+        Route::get('/get-stock', [App\Http\Controllers\IndentController::class, 'getStock'])->name('get-stock');
+        Route::get('/bulk-stock', [App\Http\Controllers\IndentController::class, 'getBulkStock'])->name('bulk-stock');
+        Route::get('/show/{indent}', [App\Http\Controllers\IndentController::class, 'show'])->name('show');
+        Route::get('/show/{indent}/print', [App\Http\Controllers\IndentController::class, 'print'])->name('print');
+        Route::get('/show/{indent}/excel', [App\Http\Controllers\IndentController::class, 'exportExcel'])->name('excel');
+        Route::get('/show/{indent}/pdf', [App\Http\Controllers\IndentController::class, 'exportPdf'])->name('pdf');
+        Route::get('/show/{indent}/process', [App\Http\Controllers\IndentController::class, 'process'])->name('process');
+        Route::get('/process-list', [App\Http\Controllers\IndentController::class, 'processList'])->name('process.list');
+        Route::get('/show/{indent}/process/excel', [App\Http\Controllers\IndentController::class, 'exportProcessExcel'])->name('process.excel');
+        Route::get('/show/{indent}/process/pdf', [App\Http\Controllers\IndentController::class, 'exportProcessPdf'])->name('process.pdf');
+        Route::post('/show/{indent}/complete', [App\Http\Controllers\IndentController::class, 'updateCompletion'])->name('complete');
     });
 
     // Reports
@@ -109,6 +112,7 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/indents', [App\Http\Controllers\MobileController::class, 'indents'])->name('mobile.indents');
     Route::post('/indents-store', [App\Http\Controllers\MobileController::class, 'storeIndent'])->name('mobile.indents.store');
     Route::post('/fg-stock', [App\Http\Controllers\MobileController::class, 'getFGStock'])->name('mobile.fg-stock');
+    Route::get('/indent/show/{indent}', [App\Http\Controllers\IndentController::class, 'show'])->name('mobile.indent.show');
     Route::get('/indents/{indent}/process', [App\Http\Controllers\MobileController::class, 'process'])->name('mobile.indents.process');
     Route::post('/indents/{indent}/completion', [App\Http\Controllers\MobileController::class, 'updateCompletion'])->name('mobile.indents.completion');
     Route::get('/indents/{indent}/excel', [App\Http\Controllers\MobileController::class, 'exportExcel'])->name('mobile.indents.excel');

@@ -86,7 +86,23 @@
                     </td>
                     <td class="py-3 px-6 text-left font-medium">
                         <div class="font-bold">{{ $recipe->finishedProduct->name }}</div>
-                        <div class="text-xs text-blue-600 uppercase">{{ $recipe->finishedProduct->type->type_name ?? 'N/A' }}</div>
+                        <div class="mt-1">
+                            @php
+                                $typeName = $recipe->finishedProduct->type->type_name ?? 'N/A';
+                                $badgeClass = 'bg-slate-100 text-slate-600'; // Default
+                                
+                                if (str_contains(strtolower($typeName), 'finished good') && !str_contains(strtolower($typeName), 'semi')) {
+                                    $badgeClass = 'bg-green-100 text-green-700 border border-green-200';
+                                } elseif (str_contains(strtolower($typeName), 'semi')) {
+                                    $badgeClass = 'bg-amber-100 text-amber-700 border border-amber-200';
+                                } elseif (str_contains(strtolower($typeName), 'raw')) {
+                                    $badgeClass = 'bg-gray-100 text-gray-700 border border-gray-200';
+                                }
+                            @endphp
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider {{ $badgeClass }}">
+                                {{ $typeName }}
+                            </span>
+                        </div>
                         <div class="text-xs text-gray-500 italic">Packing: {{ $recipe->finishedProduct->pack_name }}</div>
                     </td>
                     <td class="py-3 px-6 text-left">{{ $recipe->yield_quantity }} {{ $recipe->yield_uom }}</td>
@@ -142,13 +158,22 @@
                 @csrf
                 <input type="hidden" name="_method" id="methodField" value="POST">
                 
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-2 gap-4 mb-4 bg-gray-50 p-3 rounded-lg border">
                     <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Finished Product</label>
-                        <select name="finished_product_id" id="finished_product_id" class="shadow border rounded w-full py-2 px-3 text-gray-700" required>
+                        <label class="block text-gray-700 text-[10px] font-black uppercase tracking-widest mb-1">Filter Finished Product Type</label>
+                        <select onchange="filterFinishedProducts(this.value)" class="w-full border border-gray-200 rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-blue-500 outline-none transition uppercase font-bold">
+                            <option value="">All Types</option>
+                            @foreach($types as $type)
+                                <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-[10px] font-black uppercase tracking-widest mb-1">Finished Product</label>
+                        <select name="finished_product_id" id="finished_product_id" class="w-full border border-gray-200 rounded-lg py-1.5 px-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition" required>
                             <option value="">Select Finished Good</option>
                             @foreach($finishedGoods as $product)
-                                <option value="{{ $product->id }}">{{ $product->name }} ({{ $product->pack_name }}) ({{ $product->uom }})</option>
+                                <option value="{{ $product->id }}" data-type="{{ $product->product_type_id }}">{{ $product->name }} ({{ $product->pack_name }}) ({{ $product->uom }})</option>
                             @endforeach
                         </select>
                     </div>
@@ -165,13 +190,26 @@
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2 border-b pb-2">Raw Materials</label>
-                    <div id="rawMaterialsList" class="mt-2">
+                <div class="mb-4 bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
+                    <div class="flex justify-between items-end mb-4 border-b pb-3">
+                        <label class="block text-blue-800 text-xs font-black uppercase tracking-widest">
+                            <i class="fas fa-flask mr-2"></i> Raw Materials
+                        </label>
+                        <div class="w-48">
+                            <label class="block text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">Type Filter (All Rows)</label>
+                            <select onchange="filterAllRawMaterials(this.value)" id="rmGlobalFilter" class="w-full border border-blue-100 rounded-lg py-1.5 px-2 text-[10px] font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                                <option value="">Show All Items</option>
+                                @foreach($types as $type)
+                                    <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div id="rawMaterialsList" class="space-y-3">
                         <!-- Rows will be injected here -->
                     </div>
-                    <button type="button" onclick="addRawMaterialRow()" class="mt-2 text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center">
-                        <i class="fas fa-plus-circle mr-1"></i> Add Raw Material
+                    <button type="button" onclick="addRawMaterialRow()" class="mt-4 bg-white border-2 border-dashed border-blue-200 text-blue-600 hover:border-blue-400 hover:text-blue-700 w-full rounded-xl py-3 text-xs font-black uppercase tracking-widest transition flex items-center justify-center gap-2">
+                        <i class="fas fa-plus-circle"></i> Add Raw Material
                     </button>
                 </div>
 
@@ -214,36 +252,83 @@
 
 <script>
     let itemIndex = 0;
-    const rawMaterialsOptions = `
-        <option value="">Select Raw Material</option>
+    
+    // Store all options as arrays for filtering
+    const allFinishedProducts = Array.from(document.querySelectorAll('#finished_product_id option')).map(opt => ({
+        id: opt.value,
+        text: opt.text,
+        type: opt.dataset.type
+    }));
+
+    const allRawMaterials = [
         @foreach($rawMaterials as $material)
-            <option value="{{ $material->id }}">{{ $material->name }} ({{ $material->pack_name }}) ({{ $material->uom }})</option>
+            { id: "{{ $material->id }}", name: "{{ $material->name }}", pack: "{{ $material->pack_name }}", uom: "{{ $material->uom }}", type: "{{ $material->product_type_id }}" },
         @endforeach
-    `;
+    ];
+
+    function filterFinishedProducts(typeId) {
+        const select = document.getElementById('finished_product_id');
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Select Finished Good</option>';
+        
+        allFinishedProducts.forEach(prod => {
+            if (prod.id === "") return;
+            if (!typeId || prod.type == typeId) {
+                const opt = document.createElement('option');
+                opt.value = prod.id;
+                opt.text = prod.text;
+                opt.dataset.type = prod.type;
+                if (prod.id == currentValue) opt.selected = true;
+                select.appendChild(opt);
+            }
+        });
+    }
+
+    function filterAllRawMaterials(typeId) {
+        // Update all existing selects
+        const selects = document.querySelectorAll('#rawMaterialsList select');
+        selects.forEach(select => {
+            const currentValue = select.value;
+            populateRMSelect(select, typeId, currentValue);
+        });
+    }
+
+    function populateRMSelect(select, typeId, currentValue = '') {
+        select.innerHTML = '<option value="">Select Raw Material</option>';
+        allRawMaterials.forEach(rm => {
+            if (!typeId || rm.type == typeId) {
+                const opt = document.createElement('option');
+                opt.value = rm.id;
+                opt.text = `${rm.name} (${rm.pack}) (${rm.uom})`;
+                if (rm.id == currentValue) opt.selected = true;
+                select.appendChild(opt);
+            }
+        });
+    }
 
     function addRawMaterialRow(materialId = '', quantity = '') {
+        const typeFilter = document.getElementById('rmGlobalFilter').value;
         const container = document.getElementById('rawMaterialsList');
         const div = document.createElement('div');
-        div.className = 'grid grid-cols-12 gap-2 mb-2 raw-material-row items-center';
+        div.className = 'grid grid-cols-12 gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm items-center transition hover:border-blue-200';
         div.innerHTML = `
             <div class="col-span-8">
-                <select name="items[${itemIndex}][raw_material_id]" class="shadow border rounded w-full py-2 px-3 text-gray-700" required>
-                    ${rawMaterialsOptions}
+                <select name="items[${itemIndex}][raw_material_id]" class="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition" required>
                 </select>
             </div>
             <div class="col-span-3">
-                <input type="number" step="0.001" name="items[${itemIndex}][quantity]" value="${quantity}" placeholder="Qty" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" required>
+                <input type="number" step="0.001" name="items[${itemIndex}][quantity]" value="${quantity}" placeholder="Qty" class="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition" required>
             </div>
             <div class="col-span-1 text-right">
-                <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2">
-                    <i class="fas fa-trash"></i>
+                <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-gray-300 hover:text-red-500 transition-colors p-2 h-10 w-10 flex items-center justify-center rounded-lg hover:bg-red-50">
+                    <i class="fas fa-trash-alt"></i>
                 </button>
             </div>
         `;
         container.appendChild(div);
-        if (materialId) {
-            div.querySelector('select').value = materialId;
-        }
+        
+        const select = div.querySelector('select');
+        populateRMSelect(select, typeFilter, materialId);
         itemIndex++;
     }
 

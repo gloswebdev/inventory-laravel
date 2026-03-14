@@ -8,14 +8,20 @@
             <h2 class="text-3xl font-900 text-slate-800 tracking-tighter">Planning Hub</h2>
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Material resource planning</p>
         </div>
-        <button @click="resetForm" class="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100/50 transition-all active:scale-90 shadow-sm">
-            <i class="fas fa-rotate-right text-sm"></i>
-        </button>
+        <div class="flex items-center gap-3">
+            <button @click="showIndentModal = true" class="bg-indigo-50 hover:bg-indigo-100 px-4 py-2.5 rounded-xl border border-indigo-100 flex items-center gap-2 transition-all active:scale-95 text-indigo-700 shadow-sm">
+                <i class="fas fa-file-invoice text-xs"></i>
+                <span class="text-[9px] font-black uppercase tracking-widest">Plan by Indent</span>
+            </button>
+            <button @click="resetForm" class="w-11 h-11 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 border border-rose-100/50 transition-all active:scale-90 shadow-sm">
+                <i class="fas fa-rotate-right text-xs"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Planning Form -->
     <div class="space-y-6">
-        @if(Auth::user()->hasFeature('mobile_planning', 'type_filter'))
+        @if(Auth::user()->hasPermission('mobile_planning', 'type_filter'))
         <!-- Category Filter -->
         <div class="glass-premium p-6 rounded-[2.5rem] border border-white/80">
             <div class="flex items-center gap-3 ml-1 mb-3">
@@ -102,7 +108,7 @@
                     x-model="form.branch_code" 
                     class="w-full bg-slate-50/50 border-none rounded-2xl py-4 px-6 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none"
                 >
-                    <option value="">Global Stock (All Branches)</option>
+                    <option value="">Consolidated View (All Branches)</option>
                     @foreach($branches as $branch)
                     <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
                     @endforeach
@@ -162,7 +168,7 @@
                     </div>
                     
                     <div class="text-right shrink-0">
-                        <div class="text-[9px] font-black text-slate-300 uppercase tracking-widest" x-text="'Demand: ' + parseFloat(rm.required_qty).toFixed(2)"></div>
+                        <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="'Need: ' + parseFloat(rm.required_qty).toFixed(2)"></div>
                         <div 
                             class="text-sm font-900 tracking-tighter mt-1" 
                             :class="rm.shortfall > 0 ? 'text-rose-600' : 'text-emerald-600'" 
@@ -179,7 +185,7 @@
         <div class="grad-indigo p-1 rounded-[3rem] shadow-2xl shadow-indigo-100">
             <div class="bg-slate-900/90 backdrop-blur-md p-8 rounded-[2.9rem] border border-white/10">
                 <div class="flex items-center gap-5 mb-8">
-                    <div class="w-14 h-14 bg-white/10 rounded-3xl flex items-center justify-center text-white border border-white/5 ring-4 ring-white/5 shadow-inner">
+                    <div class="w-14 h-14 bg-indigo-500/20 rounded-3xl flex items-center justify-center text-white border border-white/10 ring-4 ring-white/5 shadow-inner">
                         <i class="fas fa-wand-magic-sparkles text-xl text-indigo-300"></i>
                     </div>
                     <div>
@@ -204,12 +210,87 @@
             </div>
         </div>
     </div>
+
+    <!-- Indent Selection Modal -->
+    <div x-show="showIndentModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-300"
+             @click.outside="showIndentModal = false">
+            
+            <div class="bg-indigo-600 p-8 text-white relative">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white/20 p-3 rounded-2xl">
+                        <i class="fas fa-file-invoice-dollar text-2xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-900 italic tracking-tighter uppercase leading-tight">Plan by Indent</h2>
+                        <p class="text-indigo-100 font-bold text-[9px] uppercase tracking-widest mt-1">Select source indent</p>
+                    </div>
+                </div>
+                <button @click="showIndentModal = false" class="absolute top-8 right-8 text-white/50 hover:text-white transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                @foreach($indents as $indent)
+                <div class="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">#{{ $indent->id }} | {{ $indent->branch_code }}</div>
+                            <div class="text-xs font-900 text-slate-800 mt-1">{{ $indent->branch_name }}</div>
+                            <div class="text-[9px] text-slate-400 font-bold mt-0.5">{{ \Carbon\Carbon::parse($indent->indent_date)->format('d M, Y') }}</div>
+                        </div>
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[8px] font-black uppercase tracking-tighter">{{ $indent->status }}</span>
+                    </div>
+                    
+                    <div class="flex gap-2 pt-2">
+                        <button 
+                            @click="planFromIndent({{ $indent->id }}, 'full')" 
+                            class="flex-1 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"
+                        >
+                            PLAN FULL
+                        </button>
+                        <button 
+                            @click="planFromIndent({{ $indent->id }}, 'shortfall')" 
+                            class="flex-1 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                        >
+                            SHORTFALL
+                        </button>
+                    </div>
+                </div>
+                @endforeach
+                
+                @if(count($indents) === 0)
+                <div class="p-10 text-center space-y-4">
+                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+                        <i class="fas fa-folder-open text-slate-300 text-2xl"></i>
+                    </div>
+                    <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">No recent indents found</p>
+                </div>
+                @endif
+            </div>
+
+            <div class="p-4 border-t bg-white">
+                <button @click="showIndentModal = false" class="w-full py-4 bg-slate-50 text-slate-500 rounded-2xl font-black italic tracking-tighter uppercase text-xs">
+                    Cancel Selection
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
     function planningApp() {
         return {
             loading: false,
+            showIndentModal: false,
             form: {
                 branch_code: '',
                 products: [
@@ -224,16 +305,67 @@
                 if (!this.selectedTypeId) return this.allProducts;
                 return this.allProducts.filter(p => p.product_type_id == this.selectedTypeId);
             },
-            addRow() {
-                this.form.products.push({ id: '', demand_qty: '' });
+            addRow(id = '', demand_qty = '') {
+                this.form.products.push({ id: id, demand_qty: demand_qty });
             },
             removeRow(index) {
                 this.form.products.splice(index, 1);
+                if(this.form.products.length === 0) this.addRow();
             },
             resetForm() {
                 this.form.products = [{ id: '', demand_qty: '' }];
                 this.results = [];
                 this.summary = [];
+                this.showIndentModal = false;
+            },
+            async planFromIndent(indentId, mode) {
+                this.loading = true;
+                this.showIndentModal = false;
+                
+                try {
+                    const response = await fetch(`{{ route('mobile.indent.show', ['indent' => '__ID__']) }}`.replace('__ID__', indentId));
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const indent = data.indent;
+                        this.form.branch_code = indent.branch_code;
+                        this.form.products = [];
+                        
+                        let itemsAdded = 0;
+                        indent.items.forEach(item => {
+                            const asked = parseFloat(item.final_qty_box || 0);
+                            const completed = parseFloat(item.completed_qty || 0);
+                            let qtyToPlan = 0;
+
+                            if (mode === 'full') {
+                                qtyToPlan = asked;
+                            } else {
+                                qtyToPlan = asked - completed;
+                            }
+
+                            if (qtyToPlan > 0) {
+                                this.form.products.push({ 
+                                    id: item.product_id, 
+                                    demand_qty: qtyToPlan.toFixed(2) 
+                                });
+                                itemsAdded++;
+                            }
+                        });
+
+                        if (itemsAdded === 0) {
+                            alert('No items to plan in this indent.');
+                            this.addRow();
+                        }
+                    } else {
+                        alert(data.message);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Synchronisation failure.');
+                } finally {
+                    this.loading = false;
+                }
             },
             async calculate() {
                 if (this.form.products.some(p => !p.id || !p.demand_qty)) {

@@ -16,8 +16,20 @@ class SettingController extends Controller
         // Live Stock API (Algebra ERP)
         $erpApiStatus = 'Active';
         $erpApiUrl = 'https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory';
+
+        // Product Master API (Algebra ERP)
+        $productMasterApiStatus = 'Active';
+        $productMasterApiUrl = 'https://logicapi.algebraerp.com/API/SYNWOOD/ProductMaster';
         
-        return view('settings.branches', compact('branches', 'apiStatus', 'apiUrl', 'erpApiStatus', 'erpApiUrl'));
+        return view('settings.branches', compact(
+            'branches', 
+            'apiStatus', 
+            'apiUrl', 
+            'erpApiStatus', 
+            'erpApiUrl',
+            'productMasterApiStatus',
+            'productMasterApiUrl'
+        ));
     }
 
     public function updateBranches(Request $request)

@@ -188,7 +188,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 overflow-x-hidden overflow-y-auto p-8">
+            <main class="flex-1 overflow-x-hidden overflow-y-auto px-8 pb-8">
                 {{-- Flash Messages --}}
                 @if(session('success'))
                     <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">

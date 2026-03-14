@@ -95,7 +95,7 @@ class ReportController extends Controller
                 $unitPerBox = (float)($product->unit_box ?: 1);
                 $weightPerUnit = (float)($product->weight_unit ?: 1);
                 
-                $displayQty = ($displayUnit === 'kg') ? ($qty * $weightPerUnit) : $qty;
+                $displayQty = ($displayUnit === 'kg') ? ($qty * $product->weight_multiplier) : $qty;
 
                 $branchStocks[$branch->code] = [
                     'qty' => $displayQty,
@@ -110,9 +110,8 @@ class ReportController extends Controller
             }
 
             $unitPerBox = (float)($product->unit_box ?: 1);
-            $weightPerUnit = (float)($product->weight_unit ?: 1);
             
-            $totalDisplayQty = ($displayUnit === 'kg') ? ($totalQty * $weightPerUnit) : $totalQty;
+            $totalDisplayQty = ($displayUnit === 'kg') ? ($totalQty * $product->weight_multiplier) : $totalQty;
 
             $reportData[] = [
                 'product' => $product,
@@ -209,7 +208,7 @@ class ReportController extends Controller
                 $qty = $externalStock[$branch->code][$product->item_code] ?? 0;
                 $unitPerBox = (float)($product->unit_box ?: 1);
                 $weightPerUnit = (float)($product->weight_unit ?: 1);
-                $displayQty = ($displayUnit === 'kg') ? ($qty * $weightPerUnit) : $qty;
+                $displayQty = ($displayUnit === 'kg') ? ($qty * $product->weight_multiplier) : $qty;
                 $branchStocks[$branch->code] = ['qty' => $displayQty, 'boxes' => $qty / $unitPerBox];
                 $totalQty += $qty;
             }
@@ -220,7 +219,7 @@ class ReportController extends Controller
             }
 
             $weightPerUnit = (float)($product->weight_unit ?: 1);
-            $totalDisplayQty = ($displayUnit === 'kg') ? ($totalQty * $weightPerUnit) : $totalQty;
+            $totalDisplayQty = ($displayUnit === 'kg') ? ($totalQty * $product->weight_multiplier) : $totalQty;
             $reportData[] = [
                 'product' => $product,
                 'branch_stocks' => $branchStocks,

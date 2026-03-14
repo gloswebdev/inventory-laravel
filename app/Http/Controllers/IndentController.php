@@ -4,128 +4,270 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Branch;
+use App\Models\Indent;
+use App\Models\IndentItem;
 use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
 
 class IndentController extends Controller
 {
-    public function calculate(Request $request)
+    /**
+     * Indent Manager Dashboard (Bulk Entry & History)
+     */
+    public function index(Request $request)
     {
-        $productsInput = $request->input('products', []);
-        $branchCode = $request->input('branch_code');
-        $results = $this->getConsolidatedRequirements($productsInput, $branchCode);
+        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
+        $this->applyTypeFilters($productsQuery);
+        $finishedGoods = $productsQuery->get();
+        
+        $branches = Branch::orderBy('code')->get();
+        
+        $query = Indent::with(['items.product', 'user']);
 
-        if (is_string($results)) {
-            return response()->json(['success' => false, 'message' => $results]);
+        if ($request->filled('from_date')) {
+            $query->whereDate('indent_date', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $query->whereDate('indent_date', '<=', $request->to_date);
+        }
+        if ($request->filled('branch_code')) {
+            $query->where('branch_code', $request->branch_code);
+        }
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
         }
 
-        $productionSummary = $this->getProductionSummary($productsInput);
+        $history = $query->orderByDesc('created_at')->limit(50)->get();
+        $users = \App\Models\User::orderBy('name')->get();
+        $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
+
+        return view('indent.index', compact('finishedGoods', 'branches', 'history', 'users', 'productTypes'));
+    }
+
+    /**
+     * Store New Indent (Bulk)
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'branch_code' => 'required',
+            'indent_date' => 'required|date',
+            'products' => 'required|array',
+        ]);
+
+        $branch = Branch::where('code', $request->branch_code)->first();
+        $branchName = $branch ? $branch->name : "Branch " . $request->branch_code;
+
+        $indent = Indent::create([
+            'branch_code' => $request->branch_code,
+            'branch_name' => $branchName,
+            'indent_date' => $request->indent_date,
+            'user_id' => auth()->id(),
+            'total_boxes' => 0,
+        ]);
+
+        $totalBoxes = 0;
+        foreach ($request->products as $item) {
+            if ($item['demand_qty'] > 0) {
+                IndentItem::create([
+                    'indent_id' => $indent->id,
+                    'product_id' => $item['id'],
+                    'product_name' => $item['name'] ?? null,
+                    'demand_qty' => $item['demand_qty'],
+                    'demand_unit' => $item['unit'],
+                    'stock_box' => $item['stock_box'] ?? 0,
+                    'stock_kg' => $item['stock_kg'] ?? 0,
+                    'final_qty_box' => $item['final_qty_box'] ?? 0,
+                ]);
+                $totalBoxes += (float)($item['final_qty_box'] ?? 0);
+            }
+        }
+
+        $indent->update(['total_boxes' => $totalBoxes]);
+
+        return response()->json(['success' => true, 'message' => 'Indent saved successfully!']);
+    }
+
+    /**
+     * Get Live Stock for a single product
+     */
+    public function getStock(Request $request)
+    {
+        $productId = $request->get('product_id');
+        $branchCode = $request->get('branch_code');
+
+        if (!$productId) return response()->json(['success' => false, 'stock' => 0]);
+
+        $query = Product::where('id', $productId);
+        $this->applyTypeFilters($query);
+        $product = $query->first();
+
+        if (!$product) return response()->json(['success' => false, 'stock' => 0]);
+
+        $externalStock = $this->getExternalStock();
+        $stock = 0;
+        
+        if ($branchCode && isset($externalStock[$branchCode][$product->item_code])) {
+            $stock = $externalStock[$branchCode][$product->item_code];
+        } else {
+            foreach ($externalStock as $items) {
+                $stock += ($items[$product->item_code] ?? 0);
+            }
+        }
+
+        $unitPerBox = (float)($product->unit_box ?: 1);
+        $stockBoxes = $stock / $unitPerBox;
 
         return response()->json([
             'success' => true, 
-            'data' => $results,
-            'summary' => $productionSummary
+            'stock' => $stock,
+            'stock_boxes' => $stockBoxes,
+            'uom' => $product->uom,
+            'unit_box' => $product->unit_box,
+            'weight_unit' => $product->weight_unit,
+            'stock_kg' => $stock * $product->weight_multiplier
         ]);
     }
 
-    public function export(Request $request)
+    /**
+     * Get Bulk Stock for all products in view
+     */
+    public function getBulkStock(Request $request)
     {
-        $productsInput = json_decode($request->input('products_json', '[]'), true);
-        $branchCode = $request->input('branch_code');
-        $results = $this->getConsolidatedRequirements($productsInput, $branchCode);
-
-        if (is_string($results)) {
-            return redirect()->back()->with('error', $results);
-        }
-
-        $summary = $this->getProductionSummary($productsInput);
-
-        return (new \App\Exports\MRPExport($results, $summary, $branchCode))->download('mrp_planning_report.xlsx');
-    }
-
-    public function index()
-    {
-        $finishedGoods = Product::whereHas('recipes')->orderBy('name')->get();
-        $branches = Branch::orderBy('code')->get();
-        $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
-        return view('indent.index', compact('finishedGoods', 'branches', 'productTypes'));
-    }
-
-    private function getProductionSummary($productsInput)
-    {
-        $summary = [];
-        foreach ($productsInput as $input) {
-            $product = \App\Models\Product::find($input['id']);
-            if ($product) {
-                $summary[] = [
-                    'name' => $product->name,
-                    'item_code' => $product->item_code,
-                    'pack_name' => $product->pack_name,
-                    'quantity' => (float)$input['demand_qty']
-                ];
-            }
-        }
-        return $summary;
-    }
-
-    private function getConsolidatedRequirements($productsInput, $branchCode = null)
-    {
-        if (empty($productsInput)) {
-            return 'No products provided';
-        }
-
-        $totalRequirements = [];
+        $branchCode = $request->get('branch_code');
         
-        // Fetch external stock from API
+        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
+        $this->applyTypeFilters($productsQuery);
+        $products = $productsQuery->get();
         $externalStock = $this->getExternalStock();
-
-        foreach ($productsInput as $input) {
-            $productId = $input['id'];
-            $demandQty = (float)$input['demand_qty'];
-
-            $recipe = \App\Models\Recipe::where('finished_product_id', $productId)
-                ->with('items.rawMaterial')
-                ->first();
-
-            if (!$recipe) continue;
-
-            foreach ($recipe->items as $item) {
-                $rm = $item->rawMaterial;
-                if (!$rm) continue;
-
-                $requiredForThisFG = ($item->quantity / $recipe->yield_quantity) * $demandQty;
-
-                if (isset($totalRequirements[$rm->id])) {
-                    $totalRequirements[$rm->id]['required_qty'] += $requiredForThisFG;
-                } else {
-                    // Correct Stock aggregation logic
-                    $currentStock = 0;
-                    if ((int)$branchCode && isset($externalStock[(int)$branchCode][$rm->item_code])) {
-                        $currentStock = $externalStock[(int)$branchCode][$rm->item_code];
-                    } else {
-                        // Sum across all branches for consolidated view
-                        foreach ($externalStock as $bCode => $items) {
-                            $currentStock += ($items[$rm->item_code] ?? 0);
-                        }
-                    }
-
-                    $totalRequirements[$rm->id] = [
-                        'id' => $rm->id,
-                        'name' => $rm->name,
-                        'item_code' => $rm->item_code,
-                        'uom' => $rm->uom,
-                        'pack_name' => $rm->pack_name,
-                        'required_qty' => $requiredForThisFG,
-                        'current_stock' => $currentStock,
-                    ];
+        
+        $results = [];
+        foreach ($products as $product) {
+            $stock = 0;
+            if ((int)$branchCode && isset($externalStock[(int)$branchCode][$product->item_code])) {
+                $stock = $externalStock[(int)$branchCode][$product->item_code];
+            } else {
+                foreach ($externalStock as $items) {
+                    $stock += ($items[$product->item_code] ?? 0);
                 }
             }
+
+            $unitPerBox = (float)($product->unit_box ?: 1);
+            $stockBoxes = $stock / $unitPerBox;
+            $stockKg = $stock * $product->weight_multiplier;
+            
+            $results[$product->id] = [
+                'stock' => $stockKg,
+                'stock_boxes' => $stockBoxes
+            ];
         }
 
-        return array_values(array_map(function($item) {
-            $shortfall = $item['required_qty'] - $item['current_stock'];
-            $item['shortfall'] = $shortfall > 0 ? $shortfall : 0;
-            return $item;
-        }, $totalRequirements));
+        return response()->json(['success' => true, 'stocks' => $results]);
+    }
+
+    public function show(Indent $indent)
+    {
+        return response()->json([
+            'success' => true,
+            'indent' => $indent->load('items.product', 'user')
+        ]);
+    }
+
+    public function print(Indent $indent)
+    {
+        $indent->load('items.product', 'user');
+        return view('indent.print', compact('indent'));
+    }
+
+    public function exportExcel(Indent $indent)
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\IndentExport($indent), 
+            "Indent_{$indent->branch_code}_{$indent->indent_date}.xlsx"
+        );
+    }
+
+    public function exportPdf(Indent $indent)
+    {
+        $indent->load('items.product', 'user');
+        $pdf = Pdf::loadView('indent.indent_pdf', compact('indent'));
+        return $pdf->download("Indent_{$indent->branch_code}_{$indent->indent_date}.pdf");
+    }
+
+    public function process(Indent $indent)
+    {
+        $indent->load('items.product', 'user');
+        $branches = Branch::orderBy('code')->get();
+        $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
+
+        return view('indent.process', compact('indent', 'branches', 'branchStocks'));
+    }
+
+    public function processList(Request $request)
+    {
+        $query = Indent::with(['user'])->withCount('items');
+
+        if ($request->filled('from_date')) $query->whereDate('indent_date', '>=', $request->from_date);
+        if ($request->filled('to_date')) $query->whereDate('indent_date', '<=', $request->to_date);
+        if ($request->filled('branch_code')) $query->where('branch_code', $request->branch_code);
+        if ($request->filled('user_id')) $query->where('user_id', $request->user_id);
+        if ($request->filled('status')) $query->where('status', $request->status);
+
+        $history = $query->orderByDesc('created_at')->get();
+        $branches = Branch::orderBy('name')->get();
+        $users = \App\Models\User::orderBy('name')->get();
+
+        return view('indent.list', compact('history', 'branches', 'users'));
+    }
+
+    public function exportProcessExcel(Indent $indent)
+    {
+        $indent->load('items.product', 'user');
+        $branches = Branch::orderBy('code')->get();
+        $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\IndentProcessExport($indent, $branches, $branchStocks), 
+            "Process_Matrix_{$indent->branch_code}_{$indent->indent_date}.xlsx"
+        );
+    }
+
+    public function updateCompletion(Request $request, Indent $indent)
+    {
+        $quantities = $request->input('completed_qty', []);
+        $totalAsked = 0; $totalCompleted = 0; $anyCompleted = false;
+
+        foreach ($indent->items as $item) {
+            $compQty = $quantities[$item->id] ?? 0;
+            $item->update(['completed_qty' => $compQty]);
+            $totalAsked += $item->final_qty_box;
+            $totalCompleted += $compQty;
+            if ($compQty > 0) $anyCompleted = true;
+        }
+
+        $status = ($totalCompleted >= $totalAsked && $totalAsked > 0) ? 'completed' : ($anyCompleted ? 'partly completed' : 'pending');
+        $indent->update(['status' => $status]);
+
+        return redirect()->back()->with('success', 'Status updated to ' . strtoupper($status));
+    }
+
+    private function getBranchStocksForIndent($indent, $branches)
+    {
+        $externalStock = $this->getExternalStock();
+        $branchStocks = [];
+        foreach ($indent->items as $item) {
+            $p = $item->product;
+            if (!$p) continue;
+            foreach ($branches as $branch) {
+                $rawStock = $externalStock[$branch->code][$p->item_code] ?? 0;
+                $branchStocks[$p->id][$branch->code] = $rawStock / ($p->unit_box ?: 1);
+            }
+        }
+        return $branchStocks;
     }
 
     private function getExternalStock()
@@ -133,27 +275,32 @@ class IndentController extends Controller
         return \Illuminate\Support\Facades\Cache::remember('external_stock_data_grouped', 300, function () {
             try {
                 $response = \Illuminate\Support\Facades\Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
-                    "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",
-                    "Branch" => "ALL",
-                    "Item" => "ALL"
+                    "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14", "Branch" => "ALL", "Item" => "ALL"
                 ]);
-
                 if ($response->successful()) {
                     $data = $response->json();
                     if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
                         $stockMap = [];
                         foreach ($data['resultdata'] as $item) {
-                            $bCode = (int)$item['Branch_Code'];
-                            $iCode = $item['User_Code'];
-                            $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
+                            $stockMap[(int)$item['Branch_Code']][$item['User_Code']] = (float)$item['ClosingQty'];
                         }
                         return $stockMap;
                     }
                 }
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('External Stock API Error (Indent): ' . $e->getMessage());
-            }
+            } catch (\Exception $e) { \Illuminate\Support\Facades\Log::error('Stock API Error: ' . $e->getMessage()); }
             return [];
         });
+    }
+
+    protected function applyTypeFilters($query)
+    {
+        $user = Auth::user();
+        if (!$user || $user->role === 'admin') return $query;
+        $permittedTypeIds = $user->getPermittedProductTypeIds();
+        $permittedRMTypes = $user->getPermittedRMTypes();
+        return $query->whereIn('product_type_id', $permittedTypeIds)
+            ->where(function ($q) use ($permittedRMTypes) {
+                $q->whereIn('rm_type', $permittedRMTypes)->orWhereNull('rm_type')->orWhere('rm_type', '');
+            });
     }
 }

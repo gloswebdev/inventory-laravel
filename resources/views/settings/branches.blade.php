@@ -36,7 +36,7 @@
             </div>
 
             <!-- Live Stock API (ERP) -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-50">
                 <div class="flex-grow">
                     <div class="flex items-center mb-1.5 ml-1">
                         <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Stock API (Algebra ERP)</label>
@@ -53,6 +53,28 @@
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">ERP Status</label>
                     <div class="px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-center font-bold text-xs uppercase tracking-tight">
                         {{ $erpApiStatus }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Master API (ERP) -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex-grow">
+                    <div class="flex items-center mb-1.5 ml-1">
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Master API (Algebra ERP)</label>
+                        <span class="ml-2 px-1.5 py-0.5 bg-cyan-100 text-cyan-700 text-[8px] font-bold rounded">EXTERNAL</span>
+                    </div>
+                    <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
+                        <code class="text-cyan-600 font-mono text-sm break-all flex-grow">{{ $productMasterApiUrl }}</code>
+                        <button onclick="navigator.clipboard.writeText('{{ $productMasterApiUrl }}'); alert('Copied to clipboard!')" class="ml-3 text-slate-400 hover:text-blue-500 transition">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="md:w-32 flex flex-col justify-center">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Status</label>
+                    <div class="px-4 py-2.5 bg-cyan-50 text-cyan-700 rounded-xl text-center font-bold text-xs uppercase tracking-tight">
+                        {{ $productMasterApiStatus }}
                     </div>
                 </div>
             </div>

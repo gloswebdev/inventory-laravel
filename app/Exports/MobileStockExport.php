@@ -54,8 +54,7 @@ class MobileStockExport implements FromCollection, WithHeadings, WithMapping, Sh
         }
 
         $unitPerBox = (float)($product->unit_box ?: 1);
-        $weightPerUnit = (float)($product->weight_unit ?: 1);
-        $displayQty = ($this->displayUnit === 'kg') ? ($qty * $weightPerUnit) : ($qty / $unitPerBox);
+        $displayQty = ($this->displayUnit === 'kg') ? ($qty * $product->weight_multiplier) : ($qty / $unitPerBox);
 
         return [
             $product->name,

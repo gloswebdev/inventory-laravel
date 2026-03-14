@@ -151,12 +151,12 @@
                             // We'll calculate the limit check in Alpine.js
                         @endphp
                         <template x-if="displayUnit === 'kg'">
-                            <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity * (product.weight_unit || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
+                            <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity * (product.weight_multiplier || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
                         </template>
                         <template x-if="displayUnit !== 'kg'">
                             <div class="text-xl font-900 tracking-tighter" :class="stocks[product.id] <= (product.low_alert_quantity / (product.unit_box || 1)) ? 'text-red-500 font-black' : (stocks[product.id] <= 0 ? 'text-slate-200' : 'text-slate-800')" x-text="Number.isInteger(stocks[product.id]) ? stocks[product.id] : parseFloat(stocks[product.id]).toFixed(2)"></div>
                         </template>
-                        <div class="text-[8px] font-black uppercase tracking-[0.1em] mt-0.5" :class="stocks[product.id] <= 0 ? 'text-slate-300' : 'text-indigo-500'" x-text="displayUnit === 'kg' ? 'Units (KG)' : 'Boxes'"></div>
+                        <div class="text-[8px] font-black uppercase tracking-[0.1em] mt-0.5" :class="stocks[product.id] <= 0 ? 'text-slate-300' : 'text-indigo-500'" x-text="displayUnit === 'kg' ? (product.uom === 'Ltr' ? 'Units (LTR)' : 'Units (KG)') : 'Boxes'"></div>
                     </div>
                 </div>
             </template>

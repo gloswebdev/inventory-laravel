@@ -1,442 +1,737 @@
 @extends('layouts.app')
 
-@section('header', 'Production Planning')
+@section('header', 'Indent Manager')
 
 @section('content')
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded shadow-md p-6">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-            <h3 class="text-lg font-bold text-gray-700">Calculate Requirements (MRP)</h3>
-            <div class="flex items-center gap-2">
-                @if(Auth::user()->hasFeature('indent', 'type_filter'))
-                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5">
-                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Filter Type:</label>
-                    <select id="global_type_filter" onchange="applyGlobalTypeFilter()" class="bg-transparent border-none text-xs font-bold text-indigo-600 focus:ring-0 outline-none pr-8">
-                        <option value="">All Types</option>
-                        @foreach($productTypes as $type)
-                            <option value="{{ $type->id }}">{{ $type->type_name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                @else
-                <select id="global_type_filter" style="display: none;"><option value=""></option></select>
-                @endif
-                @if(Auth::user()->hasFeature('indent', 'bulk_add'))
-                <button type="button" onclick="toggleBulkModal()" class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-bold py-1.5 px-3 rounded-lg text-xs transition duration-200 flex items-center gap-2">
-                    <i class="fas fa-layer-group"></i> Bulk Add
-                </button>
-                @endif
-            </div>
-        </div>
-
-        <div id="productInputList">
-            <div class="flex gap-2 mb-2 product-row items-center">
-                <div class="flex-grow">
-                    <select class="shadow border rounded w-full py-2 px-3 text-gray-700 product-select">
-                        <option value="" data-type-id="">Select Finished Good</option>
-                        @foreach($finishedGoods as $product)
-                            <option value="{{ $product->id }}" data-type-id="{{ $product->product_type_id }}">{{ $product->name }} ({{ $product->pack_name }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="w-32">
-                    <input type="number" step="0.001" placeholder="Qty" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 demand-qty">
-                </div>
-                <button type="button" class="text-red-500 hover:text-red-700 remove-row p-2" style="display:none;"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>
-        
-        <div class="mt-4 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-center justify-between gap-4">
-            @if(Auth::user()->hasFeature('indent', 'branch_select'))
-            <div class="flex-grow">
-                <label class="block text-gray-600 text-[9px] font-black uppercase tracking-widest mb-1.5 ml-1">Check Stock At</label>
-                <select id="branch_code" class="w-full border border-gray-200 rounded-xl py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-white text-xs font-bold">
-                    <option value="">Consolidated View (All Branches)</option>
-                    @foreach($branches as $branch)
-                        <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
-                    @endforeach
-                </select>
-            </div>
-            @endif
-            <div class="flex items-center gap-2 pt-5">
-                <button type="button" onclick="addProductRow()" class="h-9 px-4 bg-white border border-blue-100 text-blue-600 hover:bg-blue-50 text-[10px] font-black uppercase tracking-widest rounded-xl transition flex items-center gap-2 shadow-sm">
-                    <i class="fas fa-plus"></i> Add Another
-                </button>
-                <button type="button" onclick="clearAllRows()" class="h-9 px-4 bg-white border border-red-100 text-red-500 hover:bg-red-50 text-[10px] font-black uppercase tracking-widest rounded-xl transition flex items-center gap-2 shadow-sm">
-                    <i class="fas fa-trash-can"></i> Clear
-                </button>
-            </div>
-        </div>
-
-        <div class="mt-8 border-t pt-6">
-            @if(Auth::user()->hasPermission('indent', 'create'))
-            <button type="button" onclick="calculateIndent()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded w-full shadow-lg transition duration-200 flex justify-center items-center">
-                <i class="fas fa-microchip mr-2"></i> Explode Recipe & Generate Report
-            </button>
-            @else
-            <div class="bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl p-4 text-center">
-                <p class="text-amber-700 text-xs font-bold italic uppercase tracking-tighter">Access Restricted: You don't have permission to generate plans.</p>
-            </div>
-            @endif
-        </div>
-    </div>
-
-    <!-- Results -->
-    <div class="bg-white rounded shadow-md p-6" id="resultSection" style="display:none;">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-xl font-extrabold text-indigo-900 flex items-center">
-                <i class="fas fa-clipboard-check mr-2"></i> Planning Results
-            </h3>
-            @if(Auth::user()->hasPermission('indent', 'excel'))
-            <button onclick="exportIndent()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center shadow-md transition">
-                <i class="fas fa-file-excel mr-2"></i> Export To Excel
-            </button>
-            @endif
-        </div>
-
-        <!-- Production Summary -->
-        <div class="mb-8 bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-            <h4 class="text-sm font-bold text-indigo-700 uppercase tracking-wider mb-3 flex items-center">
-                <i class="fas fa-industry mr-2"></i> Planning Summary
-            </h4>
-            <div id="productionSummary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <!-- Will be populated by JS -->
-            </div>
-        </div>
-
-        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Consolidated Material Requirements</h4>
-        <div class="overflow-x-auto rounded-xl border border-gray-200">
-            <table class="min-w-full bg-white">
-                <thead>
-                    <tr class="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold tracking-widest border-b">
-                        <th class="py-3 px-4 text-left">Raw Material</th>
-                        <th class="py-3 px-4 text-right">Required</th>
-                        <th class="py-3 px-4 text-right">Stock</th>
-                        <th class="py-3 px-4 text-right">Shortfall</th>
-                    </tr>
-                </thead>
-                <tbody class="text-gray-600 text-sm" id="resultBody"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Bulk Add Modal -->
-<div id="bulkModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 overflow-hidden">
-        <div class="px-6 py-4 border-b flex justify-between items-center bg-indigo-600 text-white">
-            <h3 class="font-bold flex items-center"><i class="fas fa-layer-group mr-2"></i> Select Products In Bulk</h3>
-            <button onclick="toggleBulkModal()" class="text-white hover:text-gray-200 transition"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="p-0">
-            <div class="p-4 bg-gray-50 border-b">
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                        <i class="fas fa-search"></i>
-                    </span>
-                    <input type="text" id="productSearch" onkeyup="filterProducts()" class="pl-10 w-full border rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Search product name or code...">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left Panel: Bulk Entry (40%) -->
+    <div class="lg:col-span-12 xl:col-span-5 flex flex-col gap-6">
+        @if(Auth::user()->hasPermission('indent', 'create'))
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-white font-bold flex items-center italic">
+                    <i class="fas fa-list-check mr-2"></i> BULK INDENT ENTRY
+                </h3>
+                <div class="bg-white/20 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
+                    Step 1: Enter Demand
                 </div>
             </div>
             
-            <div class="h-96 overflow-y-auto" id="productListContainer">
-                @foreach($finishedGoods as $product)
-                <label class="flex items-center px-6 py-3 hover:bg-indigo-50 border-b border-gray-100 cursor-pointer product-list-item transition duration-150" 
-                       data-name="{{ strtolower($product->name) }}" 
-                       data-code="{{ strtolower($product->item_code) }}"
-                       data-type-id="{{ $product->product_type_id }}">
-                    <input type="checkbox" value="{{ $product->id }}" class="product-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                    <div class="ml-4 flex-grow">
-                        <div class="font-bold text-gray-800">{{ $product->name }}</div>
-                        <div class="flex gap-2">
-                             <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 rounded font-mono">{{ $product->item_code ?: 'N/A' }}</span>
-                             <span class="text-[10px] text-gray-400">{{ $product->pack_name }}</span>
+            <div class="p-6 space-y-4">
+                {{-- ... (Rest of the entry form content) ... --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-gray-600 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Target Branch</label>
+                        <select id="branch_code" class="w-full border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-gray-50 text-sm font-bold" onchange="updateAllStock()">
+                            <option value="">Consolidated View</option>
+                            @foreach($branches as $branch)
+                                <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Indent Date</label>
+                        <input type="date" id="indent_date" value="{{ date('Y-m-d') }}" class="w-full border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-gray-50 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Order Unit (Global)</label>
+                        <select id="global_unit" class="w-full border-2 border-indigo-200 rounded-xl py-2.4 px-4 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-indigo-50 text-indigo-700 font-black text-sm uppercase" onchange="syncGlobalUnit()">
+                            <option value="box">Boxes</option>
+                            <option value="kg">KG / LTR</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="border border-gray-100 rounded-2xl overflow-hidden mt-4">
+                    <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50/80 sticky top-0 z-10 border-b border-gray-100">
+                                    <th class="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Details</th>
+                                    <th class="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Live Stock</th>
+                                    <th class="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32 text-right">Order Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                @foreach($finishedGoods as $product)
+                                <tr class="product-row hover:bg-indigo-50/30 transition-colors" 
+                                    data-id="{{ $product->id }}" 
+                                    data-name="{{ $product->name }}"
+                                    data-pack="{{ $product->pack_name }}"
+                                    data-unit-box="{{ $product->unit_box ?: 1 }}"
+                                    data-weight-unit="{{ $product->weight_multiplier }}"
+                                    data-uom="{{ $product->uom }}">
+                                    <td class="px-4 py-3">
+                                        <div class="font-bold text-gray-700 text-xs mb-0.5 line-clamp-1 truncate">{{ $product->name }}</div>
+                                        <div class="text-[9px] font-black text-indigo-400 uppercase tracking-tighter flex items-center gap-1.5">
+                                            <span>{{ $product->item_code }}</span>
+                                            <span class="bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded">{{ $product->pack_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        <div class="stock-box text-[11px] font-black text-green-600 leading-none">0.00</div>
+                                        <div class="text-[8px] font-black text-gray-400 uppercase tracking-tighter italic">BOX</div>
+                                        <div class="stock-kg text-[9px] font-black text-gray-400 mt-1 leading-none">0.00</div>
+                                        <div class="text-[7px] font-black text-gray-300 uppercase tracking-tighter italic">{{ $product->uom == 'Ltr' ? 'LTR' : 'KG' }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <input type="number" 
+                                               class="product-qty w-full border border-gray-200 rounded-lg py-2 px-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-right font-black" 
+                                               placeholder="0" step="0.01">
+                                        <div class="selected-unit-label text-[8px] font-bold text-indigo-400 mt-1 uppercase tracking-widest">BOXES</div>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <button onclick="previewIndent()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-indigo-200 transition-all transform hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center gap-3 mt-4 group">
+                    <span class="text-xs uppercase tracking-[0.2em]">Generate Indent Preview</span>
+                    <i class="fas fa-file-invoice transition-transform group-hover:rotate-12"></i>
+                </button>
+            </div>
+        </div>
+        @else
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center flex flex-col items-center justify-center h-full opacity-60">
+            <i class="fas fa-lock text-gray-200 text-5xl mb-4"></i>
+            <h3 class="text-gray-400 font-black uppercase tracking-widest text-sm">Creation Restricted</h3>
+            <p class="text-gray-400 text-xs mt-2 max-w-xs">You don't have permissions to create new indents.</p>
+        </div>
+        @endif
+    </div>
+
+    <!-- Right Panel: Invoice Preview (60%) -->
+    <div class="lg:col-span-12 xl:col-span-7">
+        <div id="previewContainer" class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hidden animate-in fade-in slide-in-from-right duration-500 sticky top-6">
+            <div id="invoiceHeader" class="bg-gray-900 px-8 py-10 text-white relative">
+                <div class="absolute top-0 right-0 p-4 opacity-10">
+                    <i class="fas fa-file-invoice text-9xl"></i>
+                </div>
+                <div class="flex justify-between items-start relative z-10">
+                    <div>
+                        <div class="text-3xl font-black italic tracking-tighter mb-1 uppercase">Material Indent</div>
+                        <div class="text-indigo-400 font-bold tracking-widest text-[10px] uppercase">Internal Document</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Generated Date</div>
+                        <div class="text-xl font-bold" id="displayDate">Feb 18, 2026</div>
+                    </div>
+                </div>
+                <div class="mt-8 grid grid-cols-2 gap-8 border-t border-white/10 pt-8 relative z-10">
+                    <div>
+                        <div class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 italic">Target Branch</div>
+                        <div class="text-xl font-bold" id="displayBranch">All Branches (Consolidated)</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 italic">Status</div>
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-[10px] font-black uppercase tracking-widest">
+                            <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                            Draft Preview
                         </div>
                     </div>
-                </label>
-                @endforeach
+                </div>
+            </div>
+
+            <div class="p-8">
+                <table class="w-full text-left">
+                    <thead class="border-b-2 border-gray-900/5">
+                        <tr>
+                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Details</th>
+                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Live Stock</th>
+                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Requirement</th>
+                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Final Boxes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody" class="divide-y divide-gray-50">
+                        <!-- Preview rows injected here -->
+                    </tbody>
+                </table>
+
+                <div class="mt-8 border-t-4 border-gray-900 pt-6">
+                    <div class="flex justify-between items-center px-4">
+                        <div>
+                            <div class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Total Indent Volume</div>
+                            <div class="text-xs text-gray-500 italic">Consolidated for all products</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl font-black italic tracking-tighter" id="totalIndentBoxes">0.00</div>
+                            <div class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">TOTAL BOXES</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 mt-8">
+                    <button onclick="saveIndent()" class="flex-grow bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest text-xs">
+                        <i class="fas fa-save"></i> Save & Lock Indent
+                    </button>
+                    <button onclick="document.getElementById('previewContainer').classList.add('hidden')" class="bg-gray-100 hover:bg-gray-200 text-gray-500 font-black py-4 px-6 rounded-2xl transition-all uppercase tracking-widest text-[10px]">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="noPreviewPlaceholder" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-[600px] flex flex-col items-center justify-center text-center p-10 group opacity-50">
+            <div class="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <i class="fas fa-file-invoice text-gray-300 text-4xl"></i>
+            </div>
+            <h3 class="text-gray-400 font-black uppercase tracking-widest text-sm mb-2">No Preview Generated</h3>
+            <p class="text-gray-400 text-xs max-w-xs">Fill in your requirements on the left and click "Generate Indent Preview" to see the invoice format here.</p>
+        </div>
+    </div>
+
+    <!-- History: Full Width (Bottom) -->
+    <div class="lg:col-span-12 mt-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="bg-gray-50 px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-gray-700 font-black flex items-center italic">
+                    <i class="fas fa-history mr-3 text-indigo-500"></i> DATEWISE INDENT HISTORY
+                </h3>
             </div>
             
-            <div class="p-4 bg-gray-50 border-t flex justify-between items-center">
-                <span class="text-sm text-gray-500" id="selectedCount">0 products selected</span>
-                <div class="flex gap-3">
-                    <button onclick="toggleBulkModal()" class="bg-white border hover:bg-gray-100 text-gray-700 font-bold py-2 px-6 rounded-lg transition">Cancel</button>
-                    <button onclick="addSelectedProducts()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-8 rounded-lg shadow-md transition transform active:scale-95">Add Selected</button>
-                </div>
+            <!-- Filters -->
+            <div class="px-8 py-6 bg-gray-50/50 border-b border-gray-100">
+                <form action="{{ route('indent.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">From Date</label>
+                        <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">To Date</label>
+                        <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Branch</label>
+                        <select name="branch_code" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                            <option value="">All Branches</option>
+                            @foreach($branches as $branch)
+                            <option value="{{ $branch->code }}" {{ request('branch_code') == $branch->code ? 'selected' : '' }}>
+                                {{ $branch->name }} ({{ $branch->code }})
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Creator</label>
+                        <select name="user_id" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                            <option value="">All Users</option>
+                            @foreach($users as $user)
+                            <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
+                                {{ $user->name }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
+                        <select name="status" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                            <option value="">All Statuses</option>
+                            <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                            <option value="partly completed" {{ request('status') == 'partly completed' ? 'selected' : '' }}>Partly Completed</option>
+                            <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Fully Completed</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 bg-indigo-600 text-white px-6 py-2 rounded-xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-lg shadow-indigo-100 uppercase text-xs">
+                            <i class="fas fa-filter mr-2"></i>Apply
+                        </button>
+                        <a href="{{ route('indent.index') }}" class="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl flex items-center justify-center hover:bg-gray-200 transition border border-gray-200">
+                            <i class="fas fa-redo-alt text-xs"></i>
+                        </a>
+                    </div>
+                </form>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50/50">
+                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Indent Date</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Branch</th>
+                            <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">User</th>
+                            <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                            <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Volume</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total Boxes</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        @forelse($history as $indent)
+                        <tr class="hover:bg-indigo-50/20 transition-colors group">
+                            <td class="px-8 py-4 font-bold text-gray-700">{{ date('d M, Y', strtotime($indent->indent_date)) }}</td>
+                            <td class="px-8 py-4">
+                                <span class="bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-lg text-xs">
+                                    {{ $indent->branch_name }} ({{ $indent->branch_code }})
+                                </span>
+                            </td>
+                            <td class="px-8 py-4 text-center">
+                                <div class="text-xs font-black text-gray-600 uppercase tracking-tighter">{{ $indent->user->name ?? 'System' }}</div>
+                                <div class="text-[8px] text-gray-400 italic font-bold">Creator</div>
+                            </td>
+                            <td class="px-8 py-4 text-center">
+                                @if($indent->status == 'completed')
+                                <span class="bg-green-100 text-green-600 px-2 py-1 rounded-lg text-[10px] font-black tracking-tighter uppercase border border-green-200">FULLY COMPLETED</span>
+                                @elseif($indent->status == 'partly completed')
+                                <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-black tracking-tighter uppercase border border-blue-200 italic">PARTLY COMPLETED</span>
+                                @else
+                                <span class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-black tracking-tighter uppercase border border-amber-200 italic">PENDING</span>
+                                @endif
+                            </td>
+                            <td class="px-8 py-4 text-xs text-gray-500 italic text-right">
+                                @php $itemNames = $indent->items->take(2)->pluck('product_name')->toArray(); @endphp
+                                {{ implode(', ', $itemNames) }} {{ $indent->items->count() > 2 ? '... (+' . ($indent->items->count() - 2) . ' more)' : '' }}
+                            </td>
+                            <td class="px-8 py-4 text-right">
+                                <span class="text-lg font-black italic tracking-tighter text-gray-800">{{ number_format($indent->total_boxes, 0) }}</span>
+                                <span class="text-[9px] font-black text-gray-400 block -mt-1 uppercase tracking-tight">Boxes</span>
+                            </td>
+                            <td class="px-8 py-4 text-right">
+                                <div class="flex justify-end gap-1.5">
+                                    <button onclick="viewIndent({{ $indent->id }})" title="View" class="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"><i class="fas fa-eye text-xs"></i></button>
+                                    <button onclick="viewProgress({{ $indent->id }})" title="View Progress (Asked vs Completed)" class="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-600 hover:text-white transition"><i class="fas fa-list-check text-xs"></i></button>
+                                    
+                                    @if(Auth::user()->hasPermission('planning_bulk', 'print'))
+                                    <button onclick="printIndent({{ $indent->id }})" title="Print" class="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"><i class="fas fa-print text-xs"></i></button>
+                                    @endif
+                                    
+                                    @if(Auth::user()->hasPermission('planning_bulk', 'excel'))
+                                    <button onclick="exportExcel({{ $indent->id }})" title="Excel" class="bg-green-100 text-green-600 p-2 rounded-lg hover:bg-green-600 hover:text-white transition"><i class="fas fa-file-excel text-xs"></i></button>
+                                    @endif
+                                    
+                                    @if(Auth::user()->hasPermission('planning_bulk', 'pdf'))
+                                    <button onclick="exportPdf({{ $indent->id }})" title="PDF" class="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-600 hover:text-white transition"><i class="fas fa-file-pdf text-xs"></i></button>
+                                    @endif
+
+                                    @if(Auth::user()->hasPermission('planning_process', 'edit'))
+                                    <a href="{{ route('indent.process', $indent->id) }}" title="Process" class="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-600 hover:text-white transition"><i class="fas fa-cog text-xs"></i></a>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="5" class="px-8 py-10 text-center text-gray-400 italic">No previous indents found.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
+<!-- View Indent Modal -->
+<div id="viewModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b flex justify-between items-center bg-gray-50">
+            <div>
+                <h3 class="text-xl font-black text-gray-800 italic">Indent Details</h3>
+                <p id="modalBranch" class="text-xs font-bold text-indigo-600"></p>
+            </div>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition p-2 hover:bg-gray-100 rounded-full">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b-2 border-gray-100">
+                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase">Product</th>
+                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase text-center">Live Stock</th>
+                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase text-center">Required</th>
+                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase text-right">Final Boxes</th>
+                    </tr>
+                </thead>
+                <tbody id="modalTableBody">
+                    <!-- Dynamic Rows -->
+                </tbody>
+            </table>
+        </div>
+        <div class="p-6 border-t bg-gray-50 flex justify-between items-center">
+            <div class="text-xs text-gray-400 font-bold uppercase italic" id="modalMeta"></div>
+            <div class="flex gap-3">
+                @if(Auth::user()->hasPermission('planning_bulk', 'print'))
+                <button id="modalPrintBtn" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
+                    <i class="fas fa-print mr-2"></i>PRINT INDENT
+                </button>
+                @endif
+                <button onclick="closeModal()" class="bg-white border-2 border-gray-200 text-gray-600 px-6 py-2.5 rounded-xl font-black italic tracking-tighter hover:bg-gray-50 transition">
+                    CLOSE
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison / Progress Modal -->
+<div id="progressModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-8 border-b flex justify-between items-center bg-indigo-600 text-white">
+            <div>
+                <h3 class="text-2xl font-black italic tracking-tighter uppercase">Indent Completion Progress</h3>
+                <p id="progressModalBranch" class="text-xs font-bold text-indigo-200 uppercase tracking-widest mt-1"></p>
+            </div>
+            <button onclick="closeProgressModal()" class="text-white/50 hover:text-white transition p-2 hover:bg-white/10 rounded-full">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div class="p-8 overflow-y-auto custom-scrollbar flex-1">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b-2 border-gray-100">
+                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Product</th>
+                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Asked (Box)</th>
+                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Completed (Box)</th>
+                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="progressTableBody">
+                    <!-- Dynamic Rows -->
+                </tbody>
+            </table>
+        </div>
+        <div class="p-8 border-t bg-gray-50 flex justify-end">
+            <button onclick="closeProgressModal()" class="bg-indigo-600 text-white px-12 py-4 rounded-2xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 uppercase">
+                Got it
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+</style>
+
 <script>
-    // Update selected count when checkboxes change
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('product-checkbox')) {
-            const count = document.querySelectorAll('.product-checkbox:checked').length;
-            document.getElementById('selectedCount').innerText = `${count} products selected`;
-        }
-    });
+    let stockCache = {};
 
-    function toggleBulkModal() {
-        const modal = document.getElementById('bulkModal');
-        modal.classList.toggle('hidden');
-        if (!modal.classList.contains('hidden')) {
-            document.getElementById('productSearch').value = '';
-            filterProducts(); // Reset filter
-            document.getElementById('productSearch').focus();
-        }
+    function syncGlobalUnit() {
+        const unit = document.getElementById('global_unit').value;
+        const labels = document.querySelectorAll('.selected-unit-label');
+        labels.forEach(label => {
+            label.innerText = unit === 'box' ? 'BOXES' : 'KG / LTR';
+        });
     }
 
-    function applyGlobalTypeFilter() {
-        const typeId = document.getElementById('global_type_filter').value;
+    // Global Bulk Stock Fetch
+    async function updateAllStock() {
+        const branchCode = document.getElementById('branch_code').value;
         const rows = document.querySelectorAll('.product-row');
         
-        // Filter options in all selection dropdowns
-        document.querySelectorAll('.product-select').forEach(select => {
-            const options = select.querySelectorAll('option');
-            options.forEach(option => {
-                const optionTypeId = option.getAttribute('data-type-id');
-                if (!typeId || !optionTypeId || optionTypeId === typeId) {
-                    option.style.display = 'block';
-                } else {
-                    option.style.display = 'none';
-                }
-            });
-            
-            // If the currently selected option is now hidden, reset the select
-            const selectedOption = select.options[select.selectedIndex];
-            if (selectedOption && selectedOption.style.display === 'none') {
-                select.value = '';
-            }
-        });
-
-        // Also filter the bulk modal if it's open or about to be
-        filterProducts();
-    }
-
-    function filterProducts() {
-        const query = document.getElementById('productSearch').value.toLowerCase();
-        const typeId = document.getElementById('global_type_filter').value;
-        const items = document.querySelectorAll('.product-list-item');
-        
-        items.forEach(item => {
-            const name = item.getAttribute('data-name');
-            const code = item.getAttribute('data-code');
-            const itemTypeId = item.getAttribute('data-type-id');
-            
-            const matchesSearch = name.includes(query) || code.includes(query);
-            const matchesType = !typeId || itemTypeId === typeId;
-
-            if (matchesSearch && matchesType) {
-                item.style.display = 'flex';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    }
-
-    function addSelectedProducts() {
-        const checkboxes = document.querySelectorAll('.product-checkbox:checked');
-        if (checkboxes.length === 0) {
-            alert('Please select at least one product.');
-            return;
-        }
-
-        checkboxes.forEach(cb => {
-            addProductRow(cb.value);
-            cb.checked = false; // Reset for next time
-        });
-
-        document.getElementById('selectedCount').innerText = '0 products selected';
-        toggleBulkModal();
-    }
-
-    function clearAllRows() {
-        if (confirm('Are you sure you want to remove all products from the list?')) {
-            const container = document.getElementById('productInputList');
-            const rows = container.querySelectorAll('.product-row');
-            
-            // Keep only the first row and reset it
-            const firstRow = rows[0];
-            firstRow.querySelector('.product-select').value = '';
-            firstRow.querySelector('.demand-qty').value = '';
-            firstRow.querySelector('.remove-row').style.display = 'none';
-            
-            // Remove other rows
-            for (let i = 1; i < rows.length; i++) {
-                rows[i].remove();
-            }
-        }
-    }
-
-    function addProductRow(productId = '', qty = '') {
-        const container = document.getElementById('productInputList');
-        const rows = container.querySelectorAll('.product-row');
-        
-        // Find an empty row or create a new one
-        let emptyRow = null;
-        rows.forEach(r => {
-            if (!r.querySelector('.product-select').value && !emptyRow) {
-                emptyRow = r;
-            }
-        });
-
-        let row;
-        if (emptyRow) {
-            row = emptyRow;
-        } else {
-            const firstRow = rows[0];
-            row = firstRow.cloneNode(true);
-            row.querySelector('.remove-row').style.display = 'inline-block';
-            row.querySelector('.remove-row').onclick = function() { this.parentElement.remove(); };
-            container.appendChild(row);
-        }
-        
-        if (productId) row.querySelector('.product-select').value = productId;
-        if (qty) row.querySelector('.demand-qty').value = qty;
-        
-        // Apply current filter to the new row
-        const typeId = document.getElementById('global_type_filter').value;
-        if (typeId) {
-            row.querySelectorAll('.product-select option').forEach(option => {
-                const optionTypeId = option.getAttribute('data-type-id');
-                if (!typeId || !optionTypeId || optionTypeId === typeId) {
-                    option.style.display = 'block';
-                } else {
-                    option.style.display = 'none';
-                }
-            });
-        }
-
-        return row;
-    }
-
-    async function calculateIndent() {
-        const rows = document.querySelectorAll('.product-row');
-        const products = [];
-
-        rows.forEach(row => {
-            const id = row.querySelector('.product-select').value;
-            const qty = row.querySelector('.demand-qty').value;
-            if (id && qty) {
-                products.push({ id: id, demand_qty: qty });
-            }
-        });
-
-        if (products.length === 0) {
-            alert('Please select at least one product and quantity.');
-            return;
-        }
+        // Show loading state
+        rows.forEach(r => r.style.opacity = '0.5');
 
         try {
-            const response = await fetch("{{ route('planning.calculate') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({ 
-                    products: products,
-                    branch_code: document.getElementById('branch_code').value
-                })
-            });
-
-            const result = await response.json();
+            const res = await fetch(`{{ route('indent.bulk-stock') }}?branch_code=${branchCode}`);
+            const data = await res.json();
             
-            if (result.success) {
-                // Populate Production Summary
-                const summaryDiv = document.getElementById('productionSummary');
-                summaryDiv.innerHTML = '';
-                result.summary.forEach(item => {
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-3 rounded-lg border border-indigo-100 shadow-sm flex flex-col";
-                    card.innerHTML = `
-                        <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">${item.item_code || 'No Code'}</span>
-                        <div class="font-bold text-gray-800 text-sm truncate" title="${item.name}">${item.name}</div>
-                        <div class="flex justify-between items-center mt-1">
-                            <span class="text-xs text-gray-400 italic">${item.pack_name || ''}</span>
-                            <span class="text-xs font-black text-indigo-600">${parseFloat(item.quantity).toFixed(3)}</span>
-                        </div>
-                    `;
-                    summaryDiv.appendChild(card);
-                });
-
-                const tbody = document.getElementById('resultBody');
-                tbody.innerHTML = '';
+            if (data.success && data.stocks) {
+                stockCache = data.stocks;
                 
-                result.data.forEach(item => {
-                    const row = document.createElement('tr');
-                     row.className = "border-b border-gray-100 hover:bg-gray-50 transition duration-150";
-                    row.innerHTML = `
-                        <td class="py-4 px-4 text-left">
-                            <div class="font-bold text-gray-800">${item.name}</div>
-                            <div class="flex gap-2 mt-1">
-                                <span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono font-bold">${item.item_code || 'N/A'}</span>
-                                <span class="text-[9px] bg-gray-50 text-gray-500 px-1.5 py-0.5 rounded italic">${item.pack_name || ''}</span>
-                            </div>
-                        </td>
-                        <td class="py-4 px-4 text-right font-bold text-gray-700">${parseFloat(item.required_qty).toFixed(3)} <span class="text-[10px] text-gray-400 font-normal ml-1">${item.uom}</span></td>
-                        <td class="py-4 px-4 text-right text-gray-500 font-medium">${parseFloat(item.current_stock).toFixed(3)}</td>
-                        <td class="py-4 px-4 text-right">
-                            <span class="inline-block px-3 py-1 rounded-full font-black text-xs ${item.shortfall > 0 ? 'text-red-700 bg-red-100' : 'text-green-700 bg-green-100'}">
-                                ${parseFloat(item.shortfall).toFixed(3)}
-                            </span>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
+                rows.forEach(row => {
+                    const pId = row.dataset.id;
+                    const stock = data.stocks[pId] || { stock: 0, stock_boxes: 0 };
+                    
+                    row.querySelector('.stock-box').innerText = parseFloat(stock.stock_boxes).toFixed(2);
+                    row.querySelector('.stock-kg').innerText = parseFloat(stock.stock).toFixed(2);
                 });
-
-                document.getElementById('resultSection').style.display = 'block';
-                document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
-            } else {
-                alert(result.message);
             }
-
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Calculation failed.');
+        } catch(e) { 
+            console.error("Bulk stock fetch error", e); 
+        } finally {
+            rows.forEach(r => r.style.opacity = '1');
         }
     }
 
-    function exportIndent() {
-        const rows = document.querySelectorAll('.product-row');
-        const products = [];
+    // Call once on load
+    document.addEventListener('DOMContentLoaded', updateAllStock);
 
-        rows.forEach(row => {
-            const id = row.querySelector('.product-select').value;
-            const qty = row.querySelector('.demand-qty').value;
-            if (id && qty) {
-                products.push({ id: id, demand_qty: qty });
+    async function previewIndent() {
+        const rows = document.querySelectorAll('.product-row');
+        const previewBody = document.getElementById('previewBody');
+        const unit = document.getElementById('global_unit').value;
+        previewBody.innerHTML = '';
+        
+        let hasData = false;
+        let grandTotalBoxes = 0;
+
+        for (let row of rows) {
+            const qtyInput = row.querySelector('.product-qty');
+            const qtyValue = parseFloat(qtyInput.value || 0);
+            
+            if (qtyValue > 0) {
+                hasData = true;
+                const pId = row.dataset.id;
+                const pName = row.dataset.name;
+                const pPack = row.dataset.pack;
+                const unitBox = parseFloat(row.dataset.unitBox);
+                const weightUnit = parseFloat(row.dataset.weightUnit);
+                
+                // Calculate Final Boxes
+                let finalBoxes = 0;
+                if (unit === 'box') {
+                    finalBoxes = qtyValue;
+                } else {
+                    // Convert KG to Boxes
+                    const weightPerBox = unitBox * weightUnit;
+                    finalBoxes = weightPerBox > 0 ? (qtyValue / weightPerBox) : 0;
+                }
+
+                // Round to nearest integer (Standard Rounding: 10.1 -> 10, 10.5 -> 11)
+                finalBoxes = Math.round(finalBoxes);
+
+                grandTotalBoxes += finalBoxes;
+                
+                const stock = stockCache[pId] || {stock_boxes: 0, stock: 0};
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-indigo-50/20 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-4">
+                        <div class="font-bold text-gray-800 text-sm italic">${pName}</div>
+                        <div class="text-[9px] font-black text-gray-400 uppercase tracking-widest">${pPack}</div>
+                    </td>
+                    <td class="py-4 text-center px-4">
+                        <div class="text-xs font-black text-green-600">${parseFloat(stock.stock_boxes).toFixed(2)} BOX</div>
+                        <div class="text-[9px] font-black text-gray-400 italic">${parseFloat(stock.stock).toFixed(2)} KG</div>
+                    </td>
+                    <td class="py-4 text-center px-4">
+                        <div class="text-xs font-black text-gray-700">${qtyValue} <span class="uppercase">${unit}</span></div>
+                    </td>
+                    <td class="py-4 text-right">
+                        <div class="text-lg font-black italic tracking-tighter text-gray-900">${finalBoxes.toFixed(0)}</div>
+                        <div class="text-[8px] font-black text-indigo-400 uppercase tracking-widest">EST. BOXES</div>
+                    </td>
+                `;
+                tr.dataset.pId = pId;
+                tr.dataset.pName = pName;
+                tr.dataset.qty = qtyValue;
+                tr.dataset.unit = unit;
+                tr.dataset.stockBox = stock.stock_boxes;
+                tr.dataset.stockKg = stock.stock;
+                tr.dataset.finalBoxes = finalBoxes;
+
+                previewBody.appendChild(tr);
             }
+        }
+
+        if (!hasData) {
+            alert('Please enter quantity for at least one product.');
+            return;
+        }
+
+        const indentDateVal = document.getElementById('indent_date').value;
+        const displayDate = document.getElementById('displayDate');
+        if (displayDate && indentDateVal) {
+            displayDate.innerText = new Date(indentDateVal).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        
+        const branchSelect = document.getElementById('branch_code');
+        const displayBranch = document.getElementById('displayBranch');
+        if (displayBranch && branchSelect) {
+            displayBranch.innerText = branchSelect.options[branchSelect.selectedIndex].text;
+        }
+        
+        const totalIndentBoxes = document.getElementById('totalIndentBoxes');
+        if (totalIndentBoxes) {
+            totalIndentBoxes.innerText = grandTotalBoxes.toFixed(2);
+        }
+
+        const noPreview = document.getElementById('noPreviewPlaceholder');
+        const previewCont = document.getElementById('previewContainer');
+        
+        if (noPreview) noPreview.classList.add('hidden');
+        if (previewCont) {
+            previewCont.classList.remove('hidden');
+            // Force block display if hidden class is not enough
+            previewCont.style.display = 'block';
+        }
+        
+        // Scroll to preview on mobile
+        if (window.innerWidth < 1024 && previewCont) {
+            previewCont.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    // Modal Control
+    function viewIndent(id) {
+        const modal = document.getElementById('viewModal');
+        const loader = `<tr class="modal-loading"><td colspan="4" class="py-10 text-center text-gray-400 italic">Loading details...</td></tr>`;
+        document.getElementById('modalTableBody').innerHTML = loader;
+        modal.classList.remove('hidden');
+
+        fetch(`{{ url('indent/show') }}/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const indent = data.indent;
+                    document.getElementById('modalBranch').innerText = `${indent.branch_name} (${indent.branch_code}) - ${new Date(indent.indent_date).toLocaleDateString()}`;
+                    document.getElementById('modalMeta').innerText = `Created by: ${indent.user?.name || 'System'} | ID: #${String(indent.id).padStart(5, '0')}`;
+                    
+                    let html = '';
+                    indent.items.forEach(item => {
+                        html += `
+                            <tr class="border-b border-gray-50">
+                                <td class="py-4 font-bold text-gray-800 text-sm italic">
+                                    ${item.product_name}
+                                    <div class="text-[9px] text-gray-400 uppercase">${item.product?.pack_name || ''}</div>
+                                </td>
+                                <td class="py-4 text-center">
+                                    <div class="text-xs font-black text-green-600">${parseFloat(item.stock_box).toFixed(2)} BOX</div>
+                                </td>
+                                <td class="py-4 text-center font-bold text-gray-700">
+                                    ${item.demand_qty} ${item.demand_unit.toUpperCase()}
+                                </td>
+                                <td class="py-4 text-right font-black text-lg italic text-indigo-600">
+                                    ${parseFloat(item.final_qty_box).toFixed(0)}
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    document.getElementById('modalTableBody').innerHTML = html;
+                    document.getElementById('modalPrintBtn').onclick = () => printIndent(id);
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                alert('Error loading indent details');
+                closeModal();
+            });
+    }
+
+    function closeModal() {
+        document.getElementById('viewModal').classList.add('hidden');
+    }
+
+    async function viewProgress(id) {
+        const modal = document.getElementById('progressModal');
+        const loader = `<tr><td colspan="4" class="py-10 text-center text-gray-400 italic">Analyzing progress...</td></tr>`;
+        document.getElementById('progressTableBody').innerHTML = loader;
+        modal.classList.remove('hidden');
+
+        try {
+            const baseUrl = "{{ url('indent/show') }}";
+            const res = await fetch(`${baseUrl}/${id}`);
+            
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`Server returned ${res.status}: ${errorText.substring(0, 100)}`);
+            }
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                const indent = data.indent;
+                if (document.getElementById('progressModalBranch')) {
+                    const dateStr = indent.indent_date ? new Date(indent.indent_date).toLocaleDateString() : 'N/A';
+                    document.getElementById('progressModalBranch').innerText = `${indent.branch_name || 'N/A'} (${indent.branch_code || 'N/A'}) | ${dateStr}`;
+                }
+                
+                let html = '';
+                if (indent.items && indent.items.length > 0) {
+                    indent.items.forEach(item => {
+                        const asked = parseFloat(item.final_qty_box || 0);
+                        const completed = parseFloat(item.completed_qty || 0);
+                        let statusHtml = '';
+                        
+                        if (asked > 0) {
+                            if (completed >= asked) {
+                                statusHtml = '<span class="text-green-600 font-black italic text-[10px] uppercase tracking-tighter">● FULLY DONE</span>';
+                            } else if (completed > 0) {
+                                const percent = Math.round((completed / asked) * 100);
+                                statusHtml = `<span class="text-blue-500 font-black italic text-[10px] uppercase tracking-tighter">◌ PARTIAL (${percent}%)</span>`;
+                            } else {
+                                statusHtml = '<span class="text-amber-500 font-black italic text-[10px] uppercase tracking-tighter italic">◌ PENDING</span>';
+                            }
+                        } else {
+                            statusHtml = '<span class="text-gray-400 font-black italic text-[10px] uppercase tracking-tighter">◌ N/A</span>';
+                        }
+
+                        html += `
+                            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                                <td class="py-5 font-bold text-gray-800 text-sm italic">
+                                    ${item.product_name || 'Unknown Product'}
+                                    <div class="text-[9px] text-gray-400 uppercase font-black tracking-widest">${item.product?.pack_name || ''}</div>
+                                </td>
+                                <td class="py-5 text-center font-black text-gray-500 text-lg">${asked.toFixed(0)}</td>
+                                <td class="py-5 text-center font-black text-indigo-600 text-xl italic">${completed.toFixed(0)}</td>
+                                <td class="py-5 text-right">${statusHtml}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    html = '<tr><td colspan="4" class="py-10 text-center text-gray-400 italic">No items found in this indent.</td></tr>';
+                }
+                document.getElementById('progressTableBody').innerHTML = html;
+            } else {
+                throw new Error(data.message || 'Failed to load progress details.');
+            }
+        } catch (e) {
+            console.error('Progress View Error:', e);
+            alert('Error: ' + e.message);
+            closeProgressModal();
+        }
+    }
+
+    function closeProgressModal() {
+        document.getElementById('progressModal').classList.add('hidden');
+    }
+
+    function printIndent(id) {
+        window.open(`{{ url('indent/show') }}/${id}/print`, '_blank');
+    }
+
+    function exportExcel(id) {
+        window.location.href = `{{ url('indent/show') }}/${id}/excel`;
+    }
+
+    function exportPdf(id) {
+        window.location.href = `{{ url('indent/show') }}/${id}/pdf`;
+    }
+
+    async function saveIndent() {
+        const previewRows = document.getElementById('previewBody').querySelectorAll('tr');
+        const products = [];
+        
+        previewRows.forEach(row => {
+            products.push({
+                id: row.dataset.pId,
+                name: row.dataset.pName,
+                demand_qty: row.dataset.qty,
+                unit: row.dataset.unit,
+                stock_box: row.dataset.stockBox,
+                stock_kg: row.dataset.stockKg,
+                final_qty_box: row.dataset.finalBoxes
+            });
         });
 
-        if (products.length === 0) return;
+        const payload = {
+            branch_code: document.getElementById('branch_code').value,
+            indent_date: document.getElementById('indent_date').value,
+            products: products,
+            _token: '{{ csrf_token() }}'
+        };
 
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = "{{ route('planning.export') }}";
-        form.style.display = 'none';
-
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_token';
-        csrfInput.value = "{{ csrf_token() }}";
-        form.appendChild(csrfInput);
-
-        const dataInput = document.createElement('input');
-        dataInput.type = 'hidden';
-        dataInput.name = 'products_json';
-        dataInput.value = JSON.stringify(products);
-        form.appendChild(dataInput);
-
-        const branchInput = document.createElement('input');
-        branchInput.type = 'hidden';
-        branchInput.name = 'branch_code';
-        branchInput.value = document.getElementById('branch_code').value;
-        form.appendChild(branchInput);
-
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
+        try {
+            const res = await fetch('{{ route("indent.store") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('Indent saved successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Failed to save indent'));
+            }
+        } catch (e) {
+            alert('Communication error with server.');
+        }
     }
 </script>
 @endsection

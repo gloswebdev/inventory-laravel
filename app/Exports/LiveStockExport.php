@@ -69,7 +69,7 @@ class LiveStockExport implements FromCollection, WithHeadings, WithMapping, Shou
 
         foreach ($this->branches as $branch) {
             $qty = $this->externalStock[$branch->code][$product->item_code] ?? 0;
-            $displayQty = ($this->displayUnit === 'kg') ? ($qty * $weightPerUnit) : $qty;
+            $displayQty = ($this->displayUnit === 'kg') ? ($qty * $product->weight_multiplier) : $qty;
             
             $row[] = number_format($displayQty, 2, '.', '');
             $row[] = number_format($qty / $unitPerBox, 2, '.', '');
@@ -77,7 +77,7 @@ class LiveStockExport implements FromCollection, WithHeadings, WithMapping, Shou
             $totalQty += $qty;
         }
 
-        $totalDisplayQty = ($this->displayUnit === 'kg') ? ($totalQty * $weightPerUnit) : $totalQty;
+        $totalDisplayQty = ($this->displayUnit === 'kg') ? ($totalQty * $product->weight_multiplier) : $totalQty;
         $row[] = number_format($totalDisplayQty, 2, '.', '');
         $row[] = number_format($totalQty / $unitPerBox, 2, '.', '');
 

@@ -31,6 +31,8 @@ class Product extends Model
         'weight_in',
     ];
 
+    protected $appends = ['weight_multiplier'];
+
     public function group(): BelongsTo
     {
         return $this->belongsTo(ProductGroup::class);
@@ -44,5 +46,20 @@ class Product extends Model
     public function recipes()
     {
         return $this->hasMany(Recipe::class, 'finished_product_id');
+    }
+
+    /**
+     * Get the multiplier to convert unit quantity to KG/LTR
+     */
+    public function getWeightMultiplierAttribute()
+    {
+        $value = (float)($this->weight_unit ?: 1);
+        $unit = strtoupper($this->weight_in);
+
+        if ($unit === 'GM' || $unit === 'ML') {
+            return $value / 1000;
+        }
+
+        return $value;
     }
 }

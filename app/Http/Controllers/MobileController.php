@@ -101,16 +101,19 @@ class MobileController extends Controller implements HasMiddleware
         ];
 
         // Filter modules based on permissions
-        $modules = array_filter($allModules, function($m) use ($user) {
+        $modules = array_values(array_filter($allModules, function($m) use ($user) {
             return $user->hasPermission($m['permission'], 'view');
-        });
+        }));
 
         $stats = [
             'products' => Product::count(),
             'today_indents' => Indent::whereDate('created_at', today())->count(),
             'pending_indents' => Indent::where('status', 'pending')->count(),
-            'total_stock' => Product::sum('current_stock'),
-            'permitted_branches' => $user->getPermittedBranchCodes()
+            'total_stock' => (float)Product::sum('current_stock'),
+            'permitted_branches' => $user->getPermittedBranchCodes(),
+            'finished_goods' => Product::where('product_type_id', 1)->count(), // Assuming 1 is FG
+            'raw_materials' => Product::where('product_type_id', 2)->count(),  // Assuming 2 is RM
+            'last_production' => \App\Models\StockLedger::where('transaction_type', 'production_add')->latest()->first()?->created_at?->diffForHumans() ?? 'No records',
         ];
 
         return view('mobile.dashboard', compact('modules', 'stats'));
@@ -203,7 +206,7 @@ class MobileController extends Controller implements HasMiddleware
             $weightPerUnit = (float)($product->weight_unit ?: 1);
             
             if ($displayUnit === 'kg') {
-                $stocks[$product->id] = $qty * $weightPerUnit;
+                $stocks[$product->id] = $qty * $product->weight_multiplier;
             } else {
                 $stocks[$product->id] = $qty / $unitPerBox;
             }
@@ -362,8 +365,7 @@ class MobileController extends Controller implements HasMiddleware
             }
 
             $unitPerBox = (float)($product->unit_box ?: 1);
-            $weightPerUnit = (float)($product->weight_unit ?: 1);
-            $displayQty = ($displayUnit === 'kg') ? ($qty * $weightPerUnit) : ($qty / $unitPerBox);
+            $displayQty = ($displayUnit === 'kg') ? ($qty * $product->weight_multiplier) : ($qty / $unitPerBox);
 
             $reportData[] = [
                 'product' => $product,
@@ -409,7 +411,8 @@ class MobileController extends Controller implements HasMiddleware
         $permittedTypeIds = $user->getPermittedProductTypeIds();
         $permittedRMTypes = $user->getPermittedRMTypes();
         
-        $productsQuery = Product::whereHas('recipes')->orderBy('name');
+        // Use Actual IDs for Finished Good (6) and Semi Finished Good (7)
+        $productsQuery = Product::whereHas('recipes')->whereIn('product_type_id', [6, 7])->orderBy('name');
         
         if ($user->role !== 'admin') {
             $productsQuery->whereIn('product_type_id', $permittedTypeIds)
@@ -424,7 +427,14 @@ class MobileController extends Controller implements HasMiddleware
         $branches = Branch::whereIn('code', $permittedCodes)->orderBy('code')->get();
         $types = \App\Models\ProductType::orderBy('type_name')->get();
 
-        return view('mobile.planning', compact('products', 'branches', 'types'));
+        // Fetch recent indents for "Plan by Indent" feature
+        $indents = Indent::whereIn('branch_code', $permittedCodes)
+            ->with(['items.product'])
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return view('mobile.planning', compact('products', 'branches', 'types', 'indents'));
     }
 
     /**
@@ -466,14 +476,17 @@ class MobileController extends Controller implements HasMiddleware
             $productId = $input['id'];
             $demandQty = (float)$input['demand_qty'];
 
+            $product = Product::find($productId);
             $recipe = Recipe::where('finished_product_id', $productId)->with('items.rawMaterial')->first();
-            if (!$recipe) continue;
+            if (!$product || !$recipe) continue;
 
             foreach ($recipe->items as $item) {
                 $rm = $item->rawMaterial;
                 if (!$rm) continue;
 
-                $requiredForThis = ($item->quantity / $recipe->yield_quantity) * $demandQty;
+                $requiredForThisPerYield = ($item->quantity / $recipe->yield_quantity);
+                $demandInBaseUnit = $demandQty * $product->weight_multiplier;
+                $requiredForThis = $requiredForThisPerYield * $demandInBaseUnit;
 
                 if (isset($totalRequirements[$rm->id])) {
                     $totalRequirements[$rm->id]['required_qty'] += $requiredForThis;
@@ -564,7 +577,8 @@ class MobileController extends Controller implements HasMiddleware
         $permittedTypeIds = $user->getPermittedProductTypeIds();
         $permittedRMTypes = $user->getPermittedRMTypes();
         
-        $productsQuery = Product::where('product_type_id', 1)->orderBy('name');
+        // Use Actual IDs for Finished Good (6) and Semi Finished Good (7)
+        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
         
         if ($user->role !== 'admin') {
             $productsQuery->whereIn('product_type_id', $permittedTypeIds)
@@ -629,7 +643,7 @@ class MobileController extends Controller implements HasMiddleware
 
             $stocks[] = [
                 'id' => $product->id,
-                'stock_kg' => number_format($stock * $weightPerUnit, 2, '.', ''),
+                'stock_kg' => number_format($stock * $product->weight_multiplier, 2, '.', ''),
                 'stock_box' => number_format($stock / $unitPerBox, 2, '.', '')
             ];
         }

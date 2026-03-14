@@ -133,8 +133,7 @@
                             
                             // Determine if low stock based on display unit
                             if ($displayUnit === 'kg') {
-                                $weightPerUnit = (float)($row['product']->weight_unit ?: 1);
-                                $isLowStock = $stock['qty'] <= ($alertLimit * $weightPerUnit);
+                                $isLowStock = $stock['qty'] <= ($alertLimit * $row['product']->weight_multiplier);
                             } else {
                                 $isLowStock = $stock['qty'] <= $alertLimit;
                             }
@@ -149,8 +148,7 @@
                     @php
                         $totalLimit = (float)($row['product']->low_alert_quantity ?: 0);
                         if ($displayUnit === 'kg') {
-                            $weightPerUnit = (float)($row['product']->weight_unit ?: 1);
-                            $isTotalLow = $row['total_qty'] <= ($totalLimit * $weightPerUnit);
+                            $isTotalLow = $row['total_qty'] <= ($totalLimit * $row['product']->weight_multiplier);
                         } else {
                             $isTotalLow = $row['total_qty'] <= $totalLimit;
                         }

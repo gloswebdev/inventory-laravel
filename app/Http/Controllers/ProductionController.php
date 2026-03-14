@@ -71,7 +71,7 @@ class ProductionController extends Controller
 
             $requirements[] = [
                 'name' => $item->rawMaterial->name,
-                'required_qty' => $requiredQty,
+                'required_qty' => $requiredQty * $product->weight_multiplier,
                 'current_stock' => $currentStock,
                 'shortfall' => $shortfall,
             ];
@@ -107,6 +107,10 @@ class ProductionController extends Controller
                 $product = Product::find($itemData['product_id']);
                 $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
 
+                $unitPerBox = (float)($product->unit_box ?: 1);
+                $totalUnits = $itemData['quantity'] * $unitPerBox;
+                $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+
                 ProductionItem::create([
                     'production_id' => $production->id,
                     'product_id' => $product->id,
@@ -118,18 +122,18 @@ class ProductionController extends Controller
                     'exp_date' => $itemData['exp_date'] ?? null,
                 ]);
 
-                $product->increment('current_stock', $itemData['quantity']);
+                $product->increment('current_stock', $totalUnits);
                 StockLedger::create([
                     'product_id' => $product->id,
                     'transaction_type' => 'production_add',
                     'transaction_id' => $production->id,
-                    'change_quantity' => $itemData['quantity'],
+                    'change_quantity' => $totalUnits,
                     'new_stock' => $product->current_stock,
                 ]);
 
                 if ($recipe) {
                     foreach ($recipe->items as $recipeItem) {
-                        $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $itemData['quantity'];
+                        $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
                         $rawMaterial = Product::find($recipeItem->raw_material_id);
                         $rawMaterial->decrement('current_stock', $deductQty);
 
@@ -165,18 +169,22 @@ class ProductionController extends Controller
                 $oldProduct = Product::find($oldItem->product_id);
                 $oldRecipe = Recipe::where('finished_product_id', $oldProduct->id)->with('items')->first();
 
-                $oldProduct->decrement('current_stock', $oldItem->quantity_box);
+                $unitPerBox = (float)($oldProduct->unit_box ?: 1);
+                $totalUnits = $oldItem->quantity_box * $unitPerBox;
+                $totalProducedInBaseUnit = $totalUnits * $oldProduct->weight_multiplier;
+
+                $oldProduct->decrement('current_stock', $totalUnits);
                 StockLedger::create([
                     'product_id' => $oldProduct->id,
                     'transaction_type' => 'production_reversal_deduct',
                     'transaction_id' => $production->id,
-                    'change_quantity' => -$oldItem->quantity_box,
+                    'change_quantity' => -$totalUnits,
                     'new_stock' => $oldProduct->current_stock,
                 ]);
 
                 if ($oldRecipe) {
                     foreach ($oldRecipe->items as $recipeItem) {
-                        $reverseQty = ($recipeItem->quantity / $oldRecipe->yield_quantity) * $oldItem->quantity_box;
+                        $reverseQty = ($recipeItem->quantity / $oldRecipe->yield_quantity) * $totalProducedInBaseUnit;
                         $rawMaterial = Product::find($recipeItem->raw_material_id);
                         $rawMaterial->increment('current_stock', $reverseQty);
 
@@ -203,6 +211,10 @@ class ProductionController extends Controller
                 $product = Product::find($itemData['product_id']);
                 $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
 
+                $unitPerBox = (float)($product->unit_box ?: 1);
+                $totalUnits = $itemData['quantity'] * $unitPerBox;
+                $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+
                 ProductionItem::create([
                     'production_id' => $production->id,
                     'product_id' => $product->id,
@@ -214,18 +226,18 @@ class ProductionController extends Controller
                     'exp_date' => $itemData['exp_date'] ?? null,
                 ]);
 
-                $product->increment('current_stock', $itemData['quantity']);
+                $product->increment('current_stock', $totalUnits);
                 StockLedger::create([
                     'product_id' => $product->id,
                     'transaction_type' => 'production_add',
                     'transaction_id' => $production->id,
-                    'change_quantity' => $itemData['quantity'],
+                    'change_quantity' => $totalUnits,
                     'new_stock' => $product->current_stock,
                 ]);
 
                 if ($recipe) {
                     foreach ($recipe->items as $recipeItem) {
-                        $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $itemData['quantity'];
+                        $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
                         $rawMaterial = Product::find($recipeItem->raw_material_id);
                         $rawMaterial->decrement('current_stock', $deductQty);
 
@@ -251,18 +263,22 @@ class ProductionController extends Controller
                 $product = Product::find($item->product_id);
                 $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
 
-                $product->decrement('current_stock', $item->quantity_box);
+                $unitPerBox = (float)($product->unit_box ?: 1);
+                $totalUnits = $item->quantity_box * $unitPerBox;
+                $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+
+                $product->decrement('current_stock', $totalUnits);
                 StockLedger::create([
                     'product_id' => $product->id,
                     'transaction_type' => 'production_delete_deduct',
                     'transaction_id' => $production->id,
-                    'change_quantity' => -$item->quantity_box,
+                    'change_quantity' => -$totalUnits,
                     'new_stock' => $product->current_stock,
                 ]);
 
                 if ($recipe) {
                     foreach ($recipe->items as $recipeItem) {
-                        $reverseQty = ($recipeItem->quantity / $recipe->yield_quantity) * $item->quantity_box;
+                        $reverseQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
                         $rawMaterial = Product::find($recipeItem->raw_material_id);
                         $rawMaterial->increment('current_stock', $reverseQty);
 
