@@ -8,9 +8,12 @@ use App\Models\ProductionItem;
 use App\Models\Branch;
 use App\Models\Recipe;
 use App\Models\StockLedger;
+use App\Models\RecipeItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class ProductionController extends Controller
 {
@@ -56,31 +59,85 @@ class ProductionController extends Controller
     {
         $productId = $request->get('product_id');
         $quantity = $request->get('quantity');
+        $branchCode = $request->get('branch_code', '2'); // Default to Factory (2)
 
-        $recipe = Recipe::where('finished_product_id', $productId)->with('items.rawMaterial')->firstOrFail();
+        $product = Product::findOrFail($productId);
+        $recipe = Recipe::where('finished_product_id', $productId)->with('items.rawMaterial')->first();
         
+        if (!$recipe) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No recipe defined for this product.'
+            ]);
+        }
+        
+        $externalStock = $this->getExternalStock();
         $requirements = [];
         $possible = true;
 
         foreach ($recipe->items as $item) {
-            $requiredQty = ($item->quantity / $recipe->yield_quantity) * $quantity;
-            $currentStock = $item->rawMaterial->current_stock;
-            $shortfall = $currentStock - $requiredQty;
+            $rm = $item->rawMaterial;
+            if (!$rm) continue;
 
+            // Required Qty = (Recipe Qty / Yield) * (Produced Qty * FG Weight Multiplier)
+            $requiredQty = ($item->quantity / $recipe->yield_quantity) * ($quantity * $product->weight_multiplier);
+            
+            // Get live stock for target branch from ERP data
+            $liveStock = 0;
+            if (isset($externalStock[$branchCode][$rm->item_code])) {
+                $liveStock = (float)$externalStock[$branchCode][$rm->item_code];
+            } else {
+                // If not in ERP, fallback to local stock? (User asked for live stock, so usually ERP)
+                $liveStock = (float)$rm->current_stock; 
+            }
+
+            $shortfall = $liveStock - $requiredQty;
             if ($shortfall < 0) $possible = false;
 
             $requirements[] = [
-                'name' => $item->rawMaterial->name,
-                'required_qty' => $requiredQty * $product->weight_multiplier,
-                'current_stock' => $currentStock,
-                'shortfall' => $shortfall,
+                'name' => $rm->name,
+                'item_code' => $rm->item_code,
+                'uom' => $rm->uom,
+                'required_qty' => round($requiredQty, 3),
+                'live_stock' => round($liveStock, 3),
+                'shortfall' => round(max(0, $requiredQty - $liveStock), 3),
             ];
         }
 
         return response()->json([
+            'success' => true,
             'possible' => $possible,
             'requirements' => $requirements,
         ]);
+    }
+
+    private function getExternalStock()
+    {
+        return Cache::remember('external_stock_data_grouped', 3600, function () {
+            try {
+                $response = Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
+                    "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",
+                    "Branch" => "ALL",
+                    "Item" => "ALL"
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+                        $stockMap = [];
+                        foreach ($data['resultdata'] as $item) {
+                            $bCode = (int)$item['Branch_Code'];
+                            $iCode = $item['User_Code'];
+                            $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
+                        }
+                        return $stockMap;
+                    }
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('External Stock API Error (Production): ' . $e->getMessage());
+            }
+            return [];
+        });
     }
 
     public function store(Request $request)
@@ -91,6 +148,9 @@ class ProductionController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.batch_number' => 'required|string|max:255',
+            'items.*.mfg_date' => 'required|date',
+            'items.*.exp_date' => 'required|date|after_or_equal:items.*.mfg_date',
         ]);
 
         $branch = Branch::where('code', $request->branch_code)->first();
@@ -117,7 +177,7 @@ class ProductionController extends Controller
                     'product_name' => $product->name,
                     'pack_size' => $product->pack_name,
                     'quantity_box' => $itemData['quantity'],
-                    'batch_number' => $itemData['batch_number'] ?? null,
+                    'batch_number' => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
                     'mfg_date' => $itemData['mfg_date'] ?? null,
                     'exp_date' => $itemData['exp_date'] ?? null,
                 ]);
@@ -160,6 +220,9 @@ class ProductionController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.batch_number' => 'required|string|max:255',
+            'items.*.mfg_date' => 'required|date',
+            'items.*.exp_date' => 'required|date|after_or_equal:items.*.mfg_date',
         ]);
 
         $branch = Branch::where('code', $request->branch_code)->first();
@@ -221,7 +284,7 @@ class ProductionController extends Controller
                     'product_name' => $product->name,
                     'pack_size' => $product->pack_name,
                     'quantity_box' => $itemData['quantity'],
-                    'batch_number' => $itemData['batch_number'] ?? null,
+                    'batch_number' => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
                     'mfg_date' => $itemData['mfg_date'] ?? null,
                     'exp_date' => $itemData['exp_date'] ?? null,
                 ]);

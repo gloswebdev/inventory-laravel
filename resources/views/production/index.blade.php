@@ -140,12 +140,12 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 pb-8 border-b border-gray-100">
                             <div class="space-y-2">
                                 <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Branch</label>
-                                <select x-model="branchCode" class="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-4 font-bold text-gray-900 focus:border-indigo-500 focus:ring-0 transition">
-                                    <option value="">Select Target Branch</option>
+                                <select x-model="branchCode" class="w-full bg-gray-100 border-2 border-gray-200 rounded-2xl px-6 py-4 font-black text-indigo-600 focus:border-indigo-500 focus:ring-0 transition cursor-not-allowed" disabled>
                                     @foreach($branches as $branch)
                                     <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
                                     @endforeach
                                 </select>
+                                <p class="text-[8px] font-bold text-amber-500 mt-1 uppercase tracking-tighter">* All production is logged in Factory Branch</p>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Production Date</label>
@@ -170,9 +170,9 @@
                             <table class="w-full">
                                 <thead class="sticky top-0 bg-white z-10">
                                     <tr>
-                                        <th class="text-left text-[10px] font-black text-gray-400 uppercase pb-4">Product Details</th>
-                                        <th class="text-center text-[10px] font-black text-gray-400 uppercase pb-4">Qty (Box)</th>
-                                        <th class="text-left text-[10px] font-black text-gray-400 uppercase pb-4">Batch Info (No / MFG / EXP)</th>
+                                        <th class="text-left text-[10px] font-black text-gray-400 uppercase pb-4">Product Details <span class="text-rose-500">*</span></th>
+                                        <th class="text-center text-[10px] font-black text-gray-400 uppercase pb-4">Qty (Box) <span class="text-rose-500">*</span></th>
+                                        <th class="text-left text-[10px] font-black text-gray-400 uppercase pb-4">Batch Info (No / MFG / EXP) <span class="text-rose-500">*</span></th>
                                         <th class="text-right text-[10px] font-black text-gray-400 uppercase pb-4"></th>
                                     </tr>
                                 </thead>
@@ -189,17 +189,83 @@
                                                 <div x-show="item.pack_size" class="mt-1 px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-tighter inline-block" x-text="'Pack: ' + item.pack_size"></div>
                                             </td>
                                             <td class="py-4 align-top w-20">
-                                                <input type="number" x-model="item.quantity" class="w-24 bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 text-center font-black text-gray-900 focus:border-indigo-500 focus:ring-0 transition" placeholder="0">
+                                                <input type="number" x-model="item.quantity" @input="fetchRequirements(index)" class="w-24 bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 text-center font-black text-gray-900 focus:border-indigo-500 focus:ring-0 transition" placeholder="0">
                                             </td>
                                             <td class="py-4 align-top pl-4">
                                                 <div class="flex gap-2">
-                                                    <input type="text" x-model="item.batch_number" class="flex-1 bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 text-[11px] font-bold text-gray-800 placeholder:text-gray-300" placeholder="Batch #">
-                                                    <input type="date" x-model="item.mfg_date" title="MFG Date" class="w-32 bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-3 text-[10px] font-bold border-gray-100">
-                                                    <input type="date" x-model="item.exp_date" title="EXP Date" class="w-32 bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-3 text-[10px] font-bold border-gray-100">
+                                                    <div class="flex-1 relative">
+                                                        <input type="text" x-model="item.batch_number" @input="item.batch_number = $event.target.value.toUpperCase()" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-3 text-[11px] font-bold text-gray-800 placeholder:text-gray-300 uppercase" placeholder="BATCH #">
+                                                        <div x-show="!item.batch_number" class="absolute top-0 right-2 text-rose-300 transform translate-y-1 p-1"><i class="fas fa-circle text-[6px]"></i></div>
+                                                    </div>
+                                                    <div class="w-32 relative">
+                                                        <input type="date" x-model="item.mfg_date" title="MFG Date" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-3 text-[10px] font-bold border-gray-100">
+                                                        <div x-show="!item.mfg_date" class="absolute top-0 right-2 text-rose-300 transform translate-y-1 p-1"><i class="fas fa-circle text-[6px]"></i></div>
+                                                    </div>
+                                                    <div class="w-32 relative">
+                                                        <input type="date" x-model="item.exp_date" title="EXP Date" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-3 text-[10px] font-bold border-gray-100">
+                                                        <div x-show="!item.exp_date" class="absolute top-0 right-2 text-rose-300 transform translate-y-1 p-1"><i class="fas fa-circle text-[6px]"></i></div>
+                                                    </div>
                                                 </div>
+
+                                                <!-- Loading Skeleton -->
+                                                <div x-show="item.loadingRequirements" class="mt-4 bg-gray-50/50 rounded-2xl border border-gray-100 p-6 space-y-5">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="w-4 h-4 bg-indigo-100 rounded-full animate-bounce"></div>
+                                                        <div class="h-3 w-40 bg-indigo-100/50 rounded-lg animate-pulse"></div>
+                                                    </div>
+                                                    <div class="space-y-4">
+                                                        <template x-for="i in [1,2]">
+                                                            <div class="flex justify-between items-center opacity-50">
+                                                                <div class="space-y-2">
+                                                                    <div class="h-3 w-48 bg-gray-200 rounded animate-pulse"></div>
+                                                                    <div class="h-2 w-20 bg-gray-100 rounded animate-pulse"></div>
+                                                                </div>
+                                                                <div class="flex gap-4">
+                                                                    <div class="h-6 w-16 bg-gray-100 rounded-lg animate-pulse"></div>
+                                                                    <div class="h-6 w-16 bg-gray-100 rounded-lg animate-pulse"></div>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Recipe Requirements Display -->
+                                                <div x-show="item.requirements && item.requirements.length > 0 && !item.loadingRequirements" class="mt-4 bg-indigo-50/30 rounded-2xl border border-indigo-100/50 p-4 shadow-inner">
+                                                    <div class="flex items-center justify-between mb-3 px-1">
+                                                        <h4 class="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic flex items-center gap-2">
+                                                            <i class="fas fa-flask"></i> Recipe Requirements (Factory Stock)
+                                                        </h4>
+                                                        <span x-show="!item.isPossible" class="bg-rose-500 text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter shadow-lg shadow-rose-200 animate-bounce">Insufficient Stock</span>
+                                                    </div>
+                                                    <div class="space-y-2">
+                                                        <template x-for="req in item.requirements" :key="req.item_code">
+                                                            <div class="flex items-center justify-between py-1 border-b border-indigo-100/30 last:border-0 grow">
+                                                                <div class="flex-1">
+                                                                    <div class="text-[10px] font-bold text-gray-700" x-text="req.name"></div>
+                                                                    <div class="text-[8px] font-black text-gray-400 uppercase" x-text="req.item_code"></div>
+                                                                </div>
+                                                                <div class="text-right flex gap-6 items-center">
+                                                                    <div>
+                                                                        <div class="text-[10px] font-black text-gray-900" x-text="parseFloat(req.required_qty).toFixed(3)"></div>
+                                                                        <div class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Required</div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div class="text-[10px] font-black" :class="req.live_stock < req.required_qty ? 'text-rose-500' : 'text-emerald-600'" x-text="parseFloat(req.live_stock).toFixed(3)"></div>
+                                                                        <div class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Live Stock</div>
+                                                                    </div>
+                                                                    <div x-show="req.shortfall > 0">
+                                                                        <div class="text-[10px] font-black text-rose-600" x-text="'-' + parseFloat(req.shortfall).toFixed(3)"></div>
+                                                                        <div class="text-[8px] font-black text-rose-300 uppercase tracking-tighter">Shortfall</div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                                <div x-show="item.requirementsError" class="mt-2 text-[9px] font-bold text-rose-500 italic" x-text="item.requirementsError"></div>
                                             </td>
                                             <td class="py-4 text-right">
-                                                <button @click="removeItem(index)" class="text-red-300 hover:text-red-500 transition-colors p-2">
+                                                <button @click="removeItem(index)" class="text-red-300 hover:text-red-500 transition-colors p-2 pt-4 block">
                                                     <i class="fas fa-trash-can"></i>
                                                 </button>
                                             </td>
@@ -326,8 +392,8 @@ function productionManager() {
         isEditing: false,
         editId: null,
         step: 1,
-        branchCode: '',
-        branchName: '',
+        branchCode: '2',
+        branchName: 'Factory',
         productionDate: '{{ date("Y-m-d") }}',
         items: [],
         typeFilter: '',
@@ -346,6 +412,7 @@ function productionManager() {
             this.showModal = true;
             this.step = 1;
             this.typeFilter = '';
+            this.branchCode = '2';
             this.items = [];
             this.addItem();
         },
@@ -374,7 +441,11 @@ function productionManager() {
                 quantity: '',
                 batch_number: '',
                 mfg_date: '',
-                exp_date: ''
+                exp_date: '',
+                requirements: [],
+                loadingRequirements: false,
+                isPossible: true,
+                requirementsError: ''
             });
         },
 
@@ -390,7 +461,50 @@ function productionManager() {
             if (p) {
                 item.product_name = p.name;
                 item.pack_size = p.pack_name || 'N/A';
+                this.fetchRequirements(index);
             }
+        },
+
+        fetchRequirements(index) {
+            const item = this.items[index];
+            if (!item.product_id || !item.quantity || item.quantity <= 0) {
+                item.requirements = [];
+                return;
+            }
+
+            item.loadingRequirements = true;
+            item.requirementsError = '';
+
+            fetch("{{ route('production.check-stock') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    branch_code: this.branchCode
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    item.requirements = data.requirements;
+                    item.isPossible = data.possible;
+                } else {
+                    item.requirements = [];
+                    item.isPossible = true; // No recipe means we don't block
+                    item.requirementsError = data.message;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                item.requirementsError = 'Failed to load requirements';
+            })
+            .finally(() => {
+                item.loadingRequirements = false;
+            });
         },
 
         goToPreview() {
@@ -398,8 +512,12 @@ function productionManager() {
                 alert('Please fill Branch and Date');
                 return;
             }
-            if (this.items.some(i => !i.product_id || !i.quantity)) {
-                alert('Please fill all product details');
+            if (this.items.some(i => !i.product_id || !i.quantity || !i.batch_number || !i.mfg_date || !i.exp_date)) {
+                alert('Please ensure all required fields (*), including Batch No, MFG and EXP dates are filled for all products.');
+                return;
+            }
+            if (this.items.some(i => !i.isPossible)) {
+                alert('CRITICAL: Some products cannot be produced due to Raw Material shortfall in Factory. Entry blocked.');
                 return;
             }
             const b = this.branches.find(b => b.code == this.branchCode);
