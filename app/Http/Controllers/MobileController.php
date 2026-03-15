@@ -856,7 +856,7 @@ class MobileController extends Controller implements HasMiddleware
     public function exportPdf(Indent $indent)
     {
         $indent->load('items.product', 'user');
-        $pdf = Pdf::loadView('planning.indent_pdf', compact('indent'));
+        $pdf = Pdf::loadView('indent.indent_pdf', compact('indent'));
         return $pdf->download("Indent_{$indent->id}_{$indent->indent_date}.pdf");
     }
 
@@ -890,7 +890,7 @@ class MobileController extends Controller implements HasMiddleware
         $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
 
-        $pdf = Pdf::loadView('planning.process_pdf', compact('indent', 'branches', 'branchStocks'))
+        $pdf = Pdf::loadView('indent.process_pdf', compact('indent', 'branches', 'branchStocks'))
                   ->setPaper('a4', 'landscape');
         return $pdf->download("Process_Matrix_{$indent->id}_{$indent->indent_date}.pdf");
     }
