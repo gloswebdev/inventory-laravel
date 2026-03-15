@@ -229,67 +229,69 @@
                     'pending' => 'text-amber-600 bg-amber-50',
                 ][strtolower($indent->status)] ?? 'text-amber-600 bg-amber-50';
             @endphp
-            <div class="group relative glass-premium p-6 rounded-[3rem] flex items-center justify-between transition-all border border-white/80 hover:shadow-xl hover:shadow-indigo-100/50 overflow-hidden">
+            <div class="group relative glass-premium p-6 rounded-[3rem] space-y-5 transition-all border border-white/80 hover:shadow-xl hover:shadow-indigo-100/50 overflow-hidden">
                 <div class="absolute top-0 left-0 w-2 h-full {{ $statusColor }}"></div>
                 
-                <div class="flex items-center gap-4">
-                    <div class="w-14 h-14 {{ $iconColor }} rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-3 shadow-sm">
-                        <i class="fas fa-file-invoice-dollar text-xl"></i>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-[9px] font-black uppercase tracking-widest {{ str_replace('grad-', 'text-', explode(' ', $statusColor)[0]) }}">
-                                {{ $indent->status ?: 'PENDING' }}
-                            </span>
-                            <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
-                            <span class="text-[9px] text-slate-400 font-900 tracking-tighter uppercase italic">{{ $indent->items_count }} Items</span>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 {{ $iconColor }} rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-3 shadow-sm">
+                            <i class="fas fa-file-invoice-dollar text-xl"></i>
                         </div>
-                        <div class="text-[10px] font-black text-indigo-600 italic tracking-tighter mt-1">#IND-{{ $indent->id }}</div>
-                        <div class="text-[14px] font-900 text-slate-800 truncate max-w-[140px] leading-tight mt-0.5 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{{ $indent->branch_name }}</div>
-                        <div class="text-[9px] text-slate-400 font-bold mt-1.5 flex items-center gap-2">
-                            <i class="far fa-calendar-alt text-[8px]"></i>
-                            {{ date('d M, Y', strtotime($indent->indent_date)) }}
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-black uppercase tracking-widest {{ str_replace('grad-', 'text-', explode(' ', $statusColor)[0]) }}">
+                                    {{ $indent->status ?: 'PENDING' }}
+                                </span>
+                                <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                <span class="text-[9px] text-slate-400 font-900 tracking-tighter uppercase italic">{{ $indent->items_count }} Items</span>
+                            </div>
+                            <div class="text-[10px] font-black text-indigo-600 italic tracking-tighter mt-1">#IND-{{ $indent->id }}</div>
+                            <div class="text-[14px] font-900 text-slate-800 truncate max-w-[140px] leading-tight mt-0.5 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{{ $indent->branch_name }}</div>
+                            <div class="text-[9px] text-slate-400 font-bold mt-1.5 flex items-center gap-2" title="{{ date('d M, Y', strtotime($indent->indent_date)) }}">
+                                <i class="far fa-calendar-alt text-[8px]"></i>
+                                {{ date('d M, Y', strtotime($indent->indent_date)) }}
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="flex flex-col items-end gap-3 shrink-0">
-                    <div class="text-right">
+
+                    <div class="text-right shrink-0">
                         <div class="text-xl font-900 text-slate-800 tracking-tighter leading-none">{{ number_format($indent->total_boxes, 0) }}</div>
                         <div class="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1.5">Boxes</div>
                     </div>
-                    <div class="flex flex-wrap justify-end gap-1.5">
-                        @if(Auth::user()->hasPermission('mobile_indents', 'view'))
-                        <button @click="viewIndentDetails({{ $indent->id }})" class="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100 transition-all active:scale-90 hover:grad-indigo hover:text-white" title="View"><i class="fas fa-eye text-xs"></i></button>
-                        @endif
-                        @if(Auth::user()->hasFeature('mobile_indents', 'process'))
-                        <button @click="viewProgressDetails({{ $indent->id }})" class="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 border border-amber-100 transition-all active:scale-90 hover:grad-amber hover:text-white" title="Progress"><i class="fas fa-list-check text-xs"></i></button>
-                        @endif
-                        @if(Auth::user()->hasPermission('mobile_indents', 'print'))
-                        <a href="{{ route('mobile.indents.print', $indent->id) }}" target="_blank" class="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 transition-all active:scale-90 hover:grad-blue hover:text-white" title="Print"><i class="fas fa-print text-xs"></i></a>
-                        @endif
-                        @if(Auth::user()->hasPermission('mobile_indents', 'excel'))
-                        <a href="{{ route('mobile.indents.excel', $indent->id) }}" class="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 transition-all active:scale-90 hover:grad-emerald hover:text-white" title="Excel"><i class="fas fa-file-excel text-xs"></i></a>
-                        @endif
-                        @if(Auth::user()->hasPermission('mobile_indents', 'pdf'))
-                        <a href="{{ route('mobile.indents.pdf', $indent->id) }}" class="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 transition-all active:scale-90 hover:grad-rose hover:text-white" title="PDF"><i class="fas fa-file-pdf text-xs"></i></a>
-                        @endif
-                        @if(Auth::user()->hasFeature('mobile_indents', 'process'))
-                        <a href="{{ route('mobile.indents.process', $indent->id) }}" class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 transition-all active:scale-90 hover:bg-slate-700 hover:text-white" title="Status"><i class="fas fa-gear text-xs"></i></a>
-                        @endif
+                </div>
+                
+                <!-- Actions Row: Horizontally Scrollable -->
+                <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-2 px-2 snap-x">
+                    @if(Auth::user()->hasPermission('mobile_indents', 'view'))
+                    <button @click="viewIndentDetails({{ $indent->id }})" class="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100 transition-all active:scale-90 hover:grad-indigo hover:text-white shrink-0 snap-center" title="View"><i class="fas fa-eye text-xs"></i></button>
+                    @endif
+                    @if(Auth::user()->hasFeature('mobile_indents', 'process'))
+                    <button @click="viewProgressDetails({{ $indent->id }})" class="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 border border-amber-100 transition-all active:scale-90 hover:grad-amber hover:text-white shrink-0 snap-center" title="Progress"><i class="fas fa-list-check text-xs"></i></button>
+                    @endif
+                    @if(Auth::user()->hasPermission('mobile_indents', 'print'))
+                    <a href="{{ route('mobile.indents.print', $indent->id) }}" target="_blank" class="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 transition-all active:scale-90 hover:grad-blue hover:text-white shrink-0 snap-center" title="Print"><i class="fas fa-print text-xs"></i></a>
+                    @endif
+                    @if(Auth::user()->hasPermission('mobile_indents', 'excel'))
+                    <a href="{{ route('mobile.indents.excel', $indent->id) }}" class="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 transition-all active:scale-90 hover:grad-emerald hover:text-white shrink-0 snap-center" title="Excel"><i class="fas fa-file-excel text-xs"></i></a>
+                    @endif
+                    @if(Auth::user()->hasPermission('mobile_indents', 'pdf'))
+                    <a href="{{ route('mobile.indents.pdf', $indent->id) }}" class="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 transition-all active:scale-90 hover:grad-rose hover:text-white shrink-0 snap-center" title="PDF"><i class="fas fa-file-pdf text-xs"></i></a>
+                    @endif
+                    @if(Auth::user()->hasFeature('mobile_indents', 'process'))
+                    <a href="{{ route('mobile.indents.process', $indent->id) }}" class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 transition-all active:scale-90 hover:bg-slate-700 hover:text-white shrink-0 snap-center" title="Status"><i class="fas fa-gear text-xs"></i></a>
+                    @endif
 
-                        @if(Auth::user()->hasFeature('mobile_indents', 'clone'))
-                        <button @click="cloneIndent({{ $indent->id }})" class="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600 border border-violet-100 transition-all active:scale-90 hover:grad-violet hover:text-white" title="Clone"><i class="fas fa-copy text-xs"></i></button>
-                        @endif
+                    @if(Auth::user()->hasFeature('mobile_indents', 'clone'))
+                    <button @click="cloneIndent({{ $indent->id }})" class="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600 border border-violet-100 transition-all active:scale-90 hover:grad-violet hover:text-white shrink-0 snap-center" title="Clone"><i class="fas fa-copy text-xs"></i></button>
+                    @endif
 
-                        @if(Auth::user()->hasFeature('mobile_indents', 'edit'))
-                        <button @click="editIndent({{ $indent->id }})" class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 transition-all active:scale-90 hover:bg-slate-700 hover:text-white" title="Edit"><i class="fas fa-edit text-xs"></i></button>
-                        @endif
+                    @if(Auth::user()->hasFeature('mobile_indents', 'edit'))
+                    <button @click="editIndent({{ $indent->id }})" class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 transition-all active:scale-90 hover:bg-slate-700 hover:text-white shrink-0 snap-center" title="Edit"><i class="fas fa-edit text-xs"></i></button>
+                    @endif
 
-                        @if(Auth::user()->hasFeature('mobile_indents', 'delete'))
-                        <button @click="deleteIndent({{ $indent->id }})" class="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 transition-all active:scale-90 hover:grad-rose hover:text-white" title="Delete"><i class="fas fa-trash text-xs"></i></button>
-                        @endif
-                    </div>
+                    @if(Auth::user()->hasFeature('mobile_indents', 'delete'))
+                    <button @click="deleteIndent({{ $indent->id }})" class="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 transition-all active:scale-90 hover:grad-rose hover:text-white shrink-0 snap-center" title="Delete"><i class="fas fa-trash text-xs"></i></button>
+                    @endif
                 </div>
             </div>
             @endforeach

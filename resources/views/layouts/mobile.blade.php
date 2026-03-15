@@ -75,6 +75,9 @@
         .animate-blob {
             animation: blob-bounce 10s infinite alternate cubic-bezier(0.445, 0.05, 0.55, 0.95);
         }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 
     <!-- Alpine.js -->

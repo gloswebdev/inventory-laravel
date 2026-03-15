@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Recipe;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class PlanningController extends Controller
 {

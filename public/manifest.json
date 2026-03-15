@@ -2,7 +2,8 @@
     "name": "InvoFlow Mobile",
     "short_name": "InvoFlow",
     "description": "Premium Inventory & Indent Management System",
-    "start_url": "/inventorymanager/inventory-laravel/public/mobile",
+    "start_url": "./mobile",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#4f46e5",
     "theme_color": "#4f46e5",
@@ -12,13 +13,13 @@
             "src": "app_icon_512.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "maskable"
         },
         {
             "src": "app_icon_512.png",
-            "sizes": "192x192",
+            "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
         }
     ]
 }

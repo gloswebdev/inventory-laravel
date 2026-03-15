@@ -1,7 +1,11 @@
-const CACHE_NAME = 'invoflow-v3';
+const CACHE_NAME = 'invoflow-v6';
 const ASSETS_TO_CACHE = [
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
-    'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap'
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+    'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap',
+    './',
+    './mobile',
+    './manifest.json',
+    './app_icon_512.png'
 ];
 
 // Install Event
