@@ -29,6 +29,32 @@
         </div>
     </div>
 
+    <!-- PWA Install Prompt (Smart Card) -->
+    <div id="pwaInstallCard" class="hidden animate-in fade-in zoom-in duration-700 delay-100 mb-6 cursor-pointer active:scale-95 transition-transform">
+        <div class="grad-violet p-6 rounded-[2.5rem] text-white relative overflow-hidden shadow-xl shadow-violet-100 border-2 border-white">
+            <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl animate-pulse-slow"></div>
+            <div class="relative flex items-center justify-between gap-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fas fa-rocket text-[10px] text-white/80"></i>
+                        <span id="pwaStatusTag" class="text-[9px] font-black uppercase tracking-widest text-white/90">Experience Better</span>
+                    </div>
+                    <h3 class="text-xl font-900 tracking-tighter italic leading-none">Install InvoFlow</h3>
+                    <p id="pwaStatusText" class="text-[9px] text-white/70 mt-3 font-bold uppercase tracking-widest leading-relaxed">Add to Home Screen for faster access and offline capabilities.</p>
+                </div>
+                <div id="pwaActionContainer">
+                    <button id="pwaInstallActionBtn" class="shrink-0 w-14 h-14 bg-white/20 hover:bg-white/30 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/30 shadow-lg active:scale-95 transition-all hidden">
+                        <i class="fas fa-download text-xl"></i>
+                    </button>
+                    <div id="iosInstallHint" class="shrink-0 w-14 h-14 bg-white/10 rounded-2xl flex flex-col items-center justify-center border border-white/20 text-[8px] font-black hidden">
+                        <i class="fas fa-share-square text-lg mb-1"></i>
+                        <span>SHARE</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Featured Sync Status -->
     <div class="animate-in fade-in zoom-in duration-700 delay-200">
         <div class="grad-cyan p-6 rounded-[2.5rem] text-white relative overflow-hidden shadow-xl shadow-cyan-100">

@@ -9,8 +9,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>InvoFlow Mobile</title>
 
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <link rel="apple-touch-icon" href="{{ asset('app_icon_512.png') }}">
+    {{-- Increment the version (?v=...) below whenever you change manifest or icons to force browser update --}}
+    <link rel="manifest" href="{{ asset('manifest.json') }}?v=1.1">
+    <link rel="apple-touch-icon" href="{{ asset('app_icon_512.png') }}?v=1.1">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -268,7 +269,27 @@
                             const newWorker = reg.installing;
                             newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('PWA: New content is available; please refresh.');
+                                    // Show a premium update toast
+                                    const toast = document.createElement('div');
+                                    toast.innerHTML = `
+                                        <div id="pwaUpdateToast" class="fixed top-6 left-4 right-4 z-[200] animate-in slide-in-from-top duration-500">
+                                            <div class="grad-indigo p-4 rounded-2xl shadow-2xl border border-white/20 flex items-center justify-between gap-4">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white">
+                                                        <i class="fas fa-arrows-rotate fa-spin"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="text-[11px] font-900 text-white uppercase tracking-tight">Update Available</div>
+                                                        <div class="text-[9px] text-white/70 font-bold uppercase tracking-widest">New version is ready</div>
+                                                    </div>
+                                                </div>
+                                                <button onclick="window.location.reload()" class="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all">
+                                                    Refresh Now
+                                                </button>
+                                            </div>
+                                        </div>
+                                    `;
+                                    document.body.appendChild(toast);
                                 }
                             });
                         });
@@ -277,20 +298,70 @@
             });
         }
 
-        // Handle PWA Installation Prompt
+        // PWA Smart Logic
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const installCard = document.getElementById('pwaInstallCard');
+        const installBtnCont = document.getElementById('installAppContainer');
+
+        if (!isStandalone) {
+            // Show card on dashboard by default if in browser
+            if (installCard) installCard.classList.remove('hidden');
+            
+            if (isIOS) {
+                // Show iOS specific hint
+                const iosHint = document.getElementById('iosInstallHint');
+                const statusTag = document.getElementById('pwaStatusTag');
+                const statusText = document.getElementById('pwaStatusText');
+                if (iosHint) iosHint.classList.remove('hidden');
+                if (statusTag) statusTag.innerText = 'Apple iOS User';
+                if (statusText) statusText.innerText = 'Tap Share -> "Add to Home Screen" to install.';
+            }
+        }
+
+        // Handle PWA Installation Prompt (Android/Chrome)
         window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevent Chrome 67 and earlier from automatically showing the prompt
             e.preventDefault();
-            // Stash the event so it can be triggered later.
             deferredPrompt = e;
             console.log('PWA: Install prompt stashed');
 
-            // Show install button in UI
-            const installBtnCont = document.getElementById('installAppContainer');
-            if (installBtnCont) {
-                installBtnCont.classList.remove('hidden');
+            // Show install elements
+            if (installBtnCont) installBtnCont.classList.remove('hidden');
+            
+            const dashInstallBtn = document.getElementById('pwaInstallActionBtn');
+            if (dashInstallBtn && !isIOS) {
+                dashInstallBtn.classList.remove('hidden');
             }
+
+            // Update UI to show ready
+            const statusTag = document.getElementById('pwaStatusTag');
+            const statusText = document.getElementById('pwaStatusText');
+            if (statusTag) {
+                statusTag.innerText = 'App Ready to Install';
+                statusTag.classList.remove('text-white/90');
+                statusTag.classList.add('text-green-300');
+            }
+            if (statusText) statusText.innerText = 'Bhai signal mil gaya hai! Ab click karke install kar lo.';
         });
+
+        // Dashboard Install Action (Whole Card)
+        if (installCard) {
+            installCard.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        deferredPrompt = null;
+                        if (installCard) installCard.classList.add('hidden');
+                    }
+                } else if (isIOS) {
+                    // Re-show instructions for iOS
+                    alert('Bhai, iPhone par install karne ke liye: \n1. Niche Share (arrow icon) dabao.\n2. "Add to Home Screen" choose karo.');
+                } else {
+                    alert('System is checking for install signal. Please try again in 3 seconds!');
+                }
+            });
+        }
 
         const installBtn = document.getElementById('installAppBtn');
         if (installBtn) {
