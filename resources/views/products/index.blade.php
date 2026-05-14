@@ -40,8 +40,8 @@
 @endif
 
 <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden">
-    {{-- Sticky Header Section --}}
-    <div id="stickyHeader" class="sticky top-0 z-10 bg-white/90 backdrop-blur-md px-7 py-5 border-b border-slate-100 shadow-sm flex flex-col md:flex-row md:justify-between md:items-center gap-4 transition-all">
+    {{-- Header Section --}}
+    <div id="pageHeader" class="bg-white px-7 py-5 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-4 transition-all">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200/50">
                 <i class="fas fa-box-open text-white"></i>
@@ -179,7 +179,7 @@
 
         <div>
             <table class="w-full text-left border-collapse">
-                <thead id="tableHead" class="sticky z-[5] bg-slate-50">
+                <thead id="tableHead" class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
                     <tr>
                         <th class="py-3 px-6 border-b border-slate-200"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"></th>
                         <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Item Code</th>
@@ -661,18 +661,6 @@
         document.getElementById('modalTitle').innerText = 'Add Product';
     }
 
-    // ===== Dynamic Sticky Table Header =====
-    function updateTableHeadTop() {
-        const stickyHeader = document.getElementById('stickyHeader');
-        const tableHead = document.getElementById('tableHead');
-        if (stickyHeader && tableHead) {
-            const headerHeight = stickyHeader.offsetHeight;
-            tableHead.style.top = headerHeight + 'px';
-        }
-    }
-    // Run on load and resize
-    updateTableHeadTop();
-    window.addEventListener('resize', updateTableHeadTop);
     // ===== Sync Report Modal =====
     function openSyncReport(logId) {
         document.getElementById('syncReportModal').classList.remove('hidden');
