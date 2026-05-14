@@ -71,64 +71,70 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left">
                     <thead>
-                        <tr class="bg-gray-50/50">
-                            <th class="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">Date & Branch</th>
-                            <th class="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Creator</th>
-                            <th class="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                            <th class="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Items</th>
-                            <th class="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-right">Volume</th>
-                            <th class="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
+        <div class="bg-white rounded-3xl shadow-sm overflow-hidden border border-slate-100/80">
+            <div class="overflow-x-auto relative">
+                <table class="w-full text-left border-collapse">
+                    <thead class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                        <tr>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Date & Branch</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">Creator</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">Status</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">Items</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Volume</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Action</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($history as $indent)
-                        <tr class="hover:bg-amber-50/20 transition-all group">
+                        <tr class="hover:bg-slate-50/70 transition-colors group">
                             <td class="px-8 py-5">
-                                <div class="font-bold text-gray-800 text-sm italic">{{ date('d M, Y', strtotime($indent->indent_date)) }}</div>
-                                <span class="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-lg text-[10px] uppercase">
+                                <div class="font-bold text-slate-800 text-sm mb-1">{{ date('d M, Y', strtotime($indent->indent_date)) }}</div>
+                                <span class="bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded text-[10px] uppercase border border-indigo-100">
                                     {{ $indent->branch_name }}
                                 </span>
                             </td>
                             <td class="px-8 py-5 text-center">
-                                <div class="text-xs font-black text-gray-600 uppercase">{{ $indent->user->name ?? 'System' }}</div>
+                                <div class="text-sm font-bold text-slate-700">{{ $indent->user->name ?? 'System' }}</div>
                             </td>
                             <td class="px-8 py-5 text-center text-[10px] font-black">
                                 @if($indent->status == 'completed')
-                                <span class="text-green-600 uppercase tracking-tighter">● Fully Completed</span>
+                                <span class="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-emerald-200">Completed</span>
                                 @elseif($indent->status == 'partly completed')
-                                <span class="text-blue-500 uppercase tracking-tighter italic">◌ Partly Completed</span>
+                                <span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-blue-200">Partly</span>
                                 @else
-                                <span class="text-amber-500 uppercase tracking-tighter italic">◌ Pending</span>
+                                <span class="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-amber-200">Pending</span>
                                 @endif
                             </td>
                             <td class="px-8 py-5 text-center">
-                                <div class="text-sm font-bold text-gray-500">{{ $indent->items_count }} Products</div>
+                                <div class="text-sm font-bold text-slate-500">{{ $indent->items_count }} Products</div>
                             </td>
                             <td class="px-8 py-5 text-right">
-                                <span class="text-xl font-black italic tracking-tighter text-gray-900">{{ number_format($indent->total_boxes, 0) }}</span>
-                                <span class="text-[9px] font-black text-gray-400 uppercase block -mt-1">Boxes</span>
+                                <span class="text-xl font-black tracking-tight text-slate-800">{{ number_format($indent->total_boxes, 0) }}</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase block -mt-0.5 tracking-widest">Boxes</span>
                             </td>
                             <td class="px-8 py-5 text-right">
                                 <div class="flex justify-end gap-2 items-center">
-                                    <button onclick="viewIndent({{ $indent->id }})" title="View" class="bg-indigo-100 text-indigo-600 p-2.5 rounded-xl hover:bg-indigo-600 hover:text-white transition shadow-sm"><i class="fas fa-eye text-xs"></i></button>
-                                    <button onclick="viewProgress({{ $indent->id }})" title="View Progress (Asked vs Completed)" class="bg-blue-100 text-blue-600 p-2.5 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm"><i class="fas fa-list-check text-xs"></i></button>
-                                    @if(Auth::user()->hasPermission('planning_process', 'print'))
-                                    <button onclick="printIndent({{ $indent->id }})" title="Print" class="bg-indigo-100 text-indigo-600 p-2.5 rounded-xl hover:bg-indigo-600 hover:text-white transition shadow-sm"><i class="fas fa-print text-xs"></i></button>
-                                    @endif
+                                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="viewIndent({{ $indent->id }})" title="View" class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100/50"><i class="fas fa-eye text-xs"></i></button>
+                                        <button onclick="viewProgress({{ $indent->id }})" title="View Progress (Asked vs Completed)" class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100/50"><i class="fas fa-list-check text-xs"></i></button>
+                                        @if(Auth::user()->hasPermission('planning_process', 'print'))
+                                        <button onclick="printIndent({{ $indent->id }})" title="Print" class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100/50"><i class="fas fa-print text-xs"></i></button>
+                                        @endif
+                                        
+                                        @if(Auth::user()->hasPermission('planning_process', 'excel'))
+                                        <button onclick="exportExcel({{ $indent->id }})" title="Excel" class="w-8 h-8 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition shadow-sm border border-emerald-100/50"><i class="fas fa-file-excel text-xs"></i></button>
+                                        @endif
 
-                                    @if(Auth::user()->hasPermission('planning_process', 'excel'))
-                                    <button onclick="exportExcel({{ $indent->id }})" title="Excel" class="bg-green-100 text-green-600 p-2.5 rounded-xl hover:bg-green-600 hover:text-white transition shadow-sm"><i class="fas fa-file-excel text-xs"></i></button>
-                                    @endif
-
-                                    @if(Auth::user()->hasPermission('planning_process', 'pdf'))
-                                    <button onclick="exportPdf({{ $indent->id }})" title="PDF" class="bg-red-100 text-red-600 p-2.5 rounded-xl hover:bg-red-600 hover:text-white transition shadow-sm"><i class="fas fa-file-pdf text-xs"></i></button>
-                                    @endif
+                                        @if(Auth::user()->hasPermission('planning_process', 'pdf'))
+                                        <button onclick="exportPdf({{ $indent->id }})" title="PDF" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100/50"><i class="fas fa-file-pdf text-xs"></i></button>
+                                        @endif
+                                    </div>
                                     
-                                    <div class="h-8 w-px bg-gray-200 mx-1"></div>
+                                    <div class="h-8 w-px bg-slate-200 mx-1"></div>
                                     
                                     @if(Auth::user()->hasPermission('planning_process', 'edit'))
-                                    <a href="{{ route('indent.process', $indent->id) }}" class="inline-flex items-center gap-2 bg-amber-500 text-white px-6 py-2.5 rounded-xl font-black italic tracking-tighter hover:bg-amber-600 transition shadow-lg shadow-amber-200">
-                                        <i class="fas fa-microchip text-xs"></i> PROCESS NOW
+                                    <a href="{{ route('indent.process', $indent->id) }}" class="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-2.5 rounded-xl font-bold transition shadow-lg shadow-amber-200/50 hover:from-amber-600 hover:to-orange-600 uppercase text-[11px] tracking-wider">
+                                        <i class="fas fa-microchip"></i> Process Now
                                     </a>
                                     @endif
                                 </div>
@@ -136,7 +142,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="px-8 py-20 text-center text-gray-400 italic font-bold">No indents available for processing.</td>
+                            <td colspan="6" class="px-8 py-20 text-center text-slate-400 font-medium">No indents available for processing.</td>
                         </tr>
                         @endforelse
                     </tbody>
