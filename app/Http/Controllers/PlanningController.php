@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\Product;
 use App\Models\Branch;
 use App\Models\Recipe;
@@ -157,10 +158,15 @@ class PlanningController extends Controller
     {
         return Cache::remember('external_stock_data_grouped', 3600, function () {
             try {
-                $response = \Illuminate\Support\Facades\Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
-                    "apikey" => "e2a4fuye2a4fuy9swssw122sbkn0m82y83g14",
-                    "Branch" => "ALL",
-                    "Item" => "ALL"
+                $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+                $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+                $branch  = AppSetting::get('inventory_api_branch', 'ALL');
+                $item    = AppSetting::get('inventory_api_item', 'ALL');
+
+                $response = \Illuminate\Support\Facades\Http::timeout(30)->post("{$baseUrl}/ProductWiseInventory", [
+                    "apikey" => $apiKey,
+                    "Branch" => $branch,
+                    "Item"   => $item,
                 ]);
 
                 if ($response->successful()) {

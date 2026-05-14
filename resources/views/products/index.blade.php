@@ -39,208 +39,240 @@
 </div>
 @endif
 
-<div class="bg-white rounded shadow-md p-6">
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden">
     {{-- Sticky Header Section --}}
-    <div id="stickyHeader" class="sticky top-0 z-10 bg-white pb-2 -mx-6 px-6 pt-1 border-b border-gray-100 shadow-sm">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-gray-700">Product List</h3>
-            <div class="flex gap-2 flex-wrap">
-                @if(Auth::user()->hasPermission('products', 'edit'))
-                <button onclick="document.getElementById('typeModal').classList.remove('hidden')" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-tags mr-2"></i> Type
-                </button>
-                <button onclick="document.getElementById('groupModal').classList.remove('hidden')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-layer-group mr-2"></i> Group
-                </button>
-                 <button onclick="document.getElementById('categoryModal').classList.remove('hidden')" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-list mr-2"></i> Cat
-                </button>
-                 <button onclick="document.getElementById('formModal').classList.remove('hidden')" class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-shapes mr-2"></i> Form
-                </button>
-                 <button onclick="document.getElementById('rmTypeModal').classList.remove('hidden')" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-flask mr-2"></i> RM
-                </button>
-                 <button onclick="document.getElementById('packNameModal').classList.remove('hidden')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-box mr-2"></i> Pack
-                </button>
-                @endif
-                <a href="{{ route('products.export', request()->query()) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-file-download mr-2"></i> Download
-                </a>
-                @if(Auth::user()->hasPermission('products', 'create'))
-                <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-file-excel mr-2"></i> Import
-                </button>
-                <form id="syncApiForm" action="{{ route('products.sync-api') }}" method="POST" class="inline">
-                    @csrf
-                    <button type="submit" onclick="return confirm('Sync all products from Algebra ERP API? This will create new products and update existing ones.')" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded">
-                        <i class="fas fa-sync-alt mr-2"></i> Sync API
-                    </button>
-                </form>
-                <button onclick="document.getElementById('productModal').classList.remove('hidden')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-plus mr-2"></i> Add
-                </button>
-                @endif
+    <div id="stickyHeader" class="sticky top-0 z-10 bg-white/90 backdrop-blur-md px-7 py-5 border-b border-slate-100 shadow-sm flex flex-col md:flex-row md:justify-between md:items-center gap-4 transition-all">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200/50">
+                <i class="fas fa-box-open text-white"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-black text-slate-800 tracking-tight">Product Master</h3>
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Manage your inventory catalog</p>
             </div>
         </div>
-    
-        {{-- Search & Filter Form --}}
-        <div class="mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <form action="{{ route('products.index') }}" method="GET" class="flex flex-wrap gap-3 items-end">
-                <div class="flex-grow min-w-[200px]">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by Name, Code, Tech Name..." class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
-                </div>
-                
-                <div class="w-full sm:w-44">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Group</label>
-                    <select name="group_id" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
-                        <option value="">All Groups</option>
-                        @foreach($groups as $group)
-                            <option value="{{ $group->id }}" {{ request('group_id') == $group->id ? 'selected' : '' }}>
-                                {{ $group->group_name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
 
-                <div class="w-full sm:w-44">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Type</label>
-                    <select name="product_type_id" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
-                        <option value="">All Types</option>
-                        @foreach($types as $type)
-                            <option value="{{ $type->id }}" {{ request('product_type_id') == $type->id ? 'selected' : '' }}>
-                                {{ $type->type_name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+        <div class="flex gap-2 flex-wrap items-center">
+            @if(Auth::user()->hasPermission('products', 'edit'))
+            <div class="flex bg-slate-50 p-1 rounded-xl border border-slate-100 gap-1 mr-2">
+                <button onclick="document.getElementById('typeModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-purple-600 hover:shadow-sm transition-all" title="Types">
+                    <i class="fas fa-tags"></i>
+                </button>
+                <button onclick="document.getElementById('groupModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-gray-700 hover:shadow-sm transition-all" title="Groups">
+                    <i class="fas fa-layer-group"></i>
+                </button>
+                 <button onclick="document.getElementById('categoryModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition-all" title="Categories">
+                    <i class="fas fa-list"></i>
+                </button>
+                 <button onclick="document.getElementById('formModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-pink-600 hover:shadow-sm transition-all" title="Forms">
+                    <i class="fas fa-shapes"></i>
+                </button>
+                 <button onclick="document.getElementById('rmTypeModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-teal-600 hover:shadow-sm transition-all" title="RM Types">
+                    <i class="fas fa-flask"></i>
+                </button>
+                 <button onclick="document.getElementById('packNameModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-orange-600 hover:shadow-sm transition-all" title="Pack Names">
+                    <i class="fas fa-box"></i>
+                </button>
+            </div>
+            @endif
 
-                <div class="w-full sm:w-44">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Filter by RM Type</label>
-                    <select name="rm_type" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
-                        <option value="">All RM Types</option>
-                        @foreach($rmTypes as $rm)
-                            <option value="{{ $rm->value }}" {{ request('rm_type') == $rm->value ? 'selected' : '' }}>
-                                {{ $rm->value }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="w-full sm:w-24">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
-                    <select name="per_page" onchange="this.form.submit()" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
-                        <option value="50" {{ request('per_page', 50) == '50' ? 'selected' : '' }}>50</option>
-                        <option value="100" {{ request('per_page') == '100' ? 'selected' : '' }}>100</option>
-                        <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
-                    </select>
-                </div>
-
-                <div class="flex gap-2">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow">
-                        <i class="fas fa-filter mr-1"></i> Filter
-                    </button>
-                    @if(request()->hasAny(['search', 'group_id', 'product_type_id', 'rm_type']))
-                    <a href="{{ route('products.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow">
-                        Clear
-                    </a>
-                    @endif
-                </div>
-            </form>
-        </div>
-
-        @if(Auth::user()->hasPermission('products', 'delete'))
-        <div class="mb-2">
-            <button type="button" onclick="submitBulkDelete()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed" id="bulkDeleteBtn" disabled>
-                <i class="fas fa-trash-alt mr-2"></i> Bulk Delete
+            <a href="{{ route('products.export', request()->query()) }}" class="bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-xs font-bold py-2 px-4 rounded-xl transition-colors flex items-center gap-2">
+                <i class="fas fa-file-export"></i> Export
+            </a>
+            
+            @if(Auth::user()->hasPermission('products', 'create'))
+            <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold py-2 px-4 rounded-xl transition-colors flex items-center gap-2">
+                <i class="fas fa-file-import"></i> Import
             </button>
+            <form id="syncApiForm" action="{{ route('products.sync-api') }}" method="POST" class="inline m-0">
+                @csrf
+                <button type="submit" onclick="return confirm('Sync all products from Algebra ERP API? This will create new products and update existing ones.')" class="bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-700 text-xs font-bold py-2 px-4 rounded-xl transition-colors flex items-center gap-2">
+                    <i class="fas fa-rotate"></i> Sync ERP
+                </button>
+            </form>
+            <button onclick="document.getElementById('productModal').classList.remove('hidden')" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md shadow-blue-200/50 text-sm font-bold py-2 px-5 rounded-xl transition-all flex items-center gap-2">
+                <i class="fas fa-plus"></i> Add Product
+            </button>
+            @endif
         </div>
-        @endif
+    </div>
+    
+    {{-- Search & Filter Form --}}
+    <div class="px-7 py-4 bg-slate-50/50 border-b border-slate-100">
+        <form action="{{ route('products.index') }}" method="GET" class="flex flex-wrap gap-4 items-end">
+            <div class="flex-grow min-w-[200px]">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Search</label>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="By Name, Code, Tech Name..." class="w-full bg-white border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm">
+                </div>
+            </div>
+            
+            <div class="w-full sm:w-44">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Group</label>
+                <select name="group_id" class="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm appearance-none">
+                    <option value="">All Groups</option>
+                    @foreach($groups as $group)
+                        <option value="{{ $group->id }}" {{ request('group_id') == $group->id ? 'selected' : '' }}>
+                            {{ $group->group_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="w-full sm:w-44">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Type</label>
+                <select name="product_type_id" class="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm appearance-none">
+                    <option value="">All Types</option>
+                    @foreach($types as $type)
+                        <option value="{{ $type->id }}" {{ request('product_type_id') == $type->id ? 'selected' : '' }}>
+                            {{ $type->type_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="w-full sm:w-44">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">RM Type</label>
+                <select name="rm_type" class="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm appearance-none">
+                    <option value="">All RM Types</option>
+                    @foreach($rmTypes as $rm)
+                        <option value="{{ $rm->value }}" {{ request('rm_type') == $rm->value ? 'selected' : '' }}>
+                            {{ $rm->value }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="w-full sm:w-24">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Per Page</label>
+                <select name="per_page" onchange="this.form.submit()" class="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm appearance-none">
+                    <option value="50" {{ request('per_page', 50) == '50' ? 'selected' : '' }}>50</option>
+                    <option value="100" {{ request('per_page') == '100' ? 'selected' : '' }}>100</option>
+                    <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
+                </select>
+            </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                    <i class="fas fa-filter"></i> Apply
+                </button>
+                @if(request()->hasAny(['search', 'group_id', 'product_type_id', 'rm_type']))
+                <a href="{{ route('products.index') }}" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2">
+                    <i class="fas fa-times"></i> Clear
+                </a>
+                @endif
+            </div>
+        </form>
     </div>
 
     <form id="bulkDeleteForm" action="{{ route('products.bulk_delete') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete selected products?');">
         @csrf
-        <div>
-            <table class="min-w-full bg-white border border-gray-300">
-                <thead id="tableHead" class="sticky z-[5]">
-                    <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                        <th class="py-3 px-6 text-left bg-gray-100"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Item Code</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Product Name</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Category</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Form</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Technical Name</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">RM Type</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Type</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Pack Name</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Unit/Box</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Weight/Unit</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">UOM</th>
-                        <th class="py-3 px-6 text-left bg-gray-100">Price</th>
-                        <th class="py-3 px-6 text-center bg-gray-100">Stock (Factory)</th>
-                        <th class="py-3 px-6 text-center bg-gray-100">Actions</th>
+        
+        @if(Auth::user()->hasPermission('products', 'delete'))
+        <div class="bg-white px-7 py-3 border-b border-slate-100 flex items-center">
+            <button type="button" onclick="submitBulkDelete()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold py-1.5 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2" id="bulkDeleteBtn" disabled>
+                <i class="fas fa-trash-alt"></i> Delete Selected
+            </button>
+        </div>
+        @endif
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead id="tableHead" class="sticky z-[5] bg-slate-50">
+                    <tr>
+                        <th class="py-3 px-6 border-b border-slate-200"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"></th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Item Code</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Product</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Details</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-right">Packaging</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-right">Price</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-center">API Stock</th>
+                        <th class="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="text-gray-600 text-sm font-light">
-                    @foreach($products as $product)
-                    <tr class="border-b border-gray-200 hover:bg-gray-50">
-                        <td class="py-3 px-6 text-left"><input type="checkbox" name="product_ids[]" value="{{ $product->id }}" class="product-checkbox" onclick="updateBulkBtn()"></td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->item_code ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap font-medium">{{ $product->name }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->group->group_name ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->form ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->technical_name ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->rm_type ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">
-                            <span class="bg-{{ optional($product->type)->type_name == 'Finished Good' ? 'green' : 'yellow' }}-200 text-{{ optional($product->type)->type_name == 'Finished Good' ? 'green' : 'yellow' }}-700 py-1 px-3 rounded-full text-xs">
-                                {{ optional($product->type)->type_name ?? 'N/A' }}
-                            </span>
+                <tbody class="divide-y divide-slate-100">
+                    @forelse($products as $product)
+                    <tr class="hover:bg-slate-50/70 transition-colors group">
+                        <td class="py-3 px-6"><input type="checkbox" name="product_ids[]" value="{{ $product->id }}" class="product-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" onclick="updateBulkBtn()"></td>
+                        <td class="py-3 px-4">
+                            <span class="font-mono text-xs font-bold {{ $product->item_code ? 'text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md' : 'text-slate-400' }}">{{ $product->item_code ?? '-' }}</span>
                         </td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->pack_name ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->unit_box ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->weight_unit ?? '-' }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ $product->uom }}</td>
-                        <td class="py-3 px-6 text-left whitespace-nowrap">{{ number_format($product->price, 2) }}</td>
-                        <td class="py-3 px-6 text-center font-bold">
+                        <td class="py-3 px-4">
+                            <div class="font-bold text-slate-800 text-sm">{{ $product->name }}</div>
+                            <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">{{ $product->technical_name ?? 'No Tech Name' }}</div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider {{ optional($product->type)->type_name == 'Finished Good' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
+                                    {{ optional($product->type)->type_name ?? 'N/A' }}
+                                </span>
+                                @if($product->rm_type)
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                    {{ $product->rm_type }}
+                                </span>
+                                @endif
+                            </div>
+                            <div class="text-[11px] text-slate-500">
+                                {{ $product->group->group_name ?? 'No Group' }} <span class="text-slate-300 mx-1">•</span> {{ $product->form ?? '-' }}
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            <div class="text-[12px] font-semibold text-slate-700">{{ $product->pack_name ?? '-' }}</div>
+                            <div class="text-[10px] text-slate-400">
+                                {{ (float)$product->unit_box }} {{ $product->uom }}/Box <span class="text-slate-300 mx-1">|</span> {{ (float)$product->weight_unit }} Wt/Unit
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-right font-bold text-slate-700 text-sm">
+                            ₹{{ number_format($product->price, 2) }}
+                        </td>
+                        <td class="py-3 px-4 text-center">
                             @php
                                 $apiStock = $externalStock[$product->item_code] ?? null;
                             @endphp
                             @if($apiStock !== null)
-                                <span class="{{ $apiStock > 0 ? 'text-green-600' : 'text-gray-400' }}">
+                                <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black {{ $apiStock > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200' }}">
                                     {{ number_format($apiStock, 0) }}
                                 </span>
                             @else
-                                <span class="text-gray-300 text-xs">N/A</span>
+                                <span class="text-slate-300 text-xs font-semibold italic">N/A</span>
                             @endif
                         </td>
-                        <td class="py-3 px-6 text-center">
-                            <div class="flex item-center justify-center">
-                                {{-- Edit Button (Trigger Modal with data) --}}
+                        <td class="py-3 px-6 text-right whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 @if(Auth::user()->hasPermission('products', 'edit'))
                                 <button type="button" 
                                     data-product='@json($product)'
                                     onclick="editProduct(this)" 
-                                    class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
-                                    <i class="fas fa-edit"></i>
+                                    class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fas fa-edit text-xs"></i>
                                 </button>
                                 @endif
                                 
-                                {{-- Delete Button --}}
                                 @if(Auth::user()->hasPermission('products', 'delete'))
-                                <button type="button" onclick="if(confirm('Delete {{ addslashes($product->name) }}?')) { document.getElementById('delete-form-{{ $product->id }}').submit(); }" class="w-4 transform hover:text-red-500 hover:scale-110">
-                                    <i class="fas fa-trash-alt"></i>
+                                <button type="button" onclick="if(confirm('Delete {{ addslashes($product->name) }}?')) { document.getElementById('delete-form-{{ $product->id }}').submit(); }" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fas fa-trash-alt text-xs"></i>
                                 </button>
                                 @endif
                             </div>
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="8" class="py-12 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div class="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mb-4">
+                                    <i class="fas fa-box-open text-2xl"></i>
+                                </div>
+                                <p class="text-slate-500 font-medium">No products found matching your criteria.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
-        <div class="mt-4 px-4 pb-4">
+        <div class="px-7 py-4 border-t border-slate-100 bg-slate-50/50">
             {{ $products->links() }}
         </div>
     </form>

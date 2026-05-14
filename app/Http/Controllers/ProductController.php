@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\Product;
 use App\Models\ProductGroup;
 use App\Models\ProductType;
@@ -97,10 +98,15 @@ class ProductController extends Controller
     {
         return Cache::remember('external_stock_branch2', 300, function () {
             try {
-                $response = Http::timeout(30)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductWiseInventory', [
-                    'apikey' => 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14',
-                    'Branch' => '2',
-                    'Item'   => 'ALL',
+                $baseUrl  = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+                $apiKey   = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+                $branch   = AppSetting::get('factory_stock_branch', '2');
+                $item     = AppSetting::get('inventory_api_item', 'ALL');
+
+                $response = Http::timeout(30)->post("{$baseUrl}/ProductWiseInventory", [
+                    'apikey' => $apiKey,
+                    'Branch' => $branch,
+                    'Item'   => $item,
                 ]);
 
                 if ($response->successful()) {
@@ -206,15 +212,18 @@ class ProductController extends Controller
     public function syncFromApi()
     {
         try {
-            $response = Http::timeout(60)->post('https://logicapi.algebraerp.com/API/SYNWOOD/ProductMaster', [
-                'apikey'       => 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14',
-                'Itemdetcode'  => '0',
-                'Usercode'     => '0',
-                'Branchcode'   => '0',
-                'PageNumber'   => '1',
-                'RowsOfPage'   => '10000',
+            $baseUrl  = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+            $apiKey   = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+            $response = Http::timeout(60)->post("{$baseUrl}/ProductMaster", [
+                'apikey'       => $apiKey,
+                'Itemdetcode'  => AppSetting::get('product_master_itemdetcode', '0'),
+                'Usercode'     => AppSetting::get('product_master_usercode', '0'),
+                'Branchcode'   => AppSetting::get('product_master_branchcode', '0'),
+                'PageNumber'   => AppSetting::get('product_master_page_number', '1'),
+                'RowsOfPage'   => AppSetting::get('product_master_rows', '10000'),
                 'modifieddate' => '',
-                'TxnType'      => 'Old',
+                'TxnType'      => AppSetting::get('product_master_txn_type', 'Old'),
             ]);
 
             if (!$response->successful()) {

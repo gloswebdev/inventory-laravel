@@ -1,85 +1,181 @@
 @extends('layouts.app')
 
-@section('header', 'Branch Settings')
+@section('header', 'Settings')
 
 @section('content')
 <div class="max-w-4xl mx-auto space-y-6">
-    <!-- API Configuration Card -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="bg-slate-800 px-6 py-4 flex justify-between items-center">
-            <h3 class="text-white font-bold flex items-center text-sm tracking-wide">
-                <i class="fas fa-api mr-2 text-blue-400"></i> API CONFIGURATION
-            </h3>
-            <span class="flex items-center">
-                <span class="w-2 h-2 {{ $apiStatus === 'Active' ? 'bg-green-500' : 'bg-red-500' }} rounded-full mr-2 animate-pulse"></span>
-                <span class="text-[10px] font-bold {{ $apiStatus === 'Active' ? 'text-green-400' : 'text-red-400' }} uppercase">{{ $apiStatus }}</span>
-            </span>
-        </div>
-        <div class="p-6 space-y-6">
-            <!-- Internal API -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-50">
-                <div class="flex-grow">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Internal API Endpoint URL</label>
-                    <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
-                        <code class="text-blue-600 font-mono text-sm break-all flex-grow">{{ $apiUrl }}</code>
-                        <button onclick="navigator.clipboard.writeText('{{ $apiUrl }}'); alert('Copied to clipboard!')" class="ml-3 text-slate-400 hover:text-blue-500 transition">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="md:w-32 flex flex-col justify-center">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Status</label>
-                    <div class="px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-center font-bold text-xs uppercase tracking-tight">
-                        {{ $apiStatus }}
-                    </div>
-                </div>
-            </div>
 
-            <!-- Live Stock API (ERP) -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-50">
-                <div class="flex-grow">
-                    <div class="flex items-center mb-1.5 ml-1">
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Stock API (Algebra ERP)</label>
-                        <span class="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-bold rounded">EXTERNAL</span>
-                    </div>
-                    <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
-                        <code class="text-slate-600 font-mono text-sm break-all flex-grow">{{ $erpApiUrl }}</code>
-                        <button onclick="navigator.clipboard.writeText('{{ $erpApiUrl }}'); alert('Copied to clipboard!')" class="ml-3 text-slate-400 hover:text-blue-500 transition">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="md:w-32 flex flex-col justify-center">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">ERP Status</label>
-                    <div class="px-4 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-center font-bold text-xs uppercase tracking-tight">
-                        {{ $erpApiStatus }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Product Master API (ERP) -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="flex-grow">
-                    <div class="flex items-center mb-1.5 ml-1">
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Master API (Algebra ERP)</label>
-                        <span class="ml-2 px-1.5 py-0.5 bg-cyan-100 text-cyan-700 text-[8px] font-bold rounded">EXTERNAL</span>
-                    </div>
-                    <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
-                        <code class="text-cyan-600 font-mono text-sm break-all flex-grow">{{ $productMasterApiUrl }}</code>
-                        <button onclick="navigator.clipboard.writeText('{{ $productMasterApiUrl }}'); alert('Copied to clipboard!')" class="ml-3 text-slate-400 hover:text-blue-500 transition">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="md:w-32 flex flex-col justify-center">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Status</label>
-                    <div class="px-4 py-2.5 bg-cyan-50 text-cyan-700 rounded-xl text-center font-bold text-xs uppercase tracking-tight">
-                        {{ $productMasterApiStatus }}
-                    </div>
-                </div>
-            </div>
-        </div>
+    @if(session('success'))
+    <div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-5 py-3 flex items-center gap-3 text-sm font-medium">
+        <i class="fas fa-check-circle text-green-500"></i> {{ session('success') }}
     </div>
+    @endif
+
+    @if($errors->any())
+    <div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-5 py-3 text-sm">
+        <ul class="list-disc list-inside space-y-1">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+    </div>
+    @endif
+
+    {{-- ============================
+         API CONFIGURATION CARD
+         ============================ --}}
+    <form action="{{ route('settings.api.update') }}" method="POST">
+        @csrf
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {{-- Header --}}
+            <div class="bg-slate-800 px-6 py-4 flex justify-between items-center">
+                <h3 class="text-white font-bold flex items-center gap-2 text-sm tracking-wide">
+                    <i class="fas fa-plug text-blue-400"></i> API CONFIGURATION
+                    <span class="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 text-[9px] font-bold rounded border border-blue-400/30">EDITABLE</span>
+                </h3>
+                <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition active:scale-95">
+                    <i class="fas fa-save"></i> Save API Settings
+                </button>
+            </div>
+
+            <div class="p-6 space-y-8">
+
+                {{-- ---- SECTION: ERP Base Config ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center text-xs font-black">1</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">ERP Connection (Algebra ERP)</h4>
+                        <span class="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-bold rounded">EXTERNAL</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                                Base URL <span class="text-blue-400 normal-case font-normal">(shared by all ERP API calls)</span>
+                            </label>
+                            <input type="url" name="erp_api_base_url"
+                                value="{{ $settings['erp_api_base_url']->value ?? 'https://logicapi.algebraerp.com/API/SYNWOOD' }}"
+                                class="w-full border border-gray-200 rounded-xl py-2.5 px-4 font-mono text-sm text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none transition bg-blue-50/30">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">
+                                API Key <span class="text-red-400 normal-case font-normal">(used in every request)</span>
+                            </label>
+                            <div class="relative">
+                                <input type="password" id="api_key_input" name="erp_api_key"
+                                    value="{{ $settings['erp_api_key']->value ?? '' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 font-mono text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition pr-12">
+                                <button type="button" onclick="toggleKey()"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition">
+                                    <i id="eye_icon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                {{-- ---- SECTION: ProductWiseInventory API ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-black">2</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">ProductWiseInventory API</h4>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Live Stock, Production, Planning, Indent, Mobile</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 text-[10px]">POST /ProductWiseInventory</code>
+                    </p>
+
+                    <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 space-y-4">
+                        {{-- Parameter rows --}}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    apikey
+                                    <span class="font-normal text-gray-400 normal-case">(auto from above)</span>
+                                </label>
+                                <div class="bg-white border border-dashed border-gray-200 rounded-xl py-2.5 px-4 text-xs text-gray-400 font-mono">
+                                    ••••••••••••••••••
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Branch <span class="font-normal text-gray-400 normal-case">(ALL or specific code)</span>
+                                </label>
+                                <input type="text" name="inventory_api_branch"
+                                    value="{{ $settings['inventory_api_branch']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white"
+                                    placeholder="ALL">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Item <span class="font-normal text-gray-400 normal-case">(ALL or item code)</span>
+                                </label>
+                                <input type="text" name="inventory_api_item"
+                                    value="{{ $settings['inventory_api_item']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white"
+                                    placeholder="ALL">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-emerald-100">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Factory Branch Code
+                                    <span class="font-normal text-gray-400 normal-case">(for Product Master page)</span>
+                                </label>
+                                <input type="text" name="factory_stock_branch"
+                                    value="{{ $settings['factory_stock_branch']->value ?? '2' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white"
+                                    placeholder="2">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                {{-- ---- SECTION: ProductMaster API ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xs font-black">3</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">ProductMaster API</h4>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Product Sync (Products page → Sync from ERP)</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-cyan-700 text-[10px]">POST /ProductMaster</code>
+                    </p>
+
+                    <div class="bg-cyan-50/50 border border-cyan-100 rounded-xl p-4">
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            @php
+                            $pmFields = [
+                                'product_master_itemdetcode' => ['label'=>'Itemdetcode', 'placeholder'=>'0'],
+                                'product_master_usercode'    => ['label'=>'Usercode',    'placeholder'=>'0'],
+                                'product_master_branchcode'  => ['label'=>'Branchcode',  'placeholder'=>'0'],
+                                'product_master_page_number' => ['label'=>'PageNumber',  'placeholder'=>'1'],
+                                'product_master_rows'        => ['label'=>'RowsOfPage',  'placeholder'=>'10000'],
+                                'product_master_txn_type'    => ['label'=>'TxnType',     'placeholder'=>'Old'],
+                            ];
+                            @endphp
+                            @foreach($pmFields as $key => $field)
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    {{ $field['label'] }}
+                                </label>
+                                <input type="text" name="{{ $key }}"
+                                    value="{{ $settings[$key]->value ?? $field['placeholder'] }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition bg-white"
+                                    placeholder="{{ $field['placeholder'] }}">
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+            </div>{{-- /p-6 --}}
+        </div>{{-- /card --}}
+    </form>
+
+    {{-- ============================
+         BRANCH MAPPINGS
+         ============================ --}}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
         <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
             <h3 class="text-white font-bold flex items-center">
@@ -156,13 +252,28 @@
             </table>
         </div>
     </div>
-    
+
     <div class="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-4">
         <div class="text-amber-500 text-xl"><i class="fas fa-info-circle"></i></div>
         <div class="text-amber-800 text-sm">
-            <p class="font-bold mb-1">How it works:</p>
-            Mapping a Branch Code to a Name will update all dropdowns across the application (like Indent Manager) to show the name instead of just the number.
+            <p class="font-bold mb-1">How API Settings work:</p>
+            Changes are saved to the database and take effect immediately. The stock cache is automatically cleared when you save, so live data will refresh on the next page load.
         </div>
     </div>
+
 </div>
+
+<script>
+function toggleKey() {
+    const input = document.getElementById('api_key_input');
+    const icon  = document.getElementById('eye_icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+</script>
 @endsection

@@ -97,6 +97,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
 
     // Settings
     Route::get('settings/branches', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.branches.index');
+    Route::post('settings/api', [App\Http\Controllers\SettingController::class, 'updateApiSettings'])->name('settings.api.update');
     Route::post('settings/branches/store', [App\Http\Controllers\SettingController::class, 'storeBranch'])->name('settings.branches.store');
     Route::post('settings/branches/update', [App\Http\Controllers\SettingController::class, 'updateBranches'])->name('settings.branches.update');
     Route::delete('settings/branches/{branch}', [App\Http\Controllers\SettingController::class, 'deleteBranch'])->name('settings.branches.destroy');
