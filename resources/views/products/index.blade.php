@@ -177,7 +177,7 @@
         </div>
         @endif
 
-        <div class="overflow-x-auto">
+        <div>
             <table class="w-full text-left border-collapse">
                 <thead id="tableHead" class="sticky z-[5] bg-slate-50">
                     <tr>
