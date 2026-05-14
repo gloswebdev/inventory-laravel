@@ -7,26 +7,27 @@
     <!-- Left Panel: Bulk Entry (40%) -->
     <div class="lg:col-span-12 xl:col-span-5 flex flex-col gap-6">
         @if(Auth::user()->hasPermission('indent', 'create'))
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
-                <h3 class="text-white font-bold flex items-center italic">
-                    <i class="fas fa-list-check mr-2"></i> 
-                    <span id="entryTitle">BULK INDENT ENTRY</span>
-                </h3>
-                <div id="editBadge" class="hidden bg-white/20 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
-                    Editing Mode
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden flex flex-col">
+            <div class="bg-white px-7 py-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200/50 flex-shrink-0">
+                        <i class="fas fa-list-check text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-slate-800 tracking-tight leading-tight" id="entryTitle">Bulk Indent Entry</h3>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Step 1: Enter Demand</p>
+                    </div>
                 </div>
-                <div id="createBadge" class="bg-white/20 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">
-                    Step 1: Enter Demand
+                <div id="editBadge" class="hidden bg-amber-50 text-amber-700 text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest border border-amber-200 shadow-sm">
+                    Editing Mode
                 </div>
             </div>
             
-            <div class="p-6 space-y-4">
-                {{-- ... (Rest of the entry form content) ... --}}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-7 bg-slate-50/30 flex-grow space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div>
-                        <label class="block text-gray-600 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Target Branch</label>
-                        <select id="branch_code" class="w-full border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-gray-50 text-sm font-bold" onchange="updateAllStock()">
+                        <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Target Branch</label>
+                        <select id="branch_code" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm font-bold text-slate-700 shadow-sm" onchange="updateAllStock()">
                             <option value="">Consolidated View</option>
                             @foreach($branches as $branch)
                                 <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
@@ -34,55 +35,55 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-gray-600 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Indent Date</label>
-                        <input type="date" id="indent_date" value="{{ date('Y-m-d') }}" class="w-full border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-gray-50 text-sm font-bold">
+                        <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Indent Date</label>
+                        <input type="date" id="indent_date" value="{{ date('Y-m-d') }}" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm font-bold text-slate-700 shadow-sm">
                     </div>
                     <div>
-                        <label class="block text-gray-600 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Order Unit (Global)</label>
-                        <select id="global_unit" class="w-full border-2 border-indigo-200 rounded-xl py-2.4 px-4 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-indigo-50 text-indigo-700 font-black text-sm uppercase" onchange="syncGlobalUnit()">
+                        <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Order Unit (Global)</label>
+                        <select id="global_unit" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm font-black text-indigo-700 uppercase shadow-sm" onchange="syncGlobalUnit()">
                             <option value="box">Boxes</option>
                             <option value="kg">KG / LTR</option>
                         </select>
                     </div>
                 </div>
 
-                <div class="border border-gray-100 rounded-2xl overflow-hidden mt-4">
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                     <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="bg-gray-50/80 sticky top-0 z-10 border-b border-gray-100">
-                                    <th class="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Details</th>
-                                    <th class="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Live Stock</th>
-                                    <th class="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32 text-right">Order Qty</th>
+                        <table class="w-full text-left border-collapse relative">
+                            <thead class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                                <tr>
+                                    <th class="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Product Details</th>
+                                    <th class="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">Live Stock</th>
+                                    <th class="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32 text-right border-b border-slate-200">Order Qty</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-50">
+                            <tbody class="divide-y divide-slate-100">
                                 @foreach($finishedGoods as $product)
-                                <tr class="product-row hover:bg-indigo-50/30 transition-colors" 
+                                <tr class="product-row hover:bg-slate-50/70 transition-colors group" 
                                     data-id="{{ $product->id }}" 
                                     data-name="{{ $product->name }}"
                                     data-pack="{{ $product->pack_name }}"
                                     data-unit-box="{{ $product->unit_box ?: 1 }}"
                                     data-weight-unit="{{ $product->weight_multiplier }}"
                                     data-uom="{{ $product->uom }}">
-                                    <td class="px-4 py-3">
-                                        <div class="font-bold text-gray-700 text-xs mb-0.5 line-clamp-1 truncate">{{ $product->name }}</div>
-                                        <div class="text-[9px] font-black text-indigo-400 uppercase tracking-tighter flex items-center gap-1.5">
-                                            <span>{{ $product->item_code }}</span>
-                                            <span class="bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded">{{ $product->pack_name }}</span>
+                                    <td class="px-5 py-3">
+                                        <div class="font-bold text-slate-700 text-sm mb-1 line-clamp-1 truncate group-hover:text-indigo-700 transition-colors">{{ $product->name }}</div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{{ $product->item_code }}</span>
+                                            <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">{{ $product->pack_name }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <div class="stock-box text-[11px] font-black text-green-600 leading-none">0.00</div>
-                                        <div class="text-[8px] font-black text-gray-400 uppercase tracking-tighter italic">BOX</div>
-                                        <div class="stock-kg text-[9px] font-black text-gray-400 mt-1 leading-none">0.00</div>
-                                        <div class="text-[7px] font-black text-gray-300 uppercase tracking-tighter italic">{{ $product->uom == 'Ltr' ? 'LTR' : 'KG' }}</div>
+                                    <td class="px-5 py-3 text-center">
+                                        <div class="stock-box text-[11px] font-black text-emerald-600 leading-none">0.00</div>
+                                        <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">BOX</div>
+                                        <div class="stock-kg text-[9px] font-black text-slate-400 mt-1.5 leading-none">0.00</div>
+                                        <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest">{{ $product->uom == 'Ltr' ? 'LTR' : 'KG' }}</div>
                                     </td>
-                                    <td class="px-4 py-3 text-right">
+                                    <td class="px-5 py-3 text-right">
                                         <input type="number" 
-                                               class="product-qty w-full border border-gray-200 rounded-lg py-2 px-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-right font-black" 
+                                               class="product-qty w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-mono font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-right transition-all" 
                                                placeholder="0" step="0.01">
-                                        <div class="selected-unit-label text-[8px] font-bold text-indigo-400 mt-1 uppercase tracking-widest">BOXES</div>
+                                        <div class="selected-unit-label text-[9px] font-bold text-indigo-500 mt-1.5 uppercase tracking-widest">BOXES</div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -91,25 +92,25 @@
                     </div>
                 </div>
 
-                <button onclick="previewIndent()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-indigo-200 transition-all transform hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center gap-3 mt-4 group">
-                    <span class="text-xs uppercase tracking-[0.2em]">Generate Indent Preview</span>
-                    <i class="fas fa-file-invoice transition-transform group-hover:rotate-12"></i>
+                <button onclick="previewIndent()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200/50 transition duration-200 flex justify-center items-center gap-2 text-sm uppercase tracking-wider group mt-2">
+                    <span>Generate Indent Preview</span>
+                    <i class="fas fa-file-invoice transition-transform group-hover:rotate-12 text-lg"></i>
                 </button>
             </div>
         </div>
         @else
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center flex flex-col items-center justify-center h-full opacity-60">
-            <i class="fas fa-lock text-gray-200 text-5xl mb-4"></i>
-            <h3 class="text-gray-400 font-black uppercase tracking-widest text-sm">Creation Restricted</h3>
-            <p class="text-gray-400 text-xs mt-2 max-w-xs">You don't have permissions to create new indents.</p>
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 p-8 text-center flex flex-col items-center justify-center h-full opacity-60">
+            <i class="fas fa-lock text-slate-200 text-5xl mb-4"></i>
+            <h3 class="text-slate-400 font-black uppercase tracking-widest text-sm">Creation Restricted</h3>
+            <p class="text-slate-400 text-xs mt-2 max-w-xs">You don't have permissions to create new indents.</p>
         </div>
         @endif
     </div>
 
     <!-- Right Panel: Invoice Preview (60%) -->
     <div class="lg:col-span-12 xl:col-span-7">
-        <div id="previewContainer" class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hidden animate-in fade-in slide-in-from-right duration-500 sticky top-6">
-            <div id="invoiceHeader" class="bg-gray-900 px-8 py-10 text-white relative">
+        <div id="previewContainer" class="bg-white rounded-3xl shadow-xl border border-slate-100/80 overflow-hidden hidden animate-in fade-in slide-in-from-right duration-500 sticky top-6 flex-col">
+            <div id="invoiceHeader" class="bg-slate-900 px-8 py-10 text-white relative">
                 <div class="absolute top-0 right-0 p-4 opacity-10">
                     <i class="fas fa-file-invoice text-9xl"></i>
                 </div>
@@ -119,17 +120,17 @@
                         <div class="text-indigo-400 font-bold tracking-widest text-[10px] uppercase">Internal Document</div>
                     </div>
                     <div class="text-right">
-                        <div class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">Generated Date</div>
+                        <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Generated Date</div>
                         <div class="text-xl font-bold" id="displayDate">Feb 18, 2026</div>
                     </div>
                 </div>
                 <div class="mt-8 grid grid-cols-2 gap-8 border-t border-white/10 pt-8 relative z-10">
                     <div>
-                        <div class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 italic">Target Branch</div>
+                        <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1 italic">Target Branch</div>
                         <div class="text-xl font-bold" id="displayBranch">All Branches (Consolidated)</div>
                     </div>
                     <div class="text-right">
-                        <div class="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1 italic">Status</div>
+                        <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1 italic">Status</div>
                         <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-[10px] font-black uppercase tracking-widest">
                             <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
                             Draft Preview
@@ -138,77 +139,85 @@
                 </div>
             </div>
 
-            <div class="p-8">
-                <table class="w-full text-left">
-                    <thead class="border-b-2 border-gray-900/5">
-                        <tr>
-                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Details</th>
-                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Live Stock</th>
-                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center px-4">Requirement</th>
-                            <th class="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Final Boxes</th>
-                        </tr>
-                    </thead>
-                    <tbody id="previewBody" class="divide-y divide-gray-50">
-                        <!-- Preview rows injected here -->
-                    </tbody>
-                </table>
+            <div class="p-8 bg-slate-50/30 flex-grow">
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-6">Product Details</th>
+                                <th class="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center px-4">Live Stock</th>
+                                <th class="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center px-4">Requirement</th>
+                                <th class="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right px-6">Final Boxes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewBody" class="divide-y divide-slate-100">
+                            <!-- Preview rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
 
-                <div class="mt-8 border-t-4 border-gray-900 pt-6">
-                    <div class="flex justify-between items-center px-4">
+                <div class="mt-8 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                    <div class="flex justify-between items-center">
                         <div>
-                            <div class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Total Indent Volume</div>
-                            <div class="text-xs text-gray-500 italic">Consolidated for all products</div>
+                            <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Indent Volume</div>
+                            <div class="text-xs text-slate-400 italic">Consolidated for all products</div>
                         </div>
                         <div class="text-right">
-                            <div class="text-4xl font-black italic tracking-tighter" id="totalIndentBoxes">0.00</div>
-                            <div class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">TOTAL BOXES</div>
+                            <div class="text-4xl font-black tracking-tight text-slate-800" id="totalIndentBoxes">0.00</div>
+                            <div class="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-1">TOTAL BOXES</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex gap-4 mt-8">
-                    <button onclick="saveIndent()" class="flex-grow bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest text-xs">
+                    <button onclick="saveIndent()" class="flex-grow bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-200/50 transition duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
                         <i class="fas fa-save"></i> Save & Lock Indent
                     </button>
-                    <button onclick="document.getElementById('previewContainer').classList.add('hidden')" class="bg-gray-100 hover:bg-gray-200 text-gray-500 font-black py-4 px-6 rounded-2xl transition-all uppercase tracking-widest text-[10px]">
+                    <button onclick="document.getElementById('previewContainer').classList.add('hidden')" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold py-4 px-8 rounded-xl transition duration-200 text-sm uppercase tracking-wider shadow-sm">
                         Cancel
                     </button>
                 </div>
             </div>
         </div>
 
-        <div id="noPreviewPlaceholder" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 h-[600px] flex flex-col items-center justify-center text-center p-10 group opacity-50">
-            <div class="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <i class="fas fa-file-invoice text-gray-300 text-4xl"></i>
+        <div id="noPreviewPlaceholder" class="bg-white rounded-3xl border border-dashed border-slate-300 h-[600px] flex flex-col items-center justify-center text-center p-10 group opacity-70">
+            <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <i class="fas fa-file-invoice text-slate-300 text-4xl"></i>
             </div>
-            <h3 class="text-gray-400 font-black uppercase tracking-widest text-sm mb-2">No Preview Generated</h3>
-            <p class="text-gray-400 text-xs max-w-xs">Fill in your requirements on the left and click "Generate Indent Preview" to see the invoice format here.</p>
+            <h3 class="text-slate-500 font-black uppercase tracking-widest text-sm mb-2">No Preview Generated</h3>
+            <p class="text-slate-400 text-xs max-w-xs">Fill in your requirements on the left and click "Generate Indent Preview" to see the invoice format here.</p>
         </div>
     </div>
 
     <!-- History: Full Width (Bottom) -->
     <div class="lg:col-span-12 mt-6">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="bg-gray-50 px-8 py-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 class="text-gray-700 font-black flex items-center italic">
-                    <i class="fas fa-history mr-3 text-indigo-500"></i> DATEWISE INDENT HISTORY
-                </h3>
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden flex flex-col">
+            <div class="bg-white px-7 py-5 border-b border-slate-100 flex justify-between items-center z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-200/50 flex-shrink-0">
+                        <i class="fas fa-history text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-slate-800 tracking-tight leading-tight">Datewise Indent History</h3>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Past indent records</p>
+                    </div>
+                </div>
             </div>
             
             <!-- Filters -->
-            <div class="px-8 py-6 bg-gray-50/50 border-b border-gray-100">
+            <div class="px-7 py-5 bg-slate-50/50 border-b border-slate-100">
                 <form action="{{ route('indent.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">From Date</label>
-                        <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">From Date</label>
+                        <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm shadow-sm">
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">To Date</label>
-                        <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">To Date</label>
+                        <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm shadow-sm">
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Branch</label>
-                        <select name="branch_code" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Branch</label>
+                        <select name="branch_code" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm shadow-sm">
                             <option value="">All Branches</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->code }}" {{ request('branch_code') == $branch->code ? 'selected' : '' }}>
@@ -217,9 +226,9 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Creator</label>
-                        <select name="user_id" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Creator</label>
+                        <select name="user_id" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm shadow-sm">
                             <option value="">All Users</option>
                             @foreach($users as $user)
                             <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
@@ -228,9 +237,9 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
-                        <select name="status" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                        <select name="status" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm shadow-sm">
                             <option value="">All Statuses</option>
                             <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
                             <option value="partly completed" {{ request('status') == 'partly completed' ? 'selected' : '' }}>Partly Completed</option>
@@ -238,98 +247,98 @@
                         </select>
                     </div>
                     <div class="flex gap-2">
-                        <button type="submit" class="flex-1 bg-indigo-600 text-white px-6 py-2 rounded-xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-lg shadow-indigo-100 uppercase text-xs">
+                        <button type="submit" class="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-2.5 rounded-xl font-bold transition shadow-lg shadow-indigo-200/50 uppercase text-xs tracking-wider">
                             <i class="fas fa-filter mr-2"></i>Apply
                         </button>
-                        <a href="{{ route('indent.index') }}" class="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl flex items-center justify-center hover:bg-gray-200 transition border border-gray-200">
+                        <a href="{{ route('indent.index') }}" class="bg-white border border-slate-200 text-slate-500 px-4 py-2.5 rounded-xl flex items-center justify-center hover:bg-slate-50 transition shadow-sm">
                             <i class="fas fa-redo-alt text-xs"></i>
                         </a>
                     </div>
                 </form>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto relative">
                 <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50/50">
-                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Indent ID</th>
-                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Indent Date</th>
-                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Branch</th>
-                            <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">User</th>
-                            <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                            <th class="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Volume</th>
-                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total Boxes</th>
-                            <th class="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
+                    <thead class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                        <tr>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Indent ID</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Indent Date</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Target Branch</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">User</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">Status</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Volume</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Total Boxes</th>
+                            <th class="px-7 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Action</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($history as $indent)
-                        <tr class="hover:bg-indigo-50/20 transition-colors group">
-                            <td class="px-8 py-4 font-black text-indigo-600 italic tracking-tighter">#IND-{{ $indent->id }}</td>
-                            <td class="px-8 py-4 font-bold text-gray-700">{{ date('d M, Y', strtotime($indent->indent_date)) }}</td>
-                            <td class="px-8 py-4">
-                                <span class="bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-lg text-xs">
-                                    {{ $indent->branch_name }} ({{ $indent->branch_code }})
+                        <tr class="hover:bg-slate-50/70 transition-colors group">
+                            <td class="px-7 py-4 font-mono font-black text-indigo-600 tracking-tight">#IND-{{ $indent->id }}</td>
+                            <td class="px-7 py-4 font-bold text-slate-700 text-sm">{{ date('d M, Y', strtotime($indent->indent_date)) }}</td>
+                            <td class="px-7 py-4">
+                                <span class="bg-slate-100 text-slate-600 font-bold px-3 py-1.5 rounded-lg text-xs">
+                                    {{ $indent->branch_name }} <span class="text-[10px] text-slate-400 ml-1">({{ $indent->branch_code }})</span>
                                 </span>
                             </td>
-                            <td class="px-8 py-4 text-center">
-                                <div class="text-xs font-black text-gray-600 uppercase tracking-tighter">{{ $indent->user->name ?? 'System' }}</div>
-                                <div class="text-[8px] text-gray-400 italic font-bold">Creator</div>
+                            <td class="px-7 py-4 text-center">
+                                <div class="text-sm font-bold text-slate-700">{{ $indent->user->name ?? 'System' }}</div>
+                                <div class="text-[9px] text-slate-400 uppercase tracking-widest font-semibold mt-0.5">Creator</div>
                             </td>
-                            <td class="px-8 py-4 text-center">
+                            <td class="px-7 py-4 text-center">
                                 @if($indent->status == 'completed')
-                                <span class="bg-green-100 text-green-600 px-2 py-1 rounded-lg text-[10px] font-black tracking-tighter uppercase border border-green-200">FULLY COMPLETED</span>
+                                <span class="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-emerald-200">Completed</span>
                                 @elseif($indent->status == 'partly completed')
-                                <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-black tracking-tighter uppercase border border-blue-200 italic">PARTLY COMPLETED</span>
+                                <span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-blue-200">Partial</span>
                                 @else
-                                <span class="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[10px] font-black tracking-tighter uppercase border border-amber-200 italic">PENDING</span>
+                                <span class="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border border-amber-200">Pending</span>
                                 @endif
                             </td>
-                            <td class="px-8 py-4 text-xs text-gray-500 italic text-right">
+                            <td class="px-7 py-4 text-xs text-slate-500 text-right">
                                 @php $itemNames = $indent->items->take(2)->pluck('product_name')->toArray(); @endphp
                                 {{ implode(', ', $itemNames) }} {{ $indent->items->count() > 2 ? '... (+' . ($indent->items->count() - 2) . ' more)' : '' }}
                             </td>
-                            <td class="px-8 py-4 text-right">
-                                <span class="text-lg font-black italic tracking-tighter text-gray-800">{{ number_format($indent->total_boxes, 0) }}</span>
-                                <span class="text-[9px] font-black text-gray-400 block -mt-1 uppercase tracking-tight">Boxes</span>
+                            <td class="px-7 py-4 text-right">
+                                <span class="text-lg font-black text-slate-800">{{ number_format($indent->total_boxes, 0) }}</span>
+                                <span class="text-[9px] font-bold text-slate-400 block uppercase tracking-widest mt-0.5">Boxes</span>
                             </td>
-                            <td class="px-8 py-4 text-right">
-                                <div class="flex justify-end gap-1.5">
-                                    <button onclick="viewIndent({{ $indent->id }})" title="View" class="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"><i class="fas fa-eye text-xs"></i></button>
-                                    <button onclick="viewProgress({{ $indent->id }})" title="View Progress (Asked vs Completed)" class="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-600 hover:text-white transition"><i class="fas fa-list-check text-xs"></i></button>
+                            <td class="px-7 py-4 text-right">
+                                <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="viewIndent({{ $indent->id }})" title="View" class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100/50"><i class="fas fa-eye text-xs"></i></button>
+                                    <button onclick="viewProgress({{ $indent->id }})" title="View Progress (Asked vs Completed)" class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100/50"><i class="fas fa-list-check text-xs"></i></button>
                                     
                                     @if(Auth::user()->hasPermission('planning_bulk', 'print'))
-                                    <button onclick="printIndent({{ $indent->id }})" title="Print" class="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"><i class="fas fa-print text-xs"></i></button>
+                                    <button onclick="printIndent({{ $indent->id }})" title="Print" class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100/50"><i class="fas fa-print text-xs"></i></button>
                                     @endif
                                     
                                     @if(Auth::user()->hasPermission('planning_bulk', 'excel'))
-                                    <button onclick="exportExcel({{ $indent->id }})" title="Excel" class="bg-green-100 text-green-600 p-2 rounded-lg hover:bg-green-600 hover:text-white transition"><i class="fas fa-file-excel text-xs"></i></button>
+                                    <button onclick="exportExcel({{ $indent->id }})" title="Excel" class="w-8 h-8 flex items-center justify-center bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition shadow-sm border border-green-100/50"><i class="fas fa-file-excel text-xs"></i></button>
                                     @endif
                                     
                                     @if(Auth::user()->hasPermission('planning_bulk', 'pdf'))
-                                    <button onclick="exportPdf({{ $indent->id }})" title="PDF" class="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-600 hover:text-white transition"><i class="fas fa-file-pdf text-xs"></i></button>
+                                    <button onclick="exportPdf({{ $indent->id }})" title="PDF" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100/50"><i class="fas fa-file-pdf text-xs"></i></button>
                                     @endif
 
                                     @if(Auth::user()->hasPermission('planning_process', 'edit'))
-                                    <a href="{{ route('indent.process', $indent->id) }}" title="Process" class="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-600 hover:text-white transition"><i class="fas fa-cog text-xs"></i></a>
+                                    <a href="{{ route('indent.process', $indent->id) }}" title="Process" class="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition shadow-sm border border-amber-100/50"><i class="fas fa-cog text-xs"></i></a>
                                     @endif
 
                                     @if(Auth::user()->hasFeature('indent', 'clone'))
-                                    <button onclick="cloneIndent({{ $indent->id }})" title="Clone" class="bg-violet-100 text-violet-600 p-2 rounded-lg hover:bg-violet-600 hover:text-white transition"><i class="fas fa-copy text-xs"></i></button>
+                                    <button onclick="cloneIndent({{ $indent->id }})" title="Clone" class="w-8 h-8 flex items-center justify-center bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition shadow-sm border border-violet-100/50"><i class="fas fa-copy text-xs"></i></button>
                                     @endif
 
                                     @if(Auth::user()->hasPermission('indent', 'edit'))
-                                    <button onclick="editIndent({{ $indent->id }})" title="Edit" class="bg-slate-100 text-slate-600 p-2 rounded-lg hover:bg-slate-600 hover:text-white transition"><i class="fas fa-edit text-xs"></i></button>
+                                    <button onclick="editIndent({{ $indent->id }})" title="Edit" class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-600 hover:text-white transition shadow-sm border border-slate-200"><i class="fas fa-edit text-xs"></i></button>
                                     @endif
 
                                     @if(Auth::user()->hasPermission('indent', 'delete'))
-                                    <button onclick="deleteIndent({{ $indent->id }})" title="Delete" class="bg-rose-100 text-rose-600 p-2 rounded-lg hover:bg-rose-600 hover:text-white transition"><i class="fas fa-trash text-xs"></i></button>
+                                    <button onclick="deleteIndent({{ $indent->id }})" title="Delete" class="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition shadow-sm border border-rose-100/50"><i class="fas fa-trash text-xs"></i></button>
                                     @endif
                                 </div>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="px-8 py-10 text-center text-gray-400 italic">No previous indents found.</td>
+                            <td colspan="8" class="px-7 py-10 text-center text-slate-400 font-medium">No previous indents found.</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -507,22 +516,22 @@
                 const stock = stockCache[pId] || {stock_boxes: 0, stock: 0};
 
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-indigo-50/20 transition-colors';
+                tr.className = 'hover:bg-slate-50/70 transition-colors group';
                 tr.innerHTML = `
-                    <td class="py-4">
-                        <div class="font-bold text-gray-800 text-sm italic">${pName}</div>
-                        <div class="text-[9px] font-black text-gray-400 uppercase tracking-widest">${pPack}</div>
+                    <td class="py-4 px-6">
+                        <div class="font-bold text-slate-800 text-sm group-hover:text-indigo-700 transition-colors">${pName}</div>
+                        <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-1">${pPack}</div>
                     </td>
                     <td class="py-4 text-center px-4">
-                        <div class="text-xs font-black text-green-600">${parseFloat(stock.stock_boxes).toFixed(2)} BOX</div>
-                        <div class="text-[9px] font-black text-gray-400 italic">${parseFloat(stock.stock).toFixed(2)} KG</div>
+                        <div class="text-xs font-black text-emerald-600">${parseFloat(stock.stock_boxes).toFixed(2)} BOX</div>
+                        <div class="text-[9px] font-black text-slate-400 mt-1">${parseFloat(stock.stock).toFixed(2)} KG</div>
                     </td>
                     <td class="py-4 text-center px-4">
-                        <div class="text-xs font-black text-gray-700">${qtyValue} <span class="uppercase">${unit}</span></div>
+                        <div class="text-sm font-black text-slate-700">${qtyValue} <span class="text-[10px] text-slate-400 uppercase">${unit}</span></div>
                     </td>
-                    <td class="py-4 text-right">
-                        <div class="text-lg font-black italic tracking-tighter text-gray-900">${finalBoxes.toFixed(0)}</div>
-                        <div class="text-[8px] font-black text-indigo-400 uppercase tracking-widest">EST. BOXES</div>
+                    <td class="py-4 text-right px-6">
+                        <div class="text-lg font-black tracking-tight text-indigo-600">${finalBoxes.toFixed(0)}</div>
+                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">EST. BOXES</div>
                     </td>
                 `;
                 tr.dataset.pId = pId;

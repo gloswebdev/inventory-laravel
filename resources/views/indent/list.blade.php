@@ -3,35 +3,31 @@
 @section('content')
 <div class="min-h-screen bg-[#f8fafc] py-8">
     <div class="max-w-7xl mx-auto">
-        <div class="bg-white rounded-[2.5rem] shadow-xl shadow-indigo-100/50 p-8 mb-8 border border-indigo-50/50 overflow-hidden relative">
-            <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-50/30 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-            
-            <div class="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 p-8 mb-8 overflow-hidden relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex items-center gap-4 relative z-10">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200/50 flex-shrink-0">
+                    <i class="fas fa-microchip text-white text-xl"></i>
+                </div>
                 <div>
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="bg-amber-500 text-white p-3 rounded-2xl shadow-lg shadow-amber-200">
-                            <i class="fas fa-microchip text-xl"></i>
-                        </div>
-                        <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter uppercase">Process Indents</h1>
-                    </div>
-                    <p class="text-gray-500 font-bold text-sm ml-14 uppercase tracking-widest">Select an indent to view cross-branch stock distribution</p>
+                    <h1 class="text-2xl font-black text-slate-800 tracking-tight leading-tight">Process Indents</h1>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">Select an indent to view cross-branch stock distribution</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-[2.5rem] shadow-xl shadow-indigo-100/50 p-8 mb-8 border border-indigo-50/50">
-            <form action="{{ route('indent.process.list') }}" method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">From Date</label>
-                    <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2.5 font-bold text-gray-900 focus:border-indigo-500 focus:ring-0 transition">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 p-6 mb-8 relative z-20">
+            <form action="{{ route('indent.process.list') }}" method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-5 items-end">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">From Date</label>
+                    <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-sm outline-none">
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">To Date</label>
-                    <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2.5 font-bold text-gray-900 focus:border-indigo-500 focus:ring-0 transition">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">To Date</label>
+                    <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-sm outline-none">
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Branch</label>
-                    <select name="branch_code" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2.5 font-bold text-gray-900 focus:border-indigo-500 focus:ring-0 transition">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Branch</label>
+                    <select name="branch_code" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-sm outline-none">
                         <option value="">All Branches</option>
                         @foreach($branches as $branch)
                         <option value="{{ $branch->code }}" {{ request('branch_code') == $branch->code ? 'selected' : '' }}>
@@ -40,9 +36,9 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Creator</label>
-                    <select name="user_id" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2.5 font-bold text-gray-900 focus:border-indigo-500 focus:ring-0 transition">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Creator</label>
+                    <select name="user_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-sm outline-none">
                         <option value="">All Users</option>
                         @foreach($users as $user)
                         <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
@@ -51,9 +47,9 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Status</label>
-                    <select name="status" class="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2.5 font-bold text-gray-900 focus:border-indigo-500 focus:ring-0 transition">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                    <select name="status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-sm outline-none">
                         <option value="">All Statuses</option>
                         <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
                         <option value="partly completed" {{ request('status') == 'partly completed' ? 'selected' : '' }}>Partly Completed</option>
@@ -61,10 +57,10 @@
                     </select>
                 </div>
                 <div class="flex gap-2">
-                    <button type="submit" class="flex-1 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
-                        <i class="fas fa-filter mr-2"></i>FILTER
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2.5 rounded-xl font-bold hover:from-indigo-600 hover:to-purple-700 transition shadow-lg shadow-indigo-200/50 text-xs tracking-wider uppercase">
+                        <i class="fas fa-filter mr-2"></i>Filter
                     </button>
-                    <a href="{{ route('indent.process.list') }}" class="bg-gray-100 text-gray-600 px-4 py-2.5 rounded-xl flex items-center justify-center hover:bg-gray-200 transition">
+                    <a href="{{ route('indent.process.list') }}" class="bg-white border border-slate-200 text-slate-500 px-4 py-2.5 rounded-xl flex items-center justify-center hover:bg-slate-50 transition shadow-sm">
                         <i class="fas fa-redo-alt"></i>
                     </a>
                 </div>
@@ -151,34 +147,35 @@
 </div>
 
 <!-- Comparison / Progress Modal -->
-<div id="progressModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="p-8 border-b flex justify-between items-center bg-indigo-600 text-white">
+<!-- Comparison / Progress Modal -->
+<div id="progressModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 relative">
             <div>
-                <h3 class="text-2xl font-black italic tracking-tighter uppercase">Indent Completion Progress</h3>
-                <p id="progressModalBranch" class="text-xs font-bold text-indigo-200 uppercase tracking-widest mt-1"></p>
+                <h3 class="text-xl font-black tracking-tight text-slate-800">Indent Completion Progress</h3>
+                <p id="progressModalBranch" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1"></p>
             </div>
-            <button onclick="closeProgressModal()" class="text-white/50 hover:text-white transition p-2 hover:bg-white/10 rounded-full">
-                <i class="fas fa-times text-2xl"></i>
+            <button onclick="closeProgressModal()" class="text-slate-400 hover:text-slate-600 transition p-2 hover:bg-white rounded-full bg-white shadow-sm border border-slate-200 absolute top-8 right-8">
+                <i class="fas fa-times text-lg"></i>
             </button>
         </div>
         <div class="p-8 overflow-y-auto custom-scrollbar flex-1">
             <table class="w-full text-left">
-                <thead>
-                    <tr class="border-b-2 border-gray-100">
-                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Product</th>
-                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Asked (Box)</th>
-                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Completed (Box)</th>
-                        <th class="py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+                <thead class="sticky top-0 bg-white z-10 before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                    <tr>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white border-b border-slate-200">Product</th>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center bg-white border-b border-slate-200">Asked (Box)</th>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center bg-white border-b border-slate-200">Completed (Box)</th>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-white border-b border-slate-200">Status</th>
                     </tr>
                 </thead>
-                <tbody id="progressTableBody">
+                <tbody id="progressTableBody" class="divide-y divide-slate-100">
                     <!-- Dynamic Rows -->
                 </tbody>
             </table>
         </div>
-        <div class="p-8 border-t bg-gray-50 flex justify-end">
-            <button onclick="closeProgressModal()" class="bg-indigo-600 text-white px-12 py-4 rounded-2xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 uppercase">
+        <div class="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <button onclick="closeProgressModal()" class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-3.5 rounded-xl font-bold hover:from-indigo-600 hover:to-purple-700 transition shadow-lg shadow-indigo-200/50 uppercase text-sm tracking-wider">
                 Got it
             </button>
         </div>
@@ -186,40 +183,40 @@
 </div>
 
 <!-- View Indent Modal -->
-<div id="viewModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+<div id="viewModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div class="p-6 border-b flex justify-between items-center bg-gray-50">
+        <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 relative">
             <div>
-                <h3 class="text-xl font-black text-gray-800 italic">Indent Details</h3>
-                <p id="modalBranch" class="text-xs font-bold text-indigo-600"></p>
+                <h3 class="text-xl font-black tracking-tight text-slate-800">Indent Details</h3>
+                <p id="modalBranch" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1"></p>
             </div>
-            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition p-2 hover:bg-gray-100 rounded-full">
-                <i class="fas fa-times text-xl"></i>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition p-2 hover:bg-white rounded-full bg-white shadow-sm border border-slate-200 absolute top-8 right-8">
+                <i class="fas fa-times text-lg"></i>
             </button>
         </div>
-        <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+        <div class="p-8 overflow-y-auto custom-scrollbar flex-1">
             <table class="w-full text-left">
-                <thead>
-                    <tr class="border-b-2 border-gray-100">
-                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase">Product</th>
-                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase text-center">Live Stock</th>
-                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase text-center">Required</th>
-                        <th class="py-3 text-[10px] font-black text-gray-400 uppercase text-right">Final Boxes</th>
+                <thead class="sticky top-0 bg-white z-10 before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                    <tr>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white border-b border-slate-200">Product</th>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center bg-white border-b border-slate-200">Live Stock</th>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center bg-white border-b border-slate-200">Required</th>
+                        <th class="py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-white border-b border-slate-200">Final Boxes</th>
                     </tr>
                 </thead>
-                <tbody id="modalTableBody">
+                <tbody id="modalTableBody" class="divide-y divide-slate-100">
                     <!-- Dynamic Rows -->
                 </tbody>
             </table>
         </div>
-        <div class="p-6 border-t bg-gray-50 flex justify-between items-center">
-            <div class="text-xs text-gray-400 font-bold uppercase italic" id="modalMeta"></div>
+        <div class="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest" id="modalMeta"></div>
             <div class="flex gap-3">
-                <button id="modalPrintBtn" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-black italic tracking-tighter hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
-                    <i class="fas fa-print mr-2"></i>PRINT INDENT
+                <button id="modalPrintBtn" class="bg-indigo-50 text-indigo-600 border border-indigo-200 px-6 py-3 rounded-xl font-bold hover:bg-indigo-100 transition shadow-sm uppercase tracking-wider text-xs">
+                    <i class="fas fa-print mr-2"></i>Print
                 </button>
-                <button onclick="closeModal()" class="bg-white border-2 border-gray-200 text-gray-600 px-6 py-2.5 rounded-xl font-black italic tracking-tighter hover:bg-gray-50 transition">
-                    CLOSE
+                <button onclick="closeModal()" class="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 transition shadow-sm uppercase tracking-wider text-xs">
+                    Close
                 </button>
             </div>
         </div>
@@ -244,18 +241,18 @@
                     let html = '';
                     indent.items.forEach(item => {
                         html += `
-                            <tr class="border-b border-gray-50">
-                                <td class="py-4 font-bold text-gray-800 text-sm italic">
-                                    ${item.product_name}
-                                    <div class="text-[9px] text-gray-400 uppercase">${item.product?.pack_name || ''}</div>
+                            <tr class="hover:bg-slate-50/50 transition-colors">
+                                <td class="py-4">
+                                    <div class="font-bold text-slate-800 text-sm">${item.product_name}</div>
+                                    <div class="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">${item.product?.pack_name || ''}</div>
                                 </td>
                                 <td class="py-4 text-center">
-                                    <div class="text-xs font-black text-green-600">${parseFloat(item.stock_box).toFixed(2)} BOX</div>
+                                    <div class="text-xs font-black text-emerald-600">${parseFloat(item.stock_box).toFixed(2)} BOX</div>
                                 </td>
-                                <td class="py-4 text-center font-bold text-gray-700">
-                                    ${item.demand_qty} ${item.demand_unit.toUpperCase()}
+                                <td class="py-4 text-center font-bold text-slate-700">
+                                    ${item.demand_qty} <span class="text-[9px] uppercase tracking-widest text-slate-400">${item.demand_unit}</span>
                                 </td>
-                                <td class="py-4 text-right font-black text-lg italic text-indigo-600">
+                                <td class="py-4 text-right font-black text-lg text-indigo-600">
                                     ${parseFloat(item.final_qty_box).toFixed(0)}
                                 </td>
                             </tr>
@@ -296,22 +293,22 @@
                         let statusHtml = '';
                         
                         if (completed >= asked && asked > 0) {
-                            statusHtml = '<span class="text-green-600 font-black italic text-[10px] uppercase tracking-tighter">● FULLY DONE</span>';
+                            statusHtml = '<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border border-emerald-200">Fully Done</span>';
                         } else if (completed > 0) {
-                            statusHtml = '<span class="text-blue-500 font-black italic text-[10px] uppercase tracking-tighter">◌ PARTIAL (' + Math.round((completed/asked)*100) + '%)</span>';
+                            statusHtml = '<span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border border-blue-200">Partial (' + Math.round((completed/asked)*100) + '%)</span>';
                         } else {
-                            statusHtml = '<span class="text-amber-500 font-black italic text-[10px] uppercase tracking-tighter italic">◌ PENDING</span>';
+                            statusHtml = '<span class="bg-amber-50 text-amber-600 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border border-amber-200">Pending</span>';
                         }
 
                         html += `
-                            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                <td class="py-5 font-bold text-gray-800 text-sm italic">
-                                    ${item.product_name}
-                                    <div class="text-[9px] text-gray-400 uppercase font-black tracking-widest">${item.product?.pack_name || ''}</div>
+                            <tr class="hover:bg-slate-50/50 transition-colors">
+                                <td class="py-4">
+                                    <div class="font-bold text-slate-800 text-sm">${item.product_name}</div>
+                                    <div class="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">${item.product?.pack_name || ''}</div>
                                 </td>
-                                <td class="py-5 text-center font-black text-gray-500 text-lg">${asked.toFixed(0)}</td>
-                                <td class="py-5 text-center font-black text-indigo-600 text-xl italic">${completed.toFixed(0)}</td>
-                                <td class="py-5 text-right">${statusHtml}</td>
+                                <td class="py-4 text-center font-bold text-slate-600 text-sm">${asked.toFixed(0)}</td>
+                                <td class="py-4 text-center font-black text-indigo-600 text-lg">${completed.toFixed(0)}</td>
+                                <td class="py-4 text-right">${statusHtml}</td>
                             </tr>
                         `;
                     });

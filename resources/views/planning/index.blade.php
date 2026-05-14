@@ -4,19 +4,30 @@
 
 @section('content')
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded shadow-md p-6">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-            <h3 class="text-lg font-bold text-gray-700">Calculate Requirements (MRP)</h3>
-            <div class="flex items-center gap-2">
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden flex flex-col">
+        {{-- Header Section --}}
+        <div class="bg-white px-7 py-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200/50 flex-shrink-0">
+                    <i class="fas fa-microchip text-white"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-slate-800 tracking-tight leading-tight">Production Planning</h3>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Calculate Requirements (MRP)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 flex-wrap">
                 @if(count($indents) > 0)
-                <button type="button" onclick="openIndentPlanModal()" class="bg-amber-100 text-amber-700 hover:bg-amber-200 font-bold py-1.5 px-3 rounded-lg text-xs transition duration-200 flex items-center gap-2">
-                    <i class="fas fa-file-import"></i> Plan by Indent
+                <button type="button" onclick="openIndentPlanModal()" class="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 font-bold py-2 px-3 rounded-xl text-xs transition duration-200 flex items-center gap-2 shadow-sm">
+                    <i class="fas fa-file-import"></i> By Indent
                 </button>
                 @endif
+                
                 @if(Auth::user()->hasFeature('indent', 'type_filter'))
-                <div class="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5">
-                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Filter Type:</label>
-                    <select id="global_type_filter" onchange="applyGlobalTypeFilter()" class="bg-transparent border-none text-xs font-bold text-indigo-600 focus:ring-0 outline-none pr-8">
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                    <i class="fas fa-filter text-slate-400 text-[10px]"></i>
+                    <select id="global_type_filter" onchange="applyGlobalTypeFilter()" class="bg-transparent border-none text-xs font-bold text-indigo-600 focus:ring-0 outline-none pr-6 py-0.5">
                         <option value="">All Types</option>
                         @foreach($productTypes as $type)
                             <option value="{{ $type->id }}">{{ $type->type_name }}</option>
@@ -26,102 +37,122 @@
                 @else
                 <select id="global_type_filter" style="display: none;"><option value=""></option></select>
                 @endif
+
                 @if(Auth::user()->hasFeature('indent', 'bulk_add'))
-                <button type="button" onclick="toggleBulkModal()" class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-bold py-1.5 px-3 rounded-lg text-xs transition duration-200 flex items-center gap-2">
+                <button type="button" onclick="toggleBulkModal()" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-bold py-2 px-3 rounded-xl text-xs transition duration-200 flex items-center gap-2 shadow-sm">
                     <i class="fas fa-layer-group"></i> Bulk Add
                 </button>
                 @endif
             </div>
         </div>
 
-        <div id="productInputList">
-            <div class="flex gap-2 mb-2 product-row items-center">
+        <div class="p-7 bg-slate-50/30 flex-grow">
+            <div id="productInputList" class="space-y-3">
+                <div class="flex gap-3 product-row items-center bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition hover:border-indigo-300">
+                    <div class="flex-grow">
+                        <select class="w-full bg-transparent border-none py-2 px-3 text-sm font-bold text-slate-700 focus:ring-0 outline-none product-select">
+                            <option value="" data-type-id="">Select Finished Good</option>
+                            @foreach($finishedGoods as $product)
+                                <option value="{{ $product->id }}" data-type-id="{{ $product->product_type_id }}">{{ $product->name }} ({{ $product->pack_name }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="w-32 relative">
+                        <input type="number" step="0.001" placeholder="Qty" class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-mono font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all demand-qty text-right pr-4">
+                    </div>
+                    <button type="button" class="w-10 h-10 flex-shrink-0 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 transition flex items-center justify-center remove-row" style="display:none;">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-5 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                @if(Auth::user()->hasFeature('indent', 'branch_select'))
                 <div class="flex-grow">
-                    <select class="shadow border rounded w-full py-2 px-3 text-gray-700 product-select">
-                        <option value="" data-type-id="">Select Finished Good</option>
-                        @foreach($finishedGoods as $product)
-                            <option value="{{ $product->id }}" data-type-id="{{ $product->product_type_id }}">{{ $product->name }} ({{ $product->pack_name }})</option>
+                    <label class="block text-indigo-800 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Check Stock At</label>
+                    <select id="branch_code" class="w-full bg-white border border-indigo-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-bold text-indigo-900 shadow-sm">
+                        <option value="">Consolidated View (All Branches)</option>
+                        @foreach($branches as $branch)
+                            <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
                         @endforeach
                     </select>
                 </div>
-                <div class="w-32">
-                    <input type="number" step="0.001" placeholder="Qty" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 demand-qty">
+                @endif
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="clearAllRows()" class="h-10 px-4 bg-white border border-red-100 text-red-500 hover:bg-red-50 text-[10px] font-black uppercase tracking-widest rounded-xl transition flex items-center gap-2 shadow-sm whitespace-nowrap">
+                        <i class="fas fa-trash-can"></i> Clear
+                    </button>
+                    <button type="button" onclick="addProductRow()" class="h-10 px-4 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition flex items-center gap-2 shadow-sm whitespace-nowrap">
+                        <i class="fas fa-plus"></i> Add Item
+                    </button>
                 </div>
-                <button type="button" class="text-red-500 hover:text-red-700 remove-row p-2" style="display:none;"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>
-        
-        <div class="mt-4 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-center justify-between gap-4">
-            @if(Auth::user()->hasFeature('indent', 'branch_select'))
-            <div class="flex-grow">
-                <label class="block text-gray-600 text-[9px] font-black uppercase tracking-widest mb-1.5 ml-1">Check Stock At</label>
-                <select id="branch_code" class="w-full border border-gray-200 rounded-xl py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none transition bg-white text-xs font-bold">
-                    <option value="">Consolidated View (All Branches)</option>
-                    @foreach($branches as $branch)
-                        <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
-                    @endforeach
-                </select>
-            </div>
-            @endif
-            <div class="flex items-center gap-2 pt-5">
-                <button type="button" onclick="addProductRow()" class="h-9 px-4 bg-white border border-blue-100 text-blue-600 hover:bg-blue-50 text-[10px] font-black uppercase tracking-widest rounded-xl transition flex items-center gap-2 shadow-sm">
-                    <i class="fas fa-plus"></i> Add Another
-                </button>
-                <button type="button" onclick="clearAllRows()" class="h-9 px-4 bg-white border border-red-100 text-red-500 hover:bg-red-50 text-[10px] font-black uppercase tracking-widest rounded-xl transition flex items-center gap-2 shadow-sm">
-                    <i class="fas fa-trash-can"></i> Clear
-                </button>
             </div>
         </div>
 
-        <div class="mt-8 border-t pt-6">
+        <div class="p-7 border-t border-slate-100 bg-white rounded-b-3xl">
             @if(Auth::user()->hasPermission('indent', 'create'))
-            <button type="button" onclick="calculateIndent()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded w-full shadow-lg transition duration-200 flex justify-center items-center">
-                <i class="fas fa-microchip mr-2"></i> Explode Recipe & Generate Report
+            <button type="button" onclick="calculateIndent()" class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-3.5 px-4 rounded-xl w-full shadow-lg shadow-indigo-200/50 transition duration-200 flex justify-center items-center gap-2 text-sm uppercase tracking-wider">
+                <i class="fas fa-microchip text-lg"></i> Explode Recipe & Generate Report
             </button>
             @else
-            <div class="bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl p-4 text-center">
-                <p class="text-amber-700 text-xs font-bold italic uppercase tracking-tighter">Access Restricted: You don't have permission to generate plans.</p>
+            <div class="bg-amber-50 border border-dashed border-amber-300 rounded-xl p-4 text-center">
+                <p class="text-amber-700 text-[11px] font-black uppercase tracking-widest"><i class="fas fa-lock mr-1"></i> Access Restricted</p>
+                <p class="text-amber-600 text-xs mt-1">You don't have permission to generate plans.</p>
             </div>
             @endif
         </div>
     </div>
 
     <!-- Results -->
-    <div class="bg-white rounded shadow-md p-6" id="resultSection" style="display:none;">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-xl font-extrabold text-indigo-900 flex items-center">
-                <i class="fas fa-clipboard-check mr-2"></i> Planning Results
-            </h3>
+    <!-- Results -->
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden flex flex-col" id="resultSection" style="display:none;">
+        <div class="bg-white px-7 py-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-200/50 flex-shrink-0">
+                    <i class="fas fa-clipboard-check text-white"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-slate-800 tracking-tight leading-tight">Planning Results</h3>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Material requirements overview</p>
+                </div>
+            </div>
+            
             @if(Auth::user()->hasPermission('indent', 'excel'))
-            <button onclick="exportIndent()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center shadow-md transition">
-                <i class="fas fa-file-excel mr-2"></i> Export To Excel
+            <button onclick="exportIndent()" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition flex items-center gap-2">
+                <i class="fas fa-file-excel"></i> Export To Excel
             </button>
             @endif
         </div>
 
-        <!-- Production Summary -->
-        <div class="mb-8 bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-            <h4 class="text-sm font-bold text-indigo-700 uppercase tracking-wider mb-3 flex items-center">
-                <i class="fas fa-industry mr-2"></i> Planning Summary
-            </h4>
-            <div id="productionSummary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <!-- Will be populated by JS -->
+        <div class="p-7 bg-slate-50/30 flex-grow">
+            <!-- Production Summary -->
+            <div class="mb-8">
+                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
+                    <i class="fas fa-industry mr-2 text-indigo-400"></i> Planning Summary
+                </h4>
+                <div id="productionSummary" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <!-- Will be populated by JS -->
+                </div>
             </div>
-        </div>
 
-        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Consolidated Material Requirements</h4>
-        <div class="overflow-x-auto rounded-xl border border-gray-200">
-            <table class="min-w-full bg-white">
-                <thead>
-                    <tr class="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold tracking-widest border-b">
-                        <th class="py-3 px-4 text-left">Raw Material</th>
-                        <th class="py-3 px-4 text-right">Required</th>
-                        <th class="py-3 px-4 text-right">Stock</th>
-                        <th class="py-3 px-4 text-right">Shortfall</th>
-                    </tr>
-                </thead>
-                <tbody class="text-gray-600 text-sm" id="resultBody"></tbody>
-            </table>
+            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center">
+                <i class="fas fa-boxes-stacked mr-2 text-indigo-400"></i> Consolidated Material Requirements
+            </h4>
+            <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto max-h-[500px]">
+                    <table class="min-w-full bg-white text-left border-collapse relative">
+                        <thead class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                            <tr>
+                                <th class="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Raw Material</th>
+                                <th class="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Required</th>
+                                <th class="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Stock</th>
+                                <th class="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200">Shortfall</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100" id="resultBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -550,13 +581,13 @@
                 summaryDiv.innerHTML = '';
                 result.summary.forEach(item => {
                     const card = document.createElement('div');
-                    card.className = "bg-white p-3 rounded-lg border border-indigo-100 shadow-sm flex flex-col";
+                    card.className = "bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col hover:border-indigo-300 transition group";
                     card.innerHTML = `
-                        <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">${item.item_code || 'No Code'}</span>
-                        <div class="font-bold text-gray-800 text-sm truncate" title="${item.name}">${item.name}</div>
-                        <div class="flex justify-between items-center mt-1">
-                            <span class="text-xs text-gray-400 italic">${item.pack_name || ''}</span>
-                            <span class="text-xs font-black text-indigo-600">${parseFloat(item.quantity).toFixed(3)}</span>
+                        <span class="inline-flex w-fit px-2 py-0.5 rounded text-[9px] font-black bg-indigo-50 text-indigo-600 uppercase tracking-widest mb-1.5 border border-indigo-100">${item.item_code || 'No Code'}</span>
+                        <div class="font-bold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors" title="${item.name}">${item.name}</div>
+                        <div class="flex justify-between items-end mt-2">
+                            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">${item.pack_name || ''}</span>
+                            <span class="text-sm font-black text-indigo-600 bg-indigo-50/50 px-2 py-1 rounded-lg border border-indigo-100/50">${parseFloat(item.quantity).toFixed(3)}</span>
                         </div>
                     `;
                     summaryDiv.appendChild(card);
@@ -567,19 +598,22 @@
                 
                 result.data.forEach(item => {
                     const row = document.createElement('tr');
-                     row.className = "border-b border-gray-100 hover:bg-gray-50 transition duration-150";
+                     row.className = "hover:bg-slate-50/70 transition-colors group";
                     row.innerHTML = `
-                        <td class="py-4 px-4 text-left">
-                            <div class="font-bold text-gray-800">${item.name}</div>
-                            <div class="flex gap-2 mt-1">
-                                <span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono font-bold">${item.item_code || 'N/A'}</span>
-                                <span class="text-[9px] bg-gray-50 text-gray-500 px-1.5 py-0.5 rounded italic">${item.pack_name || ''}</span>
+                        <td class="py-3 px-6 text-left">
+                            <div class="font-bold text-slate-800 text-sm">${item.name}</div>
+                            <div class="flex items-center gap-2 mt-1">
+                                ${item.item_code ? `<span class="font-mono text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">${item.item_code}</span>` : ''}
+                                <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">${item.pack_name || ''}</span>
                             </div>
                         </td>
-                        <td class="py-4 px-4 text-right font-bold text-gray-700">${parseFloat(item.required_qty).toFixed(3)} <span class="text-[10px] text-gray-400 font-normal ml-1">${item.uom}</span></td>
-                        <td class="py-4 px-4 text-right text-gray-500 font-medium">${parseFloat(item.current_stock).toFixed(3)}</td>
-                        <td class="py-4 px-4 text-right">
-                            <span class="inline-block px-3 py-1 rounded-full font-black text-xs ${item.shortfall > 0 ? 'text-red-700 bg-red-100' : 'text-green-700 bg-green-100'}">
+                        <td class="py-3 px-6 text-right">
+                            <span class="font-bold text-slate-700">${parseFloat(item.required_qty).toFixed(3)}</span>
+                            <span class="text-[10px] text-slate-400 font-bold ml-1">${item.uom}</span>
+                        </td>
+                        <td class="py-3 px-6 text-right text-slate-500 font-semibold">${parseFloat(item.current_stock).toFixed(3)}</td>
+                        <td class="py-3 px-6 text-right">
+                            <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black ${item.shortfall > 0 ? 'text-red-700 bg-red-50 border border-red-200' : 'text-emerald-700 bg-emerald-50 border border-emerald-200'}">
                                 ${parseFloat(item.shortfall).toFixed(3)}
                             </span>
                         </td>
