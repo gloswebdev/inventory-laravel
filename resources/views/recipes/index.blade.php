@@ -3,96 +3,112 @@
 @section('header', 'Recipe Master')
 
 @section('content')
-<div class="bg-white rounded shadow-md p-6">
-    <div class="flex flex-wrap justify-between items-center mb-6 gap-2">
-        <h3 class="text-lg font-bold text-gray-700">Recipe List</h3>
-        <div class="flex gap-2">
-            <a href="{{ route('recipes.export', request()->query()) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded shadow">
-                <i class="fas fa-file-download mr-2"></i> Download
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100/80">
+    {{-- Header Section --}}
+    <div id="pageHeader" class="bg-white px-7 py-5 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-4 transition-all">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200/50">
+                <i class="fas fa-flask text-white"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-black text-slate-800 tracking-tight">Recipe Master</h3>
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Manage production recipes</p>
+            </div>
+        </div>
+
+        <div class="flex gap-2 flex-wrap items-center">
+            <a href="{{ route('recipes.export', request()->query()) }}" class="bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-xs font-bold py-2 px-4 rounded-xl transition-colors flex items-center gap-2">
+                <i class="fas fa-file-export"></i> Export
             </a>
             @if(Auth::user()->hasPermission('recipes', 'create'))
-            <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded shadow">
-                <i class="fas fa-file-excel mr-2"></i> Import
+            <button onclick="document.getElementById('importModal').classList.remove('hidden')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold py-2 px-4 rounded-xl transition-colors flex items-center gap-2">
+                <i class="fas fa-file-import"></i> Import
             </button>
-            <button onclick="openAddModal()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded shadow">
-                <i class="fas fa-plus mr-2"></i> Add Recipe
+            <button onclick="openAddModal()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md shadow-emerald-200/50 text-sm font-bold py-2 px-5 rounded-xl transition-all flex items-center gap-2">
+                <i class="fas fa-plus"></i> Add Recipe
             </button>
             @endif
         </div>
     </div>
 
-    {{-- Search Bar --}}
-    <div class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+    {{-- Search & Filter Form --}}
+    <div class="px-7 py-4 bg-slate-50/50 border-b border-slate-100">
         <form action="{{ route('recipes.index') }}" method="GET" class="flex flex-wrap gap-4 items-end">
-            <div class="flex-grow min-w-[300px]">
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Search</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by finished product name..." class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+            <div class="flex-grow min-w-[200px]">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Search</label>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="By finished product name..." class="w-full bg-white border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm">
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Product Type</label>
-                <select name="type_id" class="rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border min-w-[150px]">
+            
+            <div class="w-full sm:w-44">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Product Type</label>
+                <select name="type_id" class="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none">
                     <option value="">All Types</option>
                     @foreach($types as $type)
-                        <option value="{{ $type->id }}" {{ request('type_id') == $type->id ? 'selected' : '' }}>{{ $type->type_name }}</option>
+                        <option value="{{ $type->id }}" {{ request('type_id') == $type->id ? 'selected' : '' }}>
+                            {{ $type->type_name }}
+                        </option>
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Per Page</label>
-                <select name="per_page" class="rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+
+            <div class="w-full sm:w-24">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Per Page</label>
+                <select name="per_page" onchange="this.form.submit()" class="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none">
                     <option value="20" {{ request('per_page') == 20 ? 'selected' : '' }}>20</option>
                     <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
                     <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
                     <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
                 </select>
             </div>
+
             <div class="flex gap-2">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow">
-                    <i class="fas fa-search mr-1"></i> Search
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                    <i class="fas fa-filter"></i> Apply
                 </button>
                 @if(request()->anyFilled(['search', 'type_id', 'per_page']))
-                    <a href="{{ route('recipes.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded shadow">Clear</a>
+                <a href="{{ route('recipes.index') }}" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2">
+                    <i class="fas fa-times"></i> Clear
+                </a>
                 @endif
             </div>
         </form>
     </div>
 
     @if(Auth::user()->hasPermission('recipes', 'delete'))
-    <div id="bulkActions" class="mb-4 hidden">
-        <button onclick="bulkDelete()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow flex items-center">
-            <i class="fas fa-trash-alt mr-2"></i> Delete Selected (<span id="selectedCount">0</span>)
+    <div id="bulkActions" class="bg-white px-7 py-3 border-b border-slate-100 flex items-center hidden">
+        <button onclick="bulkDelete()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold py-1.5 px-4 rounded-lg transition-colors flex items-center gap-2">
+            <i class="fas fa-trash-alt"></i> Delete Selected (<span id="selectedCount">0</span>)
         </button>
     </div>
     @endif
 
-    <div class="overflow-x-auto">
-        <table class="min-w-full bg-white border border-gray-300">
-            <thead>
-                <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                    <th class="py-3 px-6 text-center w-10">
-                        <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    </th>
-                    <th class="py-3 px-6 text-left">Finished Product</th>
-                    <th class="py-3 px-6 text-left">Yield</th>
-                    <th class="py-3 px-6 text-left">Raw Materials</th>
-                    <th class="py-3 px-6 text-center">Actions</th>
+    <div>
+        <table class="w-full text-left border-collapse">
+            <thead id="tableHead" class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                <tr>
+                    <th class="py-3 px-6 border-b border-slate-200 w-10 text-center"><input type="checkbox" id="selectAll" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"></th>
+                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Finished Product</th>
+                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Yield</th>
+                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Raw Materials</th>
+                    <th class="py-3 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody class="text-gray-600 text-sm font-light">
-                @foreach($recipes as $recipe)
-                <tr class="border-b border-gray-200 hover:bg-gray-50">
-                    <td class="py-3 px-6 text-center">
-                        <input type="checkbox" name="recipe_ids[]" value="{{ $recipe->id }}" class="recipe-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    </td>
-                    <td class="py-3 px-6 text-left font-medium">
-                        <div class="font-bold">{{ $recipe->finishedProduct->name }}</div>
-                        <div class="mt-1">
+            <tbody class="divide-y divide-slate-100">
+                @forelse($recipes as $recipe)
+                <tr class="hover:bg-slate-50/70 transition-colors group">
+                    <td class="py-3 px-6 text-center"><input type="checkbox" name="recipe_ids[]" value="{{ $recipe->id }}" class="recipe-checkbox rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"></td>
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-slate-800 text-sm">{{ $recipe->finishedProduct->name }}</div>
+                        <div class="flex items-center gap-2 mt-1 mb-1">
                             @php
                                 $typeName = $recipe->finishedProduct->type->type_name ?? 'N/A';
-                                $badgeClass = 'bg-slate-100 text-slate-600'; // Default
+                                $badgeClass = 'bg-slate-100 text-slate-600 border border-slate-200'; // Default
                                 
                                 if (str_contains(strtolower($typeName), 'finished good') && !str_contains(strtolower($typeName), 'semi')) {
-                                    $badgeClass = 'bg-green-100 text-green-700 border border-green-200';
+                                    $badgeClass = 'bg-emerald-100 text-emerald-700 border border-emerald-200';
                                 } elseif (str_contains(strtolower($typeName), 'semi')) {
                                     $badgeClass = 'bg-amber-100 text-amber-700 border border-amber-200';
                                 } elseif (str_contains(strtolower($typeName), 'raw')) {
@@ -102,49 +118,70 @@
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider {{ $badgeClass }}">
                                 {{ $typeName }}
                             </span>
+                            @if($recipe->finishedProduct->item_code)
+                            <span class="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{{ $recipe->finishedProduct->item_code }}</span>
+                            @endif
                         </div>
-                        <div class="text-xs text-gray-500 italic">Packing: {{ $recipe->finishedProduct->pack_name }}</div>
+                        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                            Packing: {{ $recipe->finishedProduct->pack_name ?? '-' }}
+                        </div>
                     </td>
-                    <td class="py-3 px-6 text-left">{{ $recipe->yield_quantity }} {{ $recipe->yield_uom }}</td>
-                    <td class="py-3 px-6 text-left">
-                        <ul class="list-disc list-inside">
+                    <td class="py-3 px-4">
+                        <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-black bg-blue-50 text-blue-700 border border-blue-100">
+                            {{ $recipe->yield_quantity }} {{ $recipe->yield_uom }}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <ul class="space-y-1">
                             @foreach($recipe->items as $item)
-                                <li>
-                                    {{ $item->rawMaterial->name }} 
-                                    <span class="text-xs text-gray-500">({{ $item->rawMaterial->pack_name }})</span>
-                                    ({{ $item->quantity }})
+                                <li class="text-sm text-slate-600 flex items-center">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2"></span>
+                                    <span class="font-semibold text-slate-700 mr-1">{{ $item->rawMaterial->name }}</span> 
+                                    <span class="text-[11px] text-slate-400 font-medium mr-2">({{ $item->rawMaterial->pack_name }})</span>
+                                    <span class="text-xs font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{{ $item->quantity }}</span>
                                 </li>
                             @endforeach
                         </ul>
                     </td>
-                        <td class="py-3 px-6 text-center">
-                            <div class="flex item-center justify-center">
-                                @if(Auth::user()->hasPermission('recipes', 'edit'))
-                                <button type="button" 
-                                    data-recipe='@json($recipe)'
-                                    onclick="editRecipe(this)" 
-                                    class="w-4 mr-2 transform hover:text-blue-500 hover:scale-110">
-                                    <i class="fas fa-edit"></i>
+                    <td class="py-3 px-6 text-right whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            @if(Auth::user()->hasPermission('recipes', 'edit'))
+                            <button type="button" 
+                                data-recipe='@json($recipe)'
+                                onclick="editRecipe(this)" 
+                                class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 flex items-center justify-center transition-all shadow-sm">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            @endif
+                            @if(Auth::user()->hasPermission('recipes', 'delete'))
+                            <form action="{{ route('recipes.destroy', $recipe->id) }}" method="POST" class="inline m-0" onsubmit="return confirm('Delete this recipe?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fas fa-trash-alt text-xs"></i>
                                 </button>
-                                @endif
-                                @if(Auth::user()->hasPermission('recipes', 'delete'))
-                                <form action="{{ route('recipes.destroy', $recipe->id) }}" method="POST" onsubmit="return confirm('Are you sure?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="w-4 transform hover:text-red-500 hover:scale-110">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </form>
-                                @endif
-                            </div>
-                        </td>
+                            </form>
+                            @endif
+                        </div>
+                    </td>
                 </tr>
-                @endforeach
+                @empty
+                <tr>
+                    <td colspan="5" class="py-12 text-center">
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mb-4">
+                                <i class="fas fa-flask text-2xl"></i>
+                            </div>
+                            <p class="text-slate-500 font-medium">No recipes found matching your criteria.</p>
+                        </div>
+                    </td>
+                </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-4">
+    <div class="px-7 py-4 border-t border-slate-100 bg-slate-50/50">
         {{ $recipes->links() }}
     </div>
 </div>
