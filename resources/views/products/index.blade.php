@@ -39,7 +39,7 @@
 </div>
 @endif
 
-<div class="bg-white rounded-3xl shadow-sm border border-slate-100/80 overflow-hidden">
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100/80">
     {{-- Header Section --}}
     <div id="pageHeader" class="bg-white px-7 py-5 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-4 transition-all">
         <div class="flex items-center gap-3">
@@ -54,24 +54,24 @@
 
         <div class="flex gap-2 flex-wrap items-center">
             @if(Auth::user()->hasPermission('products', 'edit'))
-            <div class="flex bg-slate-50 p-1 rounded-xl border border-slate-100 gap-1 mr-2">
-                <button onclick="document.getElementById('typeModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-purple-600 hover:shadow-sm transition-all" title="Types">
-                    <i class="fas fa-tags"></i>
+            <div class="flex flex-wrap bg-slate-50 p-1 rounded-xl border border-slate-100 gap-1 mr-2">
+                <button onclick="document.getElementById('typeModal').classList.remove('hidden')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-white hover:text-purple-600 hover:shadow-sm transition-all" title="Types">
+                    <i class="fas fa-tags text-[10px]"></i> Types
                 </button>
-                <button onclick="document.getElementById('groupModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-gray-700 hover:shadow-sm transition-all" title="Groups">
-                    <i class="fas fa-layer-group"></i>
+                <button onclick="document.getElementById('groupModal').classList.remove('hidden')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-white hover:text-gray-700 hover:shadow-sm transition-all" title="Groups">
+                    <i class="fas fa-layer-group text-[10px]"></i> Groups
                 </button>
-                 <button onclick="document.getElementById('categoryModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition-all" title="Categories">
-                    <i class="fas fa-list"></i>
+                 <button onclick="document.getElementById('categoryModal').classList.remove('hidden')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition-all" title="Categories">
+                    <i class="fas fa-list text-[10px]"></i> Categories
                 </button>
-                 <button onclick="document.getElementById('formModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-pink-600 hover:shadow-sm transition-all" title="Forms">
-                    <i class="fas fa-shapes"></i>
+                 <button onclick="document.getElementById('formModal').classList.remove('hidden')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-white hover:text-pink-600 hover:shadow-sm transition-all" title="Forms">
+                    <i class="fas fa-shapes text-[10px]"></i> Forms
                 </button>
-                 <button onclick="document.getElementById('rmTypeModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-teal-600 hover:shadow-sm transition-all" title="RM Types">
-                    <i class="fas fa-flask"></i>
+                 <button onclick="document.getElementById('rmTypeModal').classList.remove('hidden')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-white hover:text-teal-600 hover:shadow-sm transition-all" title="RM Types">
+                    <i class="fas fa-flask text-[10px]"></i> RM Types
                 </button>
-                 <button onclick="document.getElementById('packNameModal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-white hover:text-orange-600 hover:shadow-sm transition-all" title="Pack Names">
-                    <i class="fas fa-box"></i>
+                 <button onclick="document.getElementById('packNameModal').classList.remove('hidden')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-white hover:text-orange-600 hover:shadow-sm transition-all" title="Pack Names">
+                    <i class="fas fa-box text-[10px]"></i> Packs
                 </button>
             </div>
             @endif
