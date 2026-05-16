@@ -236,7 +236,7 @@
         document.getElementById('modalTableBody').innerHTML = loader;
         modal.classList.remove('hidden');
 
-        fetch(`{{ url('planning/indent') }}/${id}`)
+        fetch(`{{ url('indent-api/show') }}/${id}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -285,7 +285,7 @@
         document.getElementById('progressTableBody').innerHTML = loader;
         modal.classList.remove('hidden');
 
-        fetch(`{{ url('planning/indent') }}/${id}`)
+        fetch(`{{ url('indent-api/show') }}/${id}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
