@@ -3,9 +3,11 @@
 @section('content')
 <div class="space-y-8 pb-10" x-data="indentApp()">
     <!-- Header & Action -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden mb-2">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+        <div class="relative z-10 flex items-center justify-between w-full">
         <div>
-            <h2 class="text-3xl font-900 text-slate-800 tracking-tighter italic uppercase">Indents</h2>
+            <h2 class="text-3xl font-900 text-slate-800 font-900 tracking-tighter italic uppercase">Indents</h2>
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Bulk Indent Management</p>
         </div>
         @if(Auth::user()->hasFeature('mobile_indents', 'bulk_entry'))
@@ -16,10 +18,11 @@
         </button>
         @endif
     </div>
+</div>
 
     <!-- Bulk Entry Section (Collapsible) -->
     <div x-show="showEntry" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 -translate-y-10 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100" class="space-y-8">
-        <div class="glass-premium p-8 rounded-[3rem] space-y-8 relative overflow-hidden border border-white/80">
+        <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-8 rounded-[3rem] space-y-8 relative overflow-hidden border border-white/80">
             <div class="absolute -top-10 -right-10 opacity-5 -rotate-12">
                 <i class="fas fa-list-check text-[12rem] text-violet-900"></i>
             </div>
@@ -27,12 +30,12 @@
             <div class="grid grid-cols-2 gap-5 relative z-10">
                 <div class="space-y-3">
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Target Date</label>
-                    <input type="date" x-model="form.indent_date" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-2xl py-4 px-5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-violet-500 shadow-sm transition-all">
+                    <input type="date" x-model="form.indent_date" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60 rounded-2xl py-4 px-5 text-xs font-bold text-slate-800 font-900 focus:ring-2 focus:ring-violet-500 shadow-md transition-all">
                 </div>
                 <div class="space-y-3">
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Display Unit</label>
                     <div class="relative">
-                        <select x-model="form.global_unit" {{ !Auth::user()->hasFeature('mobile_indents', 'unit_toggle') ? 'disabled' : '' }} class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-2xl py-4 px-5 text-xs font-black {{ Auth::user()->hasFeature('mobile_indents', 'unit_toggle') ? 'text-violet-600' : 'text-slate-400 opacity-50' }} focus:ring-2 focus:ring-violet-500 shadow-sm appearance-none transition-all">
+                        <select x-model="form.global_unit" {{ !Auth::user()->hasFeature('mobile_indents', 'unit_toggle') ? 'disabled' : '' }} class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60 rounded-2xl py-4 px-5 text-xs font-black {{ Auth::user()->hasFeature('mobile_indents', 'unit_toggle') ? 'text-violet-600' : 'text-slate-400 opacity-50' }} focus:ring-2 focus:ring-violet-500 shadow-md appearance-none transition-all">
                             <option value="box">📦 BOXES</option>
                             <option value="kg">⚖️ KG / LTR</option>
                         </select>
@@ -46,7 +49,7 @@
             <div class="space-y-3 relative z-10">
                 <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Inventory Source</label>
                 <div class="relative">
-                    <select x-model="form.branch_code" @change="updateGlobalStocks" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-2xl py-4 px-6 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-violet-500 appearance-none transition-all">
+                    <select x-model="form.branch_code" @change="updateGlobalStocks" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60 rounded-2xl py-4 px-6 text-xs font-bold text-slate-800 font-900 focus:ring-2 focus:ring-violet-500 appearance-none transition-all">
                         @if(count($branches) > 1)
                         <option value="">Permitted Branches (Consolidated)</option>
                         @endif
@@ -63,12 +66,12 @@
             <!-- Product Rows -->
             <div class="space-y-5 relative z-10">
                 <template x-for="(row, index) in form.products" :key="index">
-                    <div class="p-6 bg-white/60 border border-slate-100 rounded-[2.5rem] space-y-5 shadow-sm active:scale-[0.98] transition-transform">
+                    <div class="p-6 bg-white/60 border border-white/60 rounded-[2.5rem] space-y-5 shadow-md active:scale-[0.98] transition-transform">
                         <div class="flex items-start justify-between gap-4">
                             <div class="flex-1 min-w-0">
                                 <template x-if="row.id">
                                     <div class="space-y-1">
-                                        <div class="text-[13px] font-900 text-slate-800 truncate uppercase" x-text="row.name"></div>
+                                        <div class="text-[13px] font-900 text-slate-800 font-900 truncate uppercase" x-text="row.name"></div>
                                         <div class="flex items-center gap-2 mt-1">
                                             <span class="px-2 py-0.5 bg-violet-50 text-violet-500 rounded text-[8px] font-black uppercase tracking-widest" x-text="row.pack || '---'"></span>
                                             <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
@@ -78,7 +81,7 @@
                                 </template>
                                 <template x-if="!row.id">
                                     <div class="relative">
-                                        <select x-model="row.id" @change="onProductSelect(index)" class="w-full bg-slate-50/50 border-none rounded-xl py-3 px-4 text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-violet-500 appearance-none">
+                                        <select x-model="row.id" @change="onProductSelect(index)" class="w-full bg-white/40 backdrop-blur-sm border-none rounded-xl py-3 px-4 text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-violet-500 appearance-none">
                                             <option value="">Select Item...</option>
                                             <template x-for="p in products" :key="p.id">
                                                 <option :value="p.id" x-text="p.name + ' (' + (p.pack_name || '---') + ') | Stock: ' + (stockMap[p.id] ? stockMap[p.id].stock_box : '0')"></option>
@@ -110,7 +113,7 @@
                                 <input type="number" 
                                        x-model="row.demand_qty" 
                                        placeholder="Load" 
-                                       class="w-full bg-white border-2 border-slate-100 rounded-2xl py-3 px-4 text-[13px] font-900 text-slate-800 focus:ring-2 focus:ring-violet-500 shadow-inner text-right pr-12">
+                                       class="w-full bg-white border-2 border-white/60 rounded-2xl py-3 px-4 text-[13px] font-900 text-slate-800 font-900 focus:ring-2 focus:ring-violet-500 shadow-inner text-right pr-12">
                                 <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-violet-400 uppercase tracking-widest" x-text="form.global_unit"></span>
                             </div>
                         </div>
@@ -123,7 +126,7 @@
                     <i class="fas fa-grid-2-plus text-xs"></i>
                     <span>Quick Select</span>
                 </button>
-                <button @click="addRow" class="py-4 border-2 border-dashed border-slate-200 rounded-3xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-3">
+                <button @click="addRow" class="py-4 border-2 border-dashed border-white/70 rounded-3xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white/60 backdrop-blur-md transition-all flex items-center justify-center gap-3">
                     <i class="fas fa-plus text-xs"></i>
                     <span>New Row</span>
                 </button>
@@ -141,14 +144,14 @@
     <!-- History Logs Section -->
     <div x-show="!showEntry" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0 translate-y-10" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-8">
         <div class="flex items-center justify-between px-3 relative" x-data="{ showFilters: {{ request()->anyFilled(['from_date', 'to_date', 'branch_code', 'user_id', 'status']) ? 'true' : 'false' }} }">
-            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Transaction History</h3>
+            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><i class="fas fa-clock-rotate-left text-indigo-400"></i> Transaction Logs</h3>
             <div class="flex items-center gap-4">
-                <button @click="showFilters = !showFilters" class="text-[10px] font-black flex items-center gap-2 transition-all p-2 rounded-xl" :class="showFilters ? 'bg-violet-100 text-violet-600' : 'text-slate-400 hover:text-slate-600'">
+                <button @click="showFilters = !showFilters" class="text-[10px] font-black flex items-center gap-2 transition-all p-2 rounded-xl" :class="showFilters ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-slate-600'">
                     <i class="fas fa-sliders text-xs"></i>
                     <span x-text="showFilters ? 'HIDE' : 'FILTER'"></span>
                 </button>
                 <div class="h-4 w-[1px] bg-slate-200"></div>
-                <div class="text-[10px] font-black text-slate-800 tracking-tighter">{{ $indents->total() }} LOGS</div>
+                <div class="text-[10px] font-black text-slate-800 font-900 tracking-tighter">{{ $indents->total() }} LOGS</div>
             </div>
 
             <!-- Mobile Filters (Collapsible) -->
@@ -157,17 +160,17 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-3">
                             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Start Date</label>
-                            <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-2xl py-3 px-4 text-[11px] font-bold text-slate-800 shadow-inner">
+                            <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60 rounded-2xl py-3 px-4 text-[11px] font-bold text-slate-800 font-900 shadow-inner">
                         </div>
                         <div class="space-y-3">
                             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">End Date</label>
-                            <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-2xl py-3 px-4 text-[11px] font-bold text-slate-800 shadow-inner">
+                            <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60 rounded-2xl py-3 px-4 text-[11px] font-bold text-slate-800 font-900 shadow-inner">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-3">
                             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Status</label>
-                            <select name="status" class="w-full bg-slate-50/50 border-none rounded-2xl py-3.5 px-4 text-[10px] font-bold text-slate-800 appearance-none shadow-sm">
+                            <select name="status" class="w-full bg-white/40 backdrop-blur-sm border-none rounded-2xl py-3.5 px-4 text-[10px] font-bold text-slate-800 font-900 appearance-none shadow-md">
                                 <option value="">All Workflow</option>
                                 <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
                                 <option value="partly completed" {{ request('status') == 'partly completed' ? 'selected' : '' }}>Partial</option>
@@ -176,7 +179,7 @@
                         </div>
                         <div class="space-y-3">
                             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Branch</label>
-                            <select name="branch_code" class="w-full bg-slate-50/50 border-none rounded-2xl py-3.5 px-4 text-[10px] font-bold text-slate-800 appearance-none shadow-sm">
+                            <select name="branch_code" class="w-full bg-white/40 backdrop-blur-sm border-none rounded-2xl py-3.5 px-4 text-[10px] font-bold text-slate-800 font-900 appearance-none shadow-md">
                                 <option value="">All Access</option>
                                 @foreach($branches as $branch)
                                 <option value="{{ $branch->code }}" {{ request('branch_code') == $branch->code ? 'selected' : '' }}>
@@ -190,7 +193,7 @@
                     <div class="space-y-3">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Filtered User</label>
                         <div class="relative">
-                            <select name="user_id" class="w-full bg-slate-50/50 border-none rounded-2xl py-4 px-6 text-[10px] font-bold text-slate-800 appearance-none shadow-sm">
+                            <select name="user_id" class="w-full bg-white/40 backdrop-blur-sm border-none rounded-2xl py-4 px-6 text-[10px] font-bold text-slate-800 font-900 appearance-none shadow-md">
                                 <option value="">All Registered Users</option>
                                 @foreach($users as $user)
                                 <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>{{ $user->name }}</option>
@@ -229,76 +232,80 @@
                     'pending' => 'text-amber-600 bg-amber-50',
                 ][strtolower($indent->status)] ?? 'text-amber-600 bg-amber-50';
             @endphp
-            <div class="group relative glass-premium p-6 rounded-[3rem] space-y-5 transition-all border border-white/80 hover:shadow-xl hover:shadow-indigo-100/50 overflow-hidden">
-                <div class="absolute top-0 left-0 w-2 h-full {{ $statusColor }}"></div>
+            <div class="group relative bg-white/70 backdrop-blur-xl p-7 rounded-[2.5rem] flex flex-col gap-5 transition-all border border-white/80 shadow-lg shadow-indigo-100/20 hover:shadow-xl hover:shadow-indigo-100/40 overflow-hidden">
+                <div class="absolute top-0 left-0 w-2 h-full {{ $statusColor }} opacity-80"></div>
                 
-                <div class="flex items-center justify-between">
+                <div class="flex items-start justify-between">
                     <div class="flex items-center gap-4">
-                        <div class="w-14 h-14 {{ $iconColor }} rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-3 shadow-sm">
+                        <div class="w-14 h-14 {{ $iconColor }} rounded-[1.2rem] flex items-center justify-center transition-transform group-hover:scale-105 shadow-inner border border-white/60">
                             <i class="fas fa-file-invoice-dollar text-xl"></i>
                         </div>
                         <div>
-                            <div class="flex items-center gap-1.5">
-                                <span class="text-[9px] font-black uppercase tracking-widest {{ str_replace('grad-', 'text-', explode(' ', $statusColor)[0]) }}">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] font-black uppercase tracking-widest {{ str_replace('grad-', 'text-', explode(' ', $statusColor)[0]) }} bg-white/50 px-2 py-0.5 rounded-md border border-white/60">
                                     {{ $indent->status ?: 'PENDING' }}
                                 </span>
-                                <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
-                                <span class="text-[9px] text-slate-400 font-900 tracking-tighter uppercase italic">{{ $indent->items_count }} Items</span>
+                                <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                <span class="text-[9px] text-slate-400 font-900 tracking-tighter uppercase">{{ $indent->items_count }} Items</span>
                             </div>
-                            <div class="text-[10px] font-black text-indigo-600 italic tracking-tighter mt-1">#IND-{{ $indent->id }}</div>
-                            <div class="text-[14px] font-900 text-slate-800 truncate max-w-[140px] leading-tight mt-0.5 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{{ $indent->branch_name }}</div>
-                            <div class="text-[9px] text-slate-400 font-bold mt-1.5 flex items-center gap-2" title="{{ date('d M, Y', strtotime($indent->indent_date)) }}">
-                                <i class="far fa-calendar-alt text-[8px]"></i>
+                            <div class="text-[11px] font-black text-indigo-600 tracking-widest mt-2 uppercase">#IND-{{ $indent->id }}</div>
+                            <div class="text-lg font-900 text-slate-800 tracking-tight truncate max-w-[150px] leading-tight mt-0.5 group-hover:text-indigo-600 transition-colors">{{ $indent->branch_name }}</div>
+                            <div class="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center gap-1.5">
+                                <i class="far fa-calendar-alt"></i>
                                 {{ date('d M, Y', strtotime($indent->indent_date)) }}
                             </div>
                         </div>
                     </div>
 
                     <div class="text-right shrink-0">
-                        <div class="text-xl font-900 text-slate-800 tracking-tighter leading-none">{{ number_format($indent->total_boxes, 0) }}</div>
-                        <div class="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1.5">Boxes</div>
+                        <div class="text-3xl font-900 text-slate-800 tracking-tighter leading-none">{{ number_format($indent->total_boxes, 0) }}</div>
+                        <div class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1.5">Boxes</div>
                     </div>
                 </div>
                 
-                <!-- Actions Row: Horizontally Scrollable -->
-                <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-2 px-2 snap-x">
-                    @if(Auth::user()->hasPermission('mobile_indents', 'view'))
-                    <button @click="viewIndentDetails({{ $indent->id }})" class="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100 transition-all active:scale-90 hover:grad-indigo hover:text-white shrink-0 snap-center" title="View"><i class="fas fa-eye text-xs"></i></button>
-                    @endif
-                    @if(Auth::user()->hasFeature('mobile_indents', 'process'))
-                    <button @click="viewProgressDetails({{ $indent->id }})" class="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 border border-amber-100 transition-all active:scale-90 hover:grad-amber hover:text-white shrink-0 snap-center" title="Progress"><i class="fas fa-list-check text-xs"></i></button>
-                    @endif
-                    @if(Auth::user()->hasPermission('mobile_indents', 'print'))
-                    <a href="{{ route('mobile.indents.print', $indent->id) }}" target="_blank" class="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 transition-all active:scale-90 hover:grad-blue hover:text-white shrink-0 snap-center" title="Print"><i class="fas fa-print text-xs"></i></a>
-                    @endif
-                    @if(Auth::user()->hasPermission('mobile_indents', 'excel'))
-                    <a href="{{ route('mobile.indents.excel', $indent->id) }}" class="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 transition-all active:scale-90 hover:grad-emerald hover:text-white shrink-0 snap-center" title="Excel"><i class="fas fa-file-excel text-xs"></i></a>
-                    @endif
-                    @if(Auth::user()->hasPermission('mobile_indents', 'pdf'))
-                    <a href="{{ route('mobile.indents.pdf', $indent->id) }}" class="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 transition-all active:scale-90 hover:grad-rose hover:text-white shrink-0 snap-center" title="PDF"><i class="fas fa-file-pdf text-xs"></i></a>
-                    @endif
-                    @if(Auth::user()->hasFeature('mobile_indents', 'process'))
-                    <a href="{{ route('mobile.indents.process', $indent->id) }}" class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 transition-all active:scale-90 hover:bg-slate-700 hover:text-white shrink-0 snap-center" title="Status"><i class="fas fa-gear text-xs"></i></a>
-                    @endif
+                <div class="border-t border-white/60 pt-4 mt-2">
+                    <!-- Actions Row: Horizontally Scrollable -->
+                    <div class="flex items-center gap-3 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-2 -mx-2 px-2 snap-x">
+                        @if(Auth::user()->hasPermission('mobile_indents', 'view'))
+                        <button @click="viewIndentDetails({{ $indent->id }})" class="w-10 h-10 bg-indigo-50/50 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-100/50 transition-all active:scale-90 hover:bg-indigo-500 hover:text-white shrink-0 snap-center shadow-sm" title="View"><i class="fas fa-eye text-sm"></i></button>
+                        @endif
+                        @if(Auth::user()->hasFeature('mobile_indents', 'process'))
+                        <button @click="viewProgressDetails({{ $indent->id }})" class="w-10 h-10 bg-amber-50/50 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-100/50 transition-all active:scale-90 hover:bg-amber-500 hover:text-white shrink-0 snap-center shadow-sm" title="Progress"><i class="fas fa-list-check text-sm"></i></button>
+                        @endif
+                        @if(Auth::user()->hasPermission('mobile_indents', 'print'))
+                        <a href="{{ route('mobile.indents.print', $indent->id) }}" target="_blank" class="w-10 h-10 bg-blue-50/50 rounded-2xl flex items-center justify-center text-blue-500 border border-blue-100/50 transition-all active:scale-90 hover:bg-blue-500 hover:text-white shrink-0 snap-center shadow-sm" title="Print"><i class="fas fa-print text-sm"></i></a>
+                        @endif
+                        @if(Auth::user()->hasPermission('mobile_indents', 'excel'))
+                        <a href="{{ route('mobile.indents.excel', $indent->id) }}" class="w-10 h-10 bg-emerald-50/50 rounded-2xl flex items-center justify-center text-emerald-500 border border-emerald-100/50 transition-all active:scale-90 hover:bg-emerald-500 hover:text-white shrink-0 snap-center shadow-sm" title="Excel"><i class="fas fa-file-excel text-sm"></i></a>
+                        @endif
+                        @if(Auth::user()->hasPermission('mobile_indents', 'pdf'))
+                        <a href="{{ route('mobile.indents.pdf', $indent->id) }}" class="w-10 h-10 bg-rose-50/50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100/50 transition-all active:scale-90 hover:bg-rose-500 hover:text-white shrink-0 snap-center shadow-sm" title="PDF"><i class="fas fa-file-pdf text-sm"></i></a>
+                        @endif
+                        @if(Auth::user()->hasFeature('mobile_indents', 'process'))
+                        <a href="{{ route('mobile.indents.process', $indent->id) }}" class="w-10 h-10 bg-slate-50/50 rounded-2xl flex items-center justify-center text-slate-500 border border-slate-200/50 transition-all active:scale-90 hover:bg-slate-600 hover:text-white shrink-0 snap-center shadow-sm" title="Status"><i class="fas fa-gear text-sm"></i></a>
+                        @endif
 
-                    @if(Auth::user()->hasFeature('mobile_indents', 'clone'))
-                    <button @click="cloneIndent({{ $indent->id }})" class="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600 border border-violet-100 transition-all active:scale-90 hover:grad-violet hover:text-white shrink-0 snap-center" title="Clone"><i class="fas fa-copy text-xs"></i></button>
-                    @endif
+                        @if(Auth::user()->hasFeature('mobile_indents', 'clone'))
+                        <button @click="cloneIndent({{ $indent->id }})" class="w-10 h-10 bg-violet-50/50 rounded-2xl flex items-center justify-center text-violet-500 border border-violet-100/50 transition-all active:scale-90 hover:bg-violet-500 hover:text-white shrink-0 snap-center shadow-sm" title="Clone"><i class="fas fa-copy text-sm"></i></button>
+                        @endif
 
-                    @if(Auth::user()->hasFeature('mobile_indents', 'edit'))
-                    <button @click="editIndent({{ $indent->id }})" class="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 border border-slate-200 transition-all active:scale-90 hover:bg-slate-700 hover:text-white shrink-0 snap-center" title="Edit"><i class="fas fa-edit text-xs"></i></button>
-                    @endif
+                        @if(Auth::user()->hasFeature('mobile_indents', 'edit'))
+                        <button @click="editIndent({{ $indent->id }})" class="w-10 h-10 bg-slate-50/50 rounded-2xl flex items-center justify-center text-slate-500 border border-slate-200/50 transition-all active:scale-90 hover:bg-slate-600 hover:text-white shrink-0 snap-center shadow-sm" title="Edit"><i class="fas fa-edit text-sm"></i></button>
+                        @endif
 
-                    @if(Auth::user()->hasFeature('mobile_indents', 'delete'))
-                    <button @click="deleteIndent({{ $indent->id }})" class="w-9 h-9 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 transition-all active:scale-90 hover:grad-rose hover:text-white shrink-0 snap-center" title="Delete"><i class="fas fa-trash text-xs"></i></button>
-                    @endif
+                        @if(Auth::user()->hasFeature('mobile_indents', 'delete'))
+                        <button @click="deleteIndent({{ $indent->id }})" class="w-10 h-10 bg-rose-50/50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100/50 transition-all active:scale-90 hover:bg-rose-500 hover:text-white shrink-0 snap-center shadow-sm" title="Delete"><i class="fas fa-trash text-sm"></i></button>
+                        @endif
+                    </div>
                 </div>
             </div>
             @endforeach
             @else
-            <div class="p-12 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100">
-                <i class="fas fa-lock text-gray-200 text-4xl mb-4"></i>
-                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">History Access Restricted</p>
+            <div class="p-12 text-center bg-white/40 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-white/60 shadow-inner">
+                <div class="w-20 h-20 bg-white/50 rounded-full flex items-center justify-center mx-auto mb-5 border border-white/60 shadow-sm">
+                    <i class="fas fa-lock text-slate-300 text-3xl"></i>
+                </div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">History Access Restricted</p>
             </div>
             @endif
         </div>
@@ -318,21 +325,21 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar bg-slate-50/30">
+            <div class="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white/60 backdrop-blur-md/30">
                 <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                    <div class="bg-white p-5 rounded-3xl border border-white/60 shadow-md">
                         <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Indent ID</div>
                         <div class="text-xs font-900 text-indigo-600 italic mt-1" x-text="'#IND-' + selectedIndent?.id"></div>
                     </div>
-                    <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                    <div class="bg-white p-5 rounded-3xl border border-white/60 shadow-md">
                         <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Creator</div>
                         <div class="text-xs font-900 text-slate-700 mt-1 truncate" x-text="selectedIndent?.user?.name || 'System'"></div>
                     </div>
-                    <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                    <div class="bg-white p-5 rounded-3xl border border-white/60 shadow-md">
                         <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Indent Date</div>
                         <div class="text-xs font-900 text-slate-700 mt-1" x-text="selectedIndent ? new Date(selectedIndent.indent_date).toLocaleDateString('en-GB') : ''"></div>
                     </div>
-                    <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                    <div class="bg-white p-5 rounded-3xl border border-white/60 shadow-md">
                         <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Load</div>
                         <div class="text-xs font-900 text-slate-700 mt-1" x-text="selectedIndent?.total_boxes + ' BOXES'"></div>
                     </div>
@@ -341,9 +348,9 @@
                 <div class="space-y-3">
                     <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Products Requested</div>
                     <template x-for="item in selectedIndent?.items" :key="item.id">
-                        <div class="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm transform transition-all hover:scale-[1.02]">
+                        <div class="flex items-center justify-between p-5 bg-white/70 backdrop-blur-md border border-white/80 rounded-[2rem] shadow-md transform transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-100/50">
                             <div class="flex-1 min-w-0 pr-4">
-                                <div class="text-[11px] font-900 text-slate-800 uppercase truncate" x-text="item.product_name"></div>
+                                <div class="text-[11px] font-900 text-slate-800 font-900 uppercase truncate" x-text="item.product_name"></div>
                                 <div class="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-0.5" x-text="item.product?.item_code"></div>
                                 <div class="mt-2 flex flex-wrap items-center gap-2">
                                     <div class="flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-lg">
@@ -361,7 +368,7 @@
                     </template>
                 </div>
             </div>
-            <div class="p-8 border-t border-slate-100">
+            <div class="p-8 border-t border-white/60">
                 <button @click="viewModal = false" class="w-full py-5 grad-slate text-white rounded-[1.5rem] font-900 italic tracking-tight uppercase text-xs shadow-xl active:scale-95 transition-all">Close Viewer</button>
             </div>
         </div>
@@ -384,9 +391,9 @@
                     <div class="text-right">Packed</div>
                 </div>
                 <template x-for="item in selectedIndent?.items" :key="item.id">
-                    <div class="grid grid-cols-4 gap-4 items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50">
+                    <div class="grid grid-cols-4 gap-4 items-center p-4 bg-white/70 backdrop-blur-xl rounded-2xl border border-white/80 shadow-sm hover:shadow-md transition-all">
                         <div class="col-span-2">
-                            <div class="text-[11px] font-900 text-slate-800 uppercase truncate" x-text="item.product_name"></div>
+                            <div class="text-[11px] font-900 text-slate-800 font-900 uppercase truncate" x-text="item.product_name"></div>
                             <div class="text-[8px] text-slate-400 font-bold italic" x-text="item.product?.item_code"></div>
                         </div>
                         <div class="text-center text-[12px] font-900 text-slate-600" x-text="item.final_qty_box"></div>
@@ -397,7 +404,7 @@
                     </div>
                 </template>
             </div>
-            <div class="p-8 border-t border-slate-100">
+            <div class="p-8 border-t border-white/60">
                 <button @click="progressModal = false" class="w-full py-5 grad-indigo text-white rounded-[1.5rem] font-900 italic tracking-tight uppercase text-xs shadow-xl active:scale-95 transition-all">Got It</button>
             </div>
         </div>
@@ -408,7 +415,7 @@
         <div class="p-8 space-y-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <h3 class="text-2xl font-900 text-slate-800 tracking-tighter">Bulk Selector</h3>
+                    <h3 class="text-2xl font-900 text-slate-800 font-900 tracking-tighter">Bulk Selector</h3>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 italic">Multi-item rapid selection</p>
                 </div>
                 <button @click="showSearch = false" class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 hover:text-rose-500 transition-all active:scale-90">
@@ -417,18 +424,18 @@
             </div>
             <div class="relative group">
                 <i class="fas fa-search absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-500 transition-colors"></i>
-                <input type="text" x-model="searchQuery" placeholder="Search product name or code..." class="w-full bg-white/60 backdrop-blur-md border-2 border-slate-100 rounded-[1.5rem] py-5 pl-14 pr-6 text-sm font-bold focus:ring-2 focus:ring-violet-500 shadow-xl shadow-indigo-100/30 transition-all">
+                <input type="text" x-model="searchQuery" placeholder="Search product name or code..." class="w-full bg-white/60 backdrop-blur-md border-2 border-white/60 rounded-[1.5rem] py-5 pl-14 pr-6 text-sm font-bold focus:ring-2 focus:ring-violet-500 shadow-xl shadow-indigo-100/30 transition-all">
             </div>
         </div>
 
         <div class="flex-1 overflow-y-auto px-8 space-y-4 pb-32 custom-scrollbar">
             <template x-for="p in filteredProducts" :key="p.id">
-                <label class="flex items-center gap-5 p-5 bg-white/50 rounded-[2rem] border-2 border-slate-100 transition-all active:scale-[0.98] cursor-pointer" :class="selectedProducts.includes(p.id) ? 'border-violet-500 bg-violet-50/20 shadow-lg shadow-violet-100/50' : 'hover:border-slate-200'">
-                    <input type="checkbox" :value="p.id" x-model="selectedProducts" class="w-7 h-7 rounded-xl text-violet-600 border-slate-200 focus:ring-violet-500 shadow-sm">
+                <label class="flex items-center gap-5 p-5 bg-white/70 backdrop-blur-xl rounded-[2rem] border-2 border-white/80 transition-all active:scale-[0.98] cursor-pointer" :class="selectedProducts.includes(p.id) ? 'border-violet-400 bg-violet-50/50 shadow-xl shadow-violet-200/50' : 'hover:border-violet-200 hover:shadow-lg'">
+                    <input type="checkbox" :value="p.id" x-model="selectedProducts" class="w-7 h-7 rounded-xl text-violet-600 border-white/70 focus:ring-violet-500 shadow-md">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between">
-                            <div class="text-[13px] font-900 text-slate-800 truncate uppercase" x-text="p.name"></div>
-                            <div class="text-[10px] font-black text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg shadow-sm border border-violet-100/50" x-text="'Stock: ' + (stockMap[p.id] ? stockMap[p.id].stock_box : '0')"></div>
+                            <div class="text-[13px] font-900 text-slate-800 font-900 truncate uppercase" x-text="p.name"></div>
+                            <div class="text-[10px] font-black text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg shadow-md border border-violet-100/50" x-text="'Stock: ' + (stockMap[p.id] ? stockMap[p.id].stock_box : '0')"></div>
                         </div>
                         <div class="flex items-center gap-3 mt-1.5">
                             <span class="text-[9px] bg-slate-100/80 text-slate-500 px-2.5 py-1 rounded-lg font-black uppercase tracking-widest shadow-inner" x-text="p.item_code"></span>
@@ -476,23 +483,23 @@
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-8 space-y-5 custom-scrollbar bg-slate-50/30">
+            <div class="flex-1 overflow-y-auto p-8 space-y-5 custom-scrollbar bg-white/60 backdrop-blur-md/30">
                 <template x-for="p in form.products" :key="p.id">
-                    <div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm group">
+                    <div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-white/60 shadow-md group">
                         <div class="flex-1 min-w-0 pr-5">
-                            <div class="text-[11px] font-900 text-slate-800 truncate uppercase" x-text="p.name"></div>
+                            <div class="text-[11px] font-900 text-slate-800 font-900 truncate uppercase" x-text="p.name"></div>
                             <div class="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-1" x-text="p.item_code"></div>
                         </div>
                         <div class="text-right shrink-0">
-                            <div class="text-[13px] font-900 text-slate-800 tracking-tighter" x-text="p.demand_qty + ' ' + form.global_unit.toUpperCase()"></div>
+                            <div class="text-[13px] font-900 text-slate-800 font-900 tracking-tighter" x-text="p.demand_qty + ' ' + form.global_unit.toUpperCase()"></div>
                             <div class="text-[9px] text-violet-500 font-black italic tracking-tighter mt-0.5" x-text="calculateFinal(p) + ' BOX EQUIV.'"></div>
                         </div>
                     </div>
                 </template>
             </div>
 
-            <div class="p-8 bg-white border-t border-slate-100 space-y-6">
-                <div class="flex items-center justify-between px-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div class="p-8 bg-white border-t border-white/60 space-y-6">
+                <div class="flex items-center justify-between px-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border border-white/60">
                     <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Load</span>
                     <span class="text-3xl font-900 text-slate-900 tracking-tighter" x-text="getGrandTotal() + ' BOX'"></span>
                 </div>
@@ -842,7 +849,7 @@ function indentApp() {
 <style>
     /* Mobile Pagination Styling */
     .pagination { @apply flex justify-center gap-2 mt-10; }
-    .page-item { @apply w-11 h-11 rounded-2xl flex items-center justify-center text-[10px] font-black border-2 border-slate-50 transition-all bg-white text-slate-400 shadow-sm active:scale-90; }
+    .page-item { @apply w-11 h-11 rounded-2xl flex items-center justify-center text-[10px] font-black border-2 border-slate-50 transition-all bg-white text-slate-400 shadow-md active:scale-90; }
     .page-item.active { @apply bg-violet-600 border-violet-600 text-white shadow-xl shadow-violet-100; }
     .page-item.disabled { @apply opacity-20 grayscale pointer-events-none; }
     .page-link { @apply w-full h-full flex items-center justify-center; }

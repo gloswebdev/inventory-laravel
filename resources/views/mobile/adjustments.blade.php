@@ -3,9 +3,11 @@
 @section('content')
 <div class="space-y-8 pb-10" x-data="adjustmentApp()">
     <!-- Header Block -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden mb-2">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+        <div class="relative z-10 flex items-center justify-between w-full">
         <div>
-            <h2 class="text-3xl font-900 text-slate-800 tracking-tighter">Adjust</h2>
+            <h2 class="text-3xl font-900 text-slate-800 font-900 tracking-tighter">Adjust</h2>
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Manual Inventory Control</p>
         </div>
         @if(Auth::user()->hasFeature('mobile_adjustments', 'create'))
@@ -14,14 +16,15 @@
         </button>
         @endif
     </div>
+</div>
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom duration-700">
-        <div class="glass-premium p-5 rounded-[2.5rem] border border-white/80">
+        <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-5 rounded-[2.5rem] border border-white/80">
             <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Recent Logs</div>
-            <div class="text-xl font-900 text-slate-800 tracking-tighter">{{ count($adjustments) }}</div>
+            <div class="text-xl font-900 text-slate-800 font-900 tracking-tighter">{{ count($adjustments) }}</div>
         </div>
-        <div class="glass-premium p-5 rounded-[2.5rem] border border-white/80">
+        <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-5 rounded-[2.5rem] border border-white/80">
             <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Permitted Items</div>
             <div class="text-xl font-900 text-emerald-600 tracking-tighter">{{ count($products) }}</div>
         </div>
@@ -32,14 +35,14 @@
         <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-3">Adjustment History</h3>
         <div class="space-y-4">
             @foreach($adjustments as $adj)
-            <div class="glass-premium p-6 rounded-[2.5rem] border border-white/80 transition-all hover:shadow-lg">
+            <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-6 rounded-[2.5rem] border border-white/80 transition-all hover:shadow-lg">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 {{ $adj->adjustment_type == 'add' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500' }} rounded-2xl flex items-center justify-center border border-white shadow-sm">
+                        <div class="w-10 h-10 {{ $adj->adjustment_type == 'add' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500' }} rounded-2xl flex items-center justify-center border border-white shadow-md">
                             <i class="fas {{ $adj->adjustment_type == 'add' ? 'fa-plus' : 'fa-minus' }} text-[10px]"></i>
                         </div>
                         <div>
-                            <div class="text-[11px] font-900 text-slate-800 uppercase italic tracking-tighter">{{ $adj->product->name }}</div>
+                            <div class="text-[11px] font-900 text-slate-800 font-900 uppercase italic tracking-tighter">{{ $adj->product->name }}</div>
                             <div class="text-[8px] text-slate-400 font-bold uppercase mt-0.5">{{ $adj->created_at->diffForHumans() }}</div>
                         </div>
                     </div>
@@ -51,7 +54,7 @@
                     </div>
                 </div>
                 @if($adj->reason)
-                <div class="bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">
+                <div class="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-white/60/50">
                     <p class="text-[9px] text-slate-500 font-bold leading-relaxed italic">"{{ $adj->reason }}"</p>
                 </div>
                 @endif
@@ -59,7 +62,7 @@
             @endforeach
             
             @if(count($adjustments) === 0)
-            <div class="py-16 text-center glass-premium rounded-[3rem] border-2 border-dashed border-slate-100 opacity-50">
+            <div class="py-16 text-center glass-premium rounded-[3rem] border-2 border-dashed border-white/60 opacity-50">
                 <i class="fas fa-clipboard-check text-slate-200 text-3xl mb-4"></i>
                 <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No recent adjustments found</p>
             </div>
@@ -82,7 +85,7 @@
                 <!-- Product -->
                 <div class="space-y-2">
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Select Product</label>
-                    <select x-model="form.product_id" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none">
+                    <select x-model="form.product_id" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none">
                         <option value="">Choose item...</option>
                         @foreach($products as $product)
                         <option value="{{ $product->id }}">{{ $product->name }} ({{ $product->item_code }})</option>
@@ -94,21 +97,21 @@
                 <div class="flex gap-4">
                     <div class="flex-1 space-y-2">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Type</label>
-                        <select x-model="form.adjustment_type" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none">
+                        <select x-model="form.adjustment_type" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 appearance-none">
                             <option value="add">🟢 ADDITION</option>
                             <option value="deduct">🔴 DEDUCTION</option>
                         </select>
                     </div>
                     <div class="flex-1 space-y-2">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Quantity</label>
-                        <input type="number" step="0.001" x-model="form.quantity" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-black text-slate-700 focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-200" placeholder="0.000">
+                        <input type="number" step="0.001" x-model="form.quantity" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-sm font-black text-slate-700 focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-200" placeholder="0.000">
                     </div>
                 </div>
 
                 <!-- Reason -->
                 <div class="space-y-2">
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Reason / Note</label>
-                    <textarea x-model="form.reason" rows="3" class="w-full bg-slate-50 border-none rounded-[1.5rem] p-6 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-200" placeholder="Why are you adjusting this stock?"></textarea>
+                    <textarea x-model="form.reason" rows="3" class="w-full bg-white/60 backdrop-blur-md border-none rounded-[1.5rem] p-6 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-200" placeholder="Why are you adjusting this stock?"></textarea>
                 </div>
 
                 <button @click="submit" :disabled="loading" class="w-full grad-emerald p-1 rounded-[2rem] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] disabled:opacity-50">

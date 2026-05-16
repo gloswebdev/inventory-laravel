@@ -3,25 +3,28 @@
 @section('content')
 <div class="space-y-8 pb-10" x-data="productionApp()">
     <!-- Header Block -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden mb-2">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+        <div class="relative z-10 flex items-center justify-between w-full">
         <div>
-            <h2 class="text-3xl font-900 text-slate-800 tracking-tighter">Production</h2>
+            <h2 class="text-3xl font-900 text-slate-800 font-900 tracking-tighter">Production</h2>
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Record daily yield data</p>
         </div>
         <div class="flex items-center gap-3">
-            <div class="px-3 py-1 bg-white/60 border border-white rounded-full text-[8px] font-black uppercase tracking-widest text-slate-500 shadow-sm">Post-Entry</div>
+            <div class="px-3 py-1 bg-white/60 border border-white rounded-full text-[8px] font-black uppercase tracking-widest text-slate-500 shadow-md">Post-Entry</div>
             <div class="w-3 h-3 bg-rose-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.5)]"></div>
         </div>
     </div>
+</div>
     
     @if(Auth::user()->hasFeature('mobile_production', 'management'))
     <!-- Entry Form -->
-    <div class="glass-premium p-8 rounded-[3rem] space-y-8 border border-white/80">
+    <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-8 rounded-[3rem] space-y-8 border border-white/80">
         <!-- Branch Context -->
         <div class="space-y-3">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3 block">Operation Branch</label>
             <div class="relative group">
-                <select x-model="form.branch_code" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-[1.5rem] py-4 px-6 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 appearance-none transition-all">
+                <select x-model="form.branch_code" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60/50 rounded-[1.5rem] py-4 px-6 text-sm font-bold text-slate-800 font-900 focus:ring-2 focus:ring-indigo-500 appearance-none transition-all">
                     <option value="">Select Production site...</option>
                     @foreach($branches as $branch)
                     <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
@@ -37,7 +40,7 @@
         <div class="space-y-3">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3 block">Finished Goods</label>
             <div class="relative group">
-                <select x-model="form.product_id" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-[1.5rem] py-4 px-6 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 appearance-none transition-all">
+                <select x-model="form.product_id" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60/50 rounded-[1.5rem] py-4 px-6 text-sm font-bold text-slate-800 font-900 focus:ring-2 focus:ring-indigo-500 appearance-none transition-all">
                     <option value="">Choose specific product...</option>
                     @foreach($products as $product)
                     <option value="{{ $product->id }}">{{ $product->name }} ({{ $product->pack_name }})</option>
@@ -53,7 +56,7 @@
         <div class="space-y-3">
             <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3 block">Batch Quantity</label>
             <div class="relative">
-                <input type="number" step="0.001" x-model="form.quantity" placeholder="0.000" class="w-full bg-slate-50/50 border-2 border-slate-100/50 rounded-[1.5rem] py-5 px-8 text-3xl font-900 text-slate-800 focus:ring-2 focus:ring-rose-500 focus:border-rose-300 placeholder:text-slate-200 transition-all shadow-inner">
+                <input type="number" step="0.001" x-model="form.quantity" placeholder="0.000" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60/50 rounded-[1.5rem] py-5 px-8 text-3xl font-900 text-slate-800 font-900 focus:ring-2 focus:ring-rose-500 focus:border-rose-300 placeholder:text-slate-200 transition-all shadow-inner">
                 <div class="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-black text-rose-500 uppercase tracking-[0.2em]">BOX UNITS</div>
             </div>
         </div>
@@ -81,8 +84,8 @@
         </button>
     </div>
     @else
-    <div class="glass-premium p-10 rounded-[3rem] text-center border-2 border-dashed border-slate-100">
-        <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-10 rounded-[3rem] text-center border-2 border-dashed border-white/60">
+        <div class="w-16 h-16 bg-white/60 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-4">
             <i class="fas fa-lock text-slate-200 text-2xl"></i>
         </div>
         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recording Restricted</p>
@@ -99,13 +102,13 @@
 
         <div class="space-y-4">
             @foreach($history as $item)
-            <div class="glass-premium p-5 rounded-[2rem] border border-white/80 flex items-center justify-between group active:scale-[0.98] transition-all">
+            <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-5 rounded-[2rem] border border-white/80 flex items-center justify-between group active:scale-[0.98] transition-all">
                 <div class="flex items-center gap-4">
                     <div class="w-11 h-11 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-100/50">
                         <i class="fas fa-box-open text-xs"></i>
                     </div>
                     <div>
-                        <div class="text-[11px] font-900 text-slate-800 truncate max-w-[150px] uppercase tracking-tighter">{{ $item->product_name ?? ($item->product ? $item->product->name : 'Unknown') }}</div>
+                        <div class="text-[11px] font-900 text-slate-800 font-900 truncate max-w-[150px] uppercase tracking-tighter">{{ $item->product_name ?? ($item->product ? $item->product->name : 'Unknown') }}</div>
                         <div class="flex items-center gap-2 mt-1">
                             <span class="text-[8px] font-black text-indigo-400 uppercase">{{ $item->production->branch_code ?? 'N/A' }}</span>
                             <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
@@ -114,7 +117,7 @@
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm font-900 text-slate-800 tracking-tighter">+{{ number_format($item->quantity_box, 2) }}</div>
+                    <div class="text-sm font-900 text-slate-800 font-900 tracking-tighter">+{{ number_format($item->quantity_box, 2) }}</div>
                     <div class="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Yield Posted</div>
                 </div>
             </div>
@@ -148,7 +151,7 @@
             </div>
             <div>
                 <div class="text-[9px] font-black uppercase tracking-widest" :class="toast.success ? 'text-emerald-500' : 'text-rose-500'" x-text="toast.success ? 'Success Confirmed' : 'System Error'"></div>
-                <p class="text-[13px] font-bold text-slate-800 leading-tight mt-0.5" x-text="toast.message"></p>
+                <p class="text-[13px] font-bold text-slate-800 font-900 leading-tight mt-0.5" x-text="toast.message"></p>
             </div>
         </div>
     </div>

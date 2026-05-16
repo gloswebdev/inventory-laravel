@@ -3,9 +3,11 @@
 @section('content')
 <div class="space-y-8 pb-10" x-data="productMasterApp()">
     <!-- Header Area -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden mb-2">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+        <div class="relative z-10 flex items-center justify-between w-full">
         <div>
-            <h2 class="text-3xl font-900 text-slate-800 tracking-tighter">Products</h2>
+            <h2 class="text-3xl font-900 text-slate-800 font-900 tracking-tighter">Products</h2>
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Master Data Management</p>
         </div>
         <div class="flex items-center gap-3">
@@ -15,38 +17,131 @@
             </button>
             @endif
             @if(Auth::user()->hasFeature('mobile_products', 'sync'))
-            <button @click="triggerSync" :disabled="syncing" class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 border border-slate-100 shadow-sm transition-all active:scale-90 overflow-hidden relative">
+            <button @click="triggerSync" :disabled="syncing" class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 border border-white/60 shadow-md transition-all active:scale-90 overflow-hidden relative">
                 <i class="fas fa-rotate text-xs" :class="syncing ? 'animate-spin' : ''"></i>
             </button>
             @endif
-            <button @click="showSearch = !showSearch" :class="showSearch ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-white border-slate-100'" class="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm transition-all active:scale-90">
+            <button @click="showSearch = !showSearch" :class="showSearch ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-white border-white/60'" class="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-md transition-all active:scale-90">
                 <i class="fas fa-search text-xs"></i>
             </button>
         </div>
     </div>
+</div>
 
-    <!-- Quick Search -->
-    <div x-show="showSearch" x-cloak x-transition class="glass-premium p-6 rounded-[2.5rem] border border-white/80">
+    <!-- Quick Search & Filters -->
+    <div x-show="showSearch" x-cloak x-transition class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-6 rounded-[2.5rem] space-y-4">
+        <!-- Search Input -->
         <div class="relative group">
             <input 
                 type="text" 
                 x-model="searchTerm" 
                 @keyup.enter="handleSearch"
                 placeholder="Find item name or code..." 
-                class="w-full bg-slate-50 border-none rounded-2xl py-4 px-12 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-12 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner"
             >
             <div class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300">
                 <i class="fas fa-magnifying-glass text-[10px]"></i>
             </div>
+            <template x-if="searchTerm">
+                <button @click="searchTerm = ''; handleSearch()" class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors">
+                    <i class="fas fa-times-circle text-[10px]"></i>
+                </button>
+            </template>
         </div>
+        
+        <!-- Filters Grid -->
+        <div class="grid grid-cols-2 gap-3">
+            <!-- Product Type -->
+            <div class="relative group">
+                <select x-model="filters.type_id" @change="handleSearch" class="w-full bg-white/60 backdrop-blur-md border-none rounded-xl py-3 px-4 pr-8 text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner appearance-none cursor-pointer">
+                    <option value="">All Types</option>
+                    @foreach($types as $type)
+                    <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[8px]"></i>
+                </div>
+            </div>
+
+            <!-- Product Group -->
+            <div class="relative group">
+                <select x-model="filters.group_id" @change="handleSearch" class="w-full bg-white/60 backdrop-blur-md border-none rounded-xl py-3 px-4 pr-8 text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner appearance-none cursor-pointer">
+                    <option value="">All Groups</option>
+                    @foreach($groups as $group)
+                    <option value="{{ $group->id }}">{{ $group->group_name }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[8px]"></i>
+                </div>
+            </div>
+
+            <!-- Category -->
+            <div class="relative group">
+                <select x-model="filters.category" @change="handleSearch" class="w-full bg-white/60 backdrop-blur-md border-none rounded-xl py-3 px-4 pr-8 text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner appearance-none cursor-pointer">
+                    <option value="">All Categories</option>
+                    @foreach($categories as $category)
+                    <option value="{{ $category }}">{{ $category }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[8px]"></i>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <div class="relative group">
+                <select x-model="filters.form" @change="handleSearch" class="w-full bg-white/60 backdrop-blur-md border-none rounded-xl py-3 px-4 pr-8 text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner appearance-none cursor-pointer">
+                    <option value="">All Forms</option>
+                    @foreach($forms as $form)
+                    <option value="{{ $form }}">{{ $form }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[8px]"></i>
+                </div>
+            </div>
+
+            <!-- RM Type -->
+            <div class="relative group">
+                <select x-model="filters.rm_type" @change="handleSearch" class="w-full bg-white/60 backdrop-blur-md border-none rounded-xl py-3 px-4 pr-8 text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner appearance-none cursor-pointer">
+                    <option value="">All RM Types</option>
+                    @foreach($rmTypes as $rmType)
+                    <option value="{{ $rmType }}">{{ $rmType }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[8px]"></i>
+                </div>
+            </div>
+
+            <!-- Pack Name -->
+            <div class="relative group">
+                <select x-model="filters.pack_name" @change="handleSearch" class="w-full bg-white/60 backdrop-blur-md border-none rounded-xl py-3 px-4 pr-8 text-[10px] font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 shadow-inner appearance-none cursor-pointer">
+                    <option value="">All Packs</option>
+                    @foreach($packs as $pack)
+                    <option value="{{ $pack }}">{{ $pack }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                    <i class="fas fa-chevron-down text-[8px]"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Clear Filters Button -->
+        <button @click="clearFilters" class="w-full bg-indigo-50/50 text-indigo-600 font-black tracking-widest uppercase text-[10px] py-3 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all active:scale-[0.98]">
+            Clear All Filters
+        </button>
     </div>
 
     <!-- Product Grid -->
     <div class="space-y-4">
         @foreach($products as $product)
-        <div class="glass-premium p-6 rounded-[2.5rem] border border-white/80 flex items-center justify-between group active:scale-[0.98] transition-all">
+        <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-6 rounded-[2.5rem] border border-white/80 flex items-center justify-between group active:scale-[0.98] transition-all">
             <div class="flex-1 min-w-0 pr-4">
-                <div class="text-[12px] font-900 text-slate-800 truncate uppercase tracking-tight italic">{{ $product->name }}</div>
+                <div class="text-[12px] font-900 text-slate-800 font-900 truncate uppercase tracking-tight italic">{{ $product->name }}</div>
                 <div class="flex items-center gap-2 mt-1.5">
                     <span class="text-[8px] font-black text-indigo-400 uppercase tracking-widest">{{ $product->item_code }}</span>
                     <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
@@ -54,7 +149,7 @@
                 </div>
             </div>
             @if(Auth::user()->hasFeature('mobile_products', 'edit'))
-            <button @click="openEdit({{ json_encode($product) }})" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 border border-slate-100 hover:text-indigo-500 hover:border-indigo-100 transition-all">
+            <button @click="openEdit({{ json_encode($product) }})" class="w-10 h-10 bg-white/60 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-400 border border-white/60 hover:text-indigo-500 hover:border-indigo-100 transition-all">
                 <i class="fas fa-pen-to-square text-[10px]"></i>
             </button>
             @endif
@@ -68,7 +163,7 @@
 
         @if(count($products) === 0)
         <div class="py-20 text-center opacity-40">
-            <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div class="w-20 h-20 bg-white/60 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-6">
                 <i class="fas fa-box-open text-slate-200 text-4xl"></i>
             </div>
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-loose">No master records matches<br>your search criteria.</p>
@@ -90,17 +185,17 @@
             <div class="p-8 space-y-5 overflow-y-auto max-h-[70vh]">
                 <div class="space-y-2">
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Product Name</label>
-                    <input type="text" x-model="form.name" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" x-model="form.name" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2" x-show="!isEdit">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Item Code</label>
-                        <input type="text" x-model="form.item_code" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500" placeholder="SKU-XXX">
+                        <input type="text" x-model="form.item_code" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500" placeholder="SKU-XXX">
                     </div>
                     <div class="space-y-2">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Product Type</label>
-                        <select x-model="form.product_type_id" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                        <select x-model="form.product_type_id" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500">
                             <option value="">Select Type</option>
                             @foreach($types as $type)
                             <option value="{{ $type->id }}">{{ $type->type_name }}</option>
@@ -109,18 +204,18 @@
                     </div>
                     <div class="space-y-2" :class="isEdit ? 'col-span-2' : ''">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Low Alert (Boxes)</label>
-                        <input type="number" x-model="form.low_alert_quantity" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                        <input type="number" x-model="form.low_alert_quantity" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700 focus:ring-2 focus:ring-indigo-500">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4" x-show="!isEdit">
                     <div class="space-y-2">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Unit/Box</label>
-                        <input type="number" x-model="form.unit_box" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700">
+                        <input type="number" x-model="form.unit_box" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700">
                     </div>
                     <div class="space-y-2">
                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Weight/Unit (KG)</label>
-                        <input type="number" x-model="form.weight_unit" step="0.001" class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700">
+                        <input type="number" x-model="form.weight_unit" step="0.001" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-xs font-black text-slate-700">
                     </div>
                 </div>
 
@@ -138,8 +233,16 @@
 <script>
     function productMasterApp() {
         return {
-            showSearch: false,
+            showSearch: {{ request()->anyFilled(['search', 'type_id', 'group_id', 'category', 'form', 'rm_type', 'pack_name']) ? 'true' : 'false' }},
             searchTerm: '{{ request('search') }}',
+            filters: {
+                type_id: '{{ request('type_id') }}',
+                group_id: '{{ request('group_id') }}',
+                category: '{{ request('category') }}',
+                form: '{{ request('form') }}',
+                rm_type: '{{ request('rm_type') }}',
+                pack_name: '{{ request('pack_name') }}',
+            },
             showModal: false,
             isEdit: false,
             loading: false,
@@ -158,8 +261,27 @@
                 const url = new URL(window.location.href);
                 if (this.searchTerm) url.searchParams.set('search', this.searchTerm);
                 else url.searchParams.delete('search');
+                
+                Object.keys(this.filters).forEach(key => {
+                    if (this.filters[key]) url.searchParams.set(key, this.filters[key]);
+                    else url.searchParams.delete(key);
+                });
+                
                 url.searchParams.delete('page');
                 window.location.href = url.toString();
+            },
+
+            clearFilters() {
+                this.searchTerm = '';
+                this.filters = {
+                    type_id: '',
+                    group_id: '',
+                    category: '',
+                    form: '',
+                    rm_type: '',
+                    pack_name: ''
+                };
+                this.handleSearch();
             },
 
             openCreate() {

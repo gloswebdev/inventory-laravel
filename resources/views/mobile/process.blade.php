@@ -3,9 +3,11 @@
 @section('content')
 <div class="space-y-8 pb-10" x-data="processApp()">
     <!-- Header Area -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden mb-2">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+        <div class="relative z-10 flex items-center justify-between w-full">
         <div>
-            <h2 class="text-3xl font-900 text-slate-800 tracking-tighter uppercase italic">Dispatch</h2>
+            <h2 class="text-3xl font-900 text-slate-800 font-900 tracking-tighter uppercase italic">Dispatch</h2>
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">
                 Ref: #IND-{{ $indent->id }} • {{ $indent->branch_name }}
             </p>
@@ -14,7 +16,7 @@
                     <i class="fas fa-user-circle mr-1 text-[7px]"></i> BY: {{ $indent->user->name ?? 'SYSTEM' }}
                 </p>
                 @if(Auth::user()->hasFeature('mobile_indents', 'branch_reorder'))
-                <button @click="showReorderModal = true" class="px-3 py-1 bg-white/60 border border-slate-100 rounded-full text-[7px] font-black uppercase tracking-widest text-indigo-500 shadow-sm active:scale-95 transition-all">
+                <button @click="showReorderModal = true" class="px-3 py-1 bg-white/60 border border-white/60 rounded-full text-[7px] font-black uppercase tracking-widest text-indigo-500 shadow-md active:scale-95 transition-all">
                     <i class="fas fa-sort mr-1"></i> Reorder
                 </button>
                 @endif
@@ -22,13 +24,13 @@
         </div>
         <div class="flex flex-col items-end gap-3">
             <div class="flex items-center gap-2">
-                <a href="javascript:window.print()" class="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100 shadow-sm transition-all active:scale-90 hover:grad-blue hover:text-white">
+                <a href="javascript:window.print()" class="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100 shadow-md transition-all active:scale-90 hover:grad-blue hover:text-white">
                     <i class="fas fa-print text-xs"></i>
                 </a>
-                <a href="{{ route('mobile.indents.process.excel', $indent->id) }}" class="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm transition-all active:scale-90 hover:grad-emerald hover:text-white">
+                <a href="{{ route('mobile.indents.process.excel', $indent->id) }}" class="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-md transition-all active:scale-90 hover:grad-emerald hover:text-white">
                     <i class="fas fa-file-excel text-xs"></i>
                 </a>
-                <a href="{{ route('mobile.indents.process.pdf', $indent->id) }}" class="w-10 h-10 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600 border border-rose-100 shadow-sm transition-all active:scale-90 hover:grad-rose hover:text-white">
+                <a href="{{ route('mobile.indents.process.pdf', $indent->id) }}" class="w-10 h-10 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600 border border-rose-100 shadow-md transition-all active:scale-90 hover:grad-rose hover:text-white">
                     <i class="fas fa-file-pdf text-xs"></i>
                 </a>
             </div>
@@ -40,15 +42,16 @@
                         'pending' => 'text-amber-500 bg-amber-50 border-amber-100',
                     ][strtolower($indent->status)] ?? 'text-amber-500 bg-amber-50 border-amber-100';
                 @endphp
-                <span class="px-2 py-0.5 {{ $statusColor }} border rounded text-[8px] font-black uppercase tracking-widest shadow-sm">{{ $indent->status ?: 'PENDING' }}</span>
-                <span class="text-[10px] font-black text-slate-800 tracking-tighter uppercase mt-1 italic">{{ date('d M, Y', strtotime($indent->indent_date)) }}</span>
+                <span class="px-2 py-0.5 {{ $statusColor }} border rounded text-[8px] font-black uppercase tracking-widest shadow-md">{{ $indent->status ?: 'PENDING' }}</span>
+                <span class="text-[10px] font-black text-slate-800 font-900 tracking-tighter uppercase mt-1 italic">{{ date('d M, Y', strtotime($indent->indent_date)) }}</span>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Cross-Branch Stock Analytics -->
-    <div class="glass-premium overflow-hidden rounded-[2.5rem] border border-white/80">
-        <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+    <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all overflow-hidden rounded-[2.5rem] border border-white/80">
+        <div class="p-6 border-b border-white/60 flex items-center justify-between bg-white/60 backdrop-blur-md/30">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-xl grad-indigo flex items-center justify-center text-white shadow-lg shadow-indigo-100 border border-white/20">
                     <i class="fas fa-chart-column text-[10px]"></i>
@@ -80,7 +83,7 @@
                     @foreach($indent->items as $item)
                     <tr class="hover:bg-indigo-50/10 transition-colors">
                         <td class="px-6 py-5 sticky left-0 bg-white/95 backdrop-blur-md z-10 shadow-[8px_0_15px_rgba(0,0,0,0.02)]">
-                            <div class="text-[12px] font-900 text-slate-800 leading-tight uppercase tracking-tighter">{{ $item->product ? $item->product->name : 'Unknown' }}</div>
+                            <div class="text-[12px] font-900 text-slate-800 font-900 leading-tight uppercase tracking-tighter">{{ $item->product ? $item->product->name : 'Unknown' }}</div>
                             <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{{ $item->product ? $item->product->pack_name : '-' }}</div>
                         </td>
                         <td class="px-6 py-5 text-center">
@@ -108,14 +111,14 @@
                 </tbody>
             </table>
         </div>
-        <div class="px-6 py-3 bg-slate-50/20 flex justify-center items-center gap-2">
+        <div class="px-6 py-3 bg-white/60 backdrop-blur-md/20 flex justify-center items-center gap-2">
             <i class="fas fa-arrows-left-right text-[10px] text-slate-300"></i>
             <span class="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">Swipe horizontally to view more branches</span>
         </div>
     </div>
 
     <!-- Completion Update Section -->
-    <div class="glass-premium p-8 rounded-[3rem] space-y-8 border border-white/80">
+    <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-8 rounded-[3rem] space-y-8 border border-white/80">
         <div class="flex items-center gap-3 ml-2">
             <i class="fas fa-file-circle-check text-indigo-500 text-xs shadow-glow"></i>
             <h3 class="text-[10px] font-black text-slate-700 uppercase tracking-[0.1em]">Fulfilment Execution</h3>
@@ -123,21 +126,21 @@
         
         <div class="space-y-5">
             @foreach($indent->items as $item)
-            <div class="flex items-center justify-between gap-6 p-6 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100/50 group hover:border-indigo-200 transition-all active:scale-[0.98]">
+            <div class="flex items-center justify-between gap-6 p-6 bg-white/40 backdrop-blur-sm rounded-[2rem] border-2 border-white/60/50 group hover:border-indigo-200 transition-all active:scale-[0.98]">
                 <div class="flex-1 min-w-0">
-                    <div class="text-[13px] font-900 text-slate-800 truncate uppercase tracking-tighter italic">{{ $item->product ? $item->product->name : 'Product' }}</div>
+                    <div class="text-[13px] font-900 text-slate-800 font-900 truncate uppercase tracking-tighter italic">{{ $item->product ? $item->product->name : 'Product' }}</div>
                     <div class="flex items-center gap-3 mt-2">
-                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-0.5 rounded shadow-sm border border-slate-100">Asked: {{ number_format($item->final_qty_box, 0) }}</span>
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white px-2 py-0.5 rounded shadow-md border border-white/60">Asked: {{ number_format($item->final_qty_box, 0) }}</span>
                     </div>
                 </div>
                 <div class="w-28 relative">
                     <input 
                         type="number" 
                         x-model="form.completed_qty[{{ $item->id }}]" 
-                        class="w-full bg-white border-none rounded-2xl py-3.5 px-5 text-sm font-900 text-slate-800 text-right focus:ring-2 focus:ring-indigo-500 shadow-inner group-hover:shadow-md transition-all"
+                        class="w-full bg-white border-none rounded-2xl py-3.5 px-5 text-sm font-900 text-slate-800 font-900 text-right focus:ring-2 focus:ring-indigo-500 shadow-inner group-hover:shadow-md transition-all"
                         placeholder="0"
                     >
-                    <div class="absolute -top-2 -right-1 bg-white border border-slate-100 px-1.5 rounded text-[7px] font-black text-indigo-400 shadow-sm">LOAD</div>
+                    <div class="absolute -top-2 -right-1 bg-white border border-white/60 px-1.5 rounded text-[7px] font-black text-indigo-400 shadow-md">LOAD</div>
                 </div>
             </div>
             @endforeach
@@ -213,7 +216,7 @@
             <div class="p-8 overflow-y-auto flex-1 custom-scrollbar">
                 <ul id="mobileSortableBranches" class="space-y-3">
                     @foreach($branches as $branch)
-                    <li data-id="{{ $branch->id }}" class="flex items-center gap-4 p-5 bg-slate-50 rounded-[1.5rem] border border-slate-100 cursor-move active:bg-indigo-50 transition-all">
+                    <li data-id="{{ $branch->id }}" class="flex items-center gap-4 p-5 bg-white/60 backdrop-blur-md rounded-[1.5rem] border border-white/60 cursor-move active:bg-indigo-50 transition-all">
                         <i class="fas fa-grip-lines text-slate-300"></i>
                         <span class="text-sm font-bold text-slate-700 uppercase tracking-tighter italic">{{ $branch->name }}</span>
                         <span class="ml-auto text-[8px] font-black text-slate-300 uppercase">{{ $branch->code }}</span>
@@ -226,7 +229,7 @@
                 <button onclick="saveMobileOrder()" class="flex-1 grad-indigo p-4 rounded-[1.5rem] text-white font-900 italic text-sm uppercase tracking-widest shadow-lg shadow-indigo-100">
                     Update Order
                 </button>
-                <button @click="showReorderModal = false" class="px-6 py-4 bg-slate-50 text-slate-400 font-bold rounded-[1.5rem] text-xs">Close</button>
+                <button @click="showReorderModal = false" class="px-6 py-4 bg-white/60 backdrop-blur-md text-slate-400 font-bold rounded-[1.5rem] text-xs">Close</button>
             </div>
         </div>
     </div>
@@ -249,7 +252,7 @@
             </div>
             <div>
                 <div class="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Logs Secured</div>
-                <p class="text-[13px] font-bold text-slate-800 leading-tight mt-1" x-text="toast.message"></p>
+                <p class="text-[13px] font-bold text-slate-800 font-900 leading-tight mt-1" x-text="toast.message"></p>
             </div>
         </div>
     </div>

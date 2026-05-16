@@ -1256,10 +1256,34 @@ class MobileController extends Controller implements HasMiddleware
             });
         }
 
+        if ($request->filled('type_id')) {
+            $query->where('product_type_id', $request->type_id);
+        }
+        if ($request->filled('group_id')) {
+            $query->where('group_id', $request->group_id);
+        }
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+        if ($request->filled('form')) {
+            $query->where('form', $request->form);
+        }
+        if ($request->filled('rm_type')) {
+            $query->where('rm_type', $request->rm_type);
+        }
+        if ($request->filled('pack_name')) {
+            $query->where('pack_name', $request->pack_name);
+        }
+
         $products = $query->paginate(30)->withQueryString();
         $types = ProductType::orderBy('type_name')->get();
+        $groups = \App\Models\ProductGroup::orderBy('group_name')->get();
+        $categories = Product::select('category')->whereNotNull('category')->where('category', '!=', '')->distinct()->orderBy('category')->pluck('category');
+        $forms = Product::select('form')->whereNotNull('form')->where('form', '!=', '')->distinct()->orderBy('form')->pluck('form');
+        $rmTypes = Product::select('rm_type')->whereNotNull('rm_type')->where('rm_type', '!=', '')->distinct()->orderBy('rm_type')->pluck('rm_type');
+        $packs = Product::select('pack_name')->whereNotNull('pack_name')->where('pack_name', '!=', '')->distinct()->orderBy('pack_name')->pluck('pack_name');
 
-        return view('mobile.products', compact('products', 'types'));
+        return view('mobile.products', compact('products', 'types', 'groups', 'categories', 'forms', 'rmTypes', 'packs'));
     }
 
     /**

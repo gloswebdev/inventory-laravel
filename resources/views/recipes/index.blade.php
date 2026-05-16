@@ -187,7 +187,7 @@
 </div>
 
 {{-- Recipe Modal --}}
-<div id="recipeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+<div id="recipeModal" class="fixed inset-0 z-[100] bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
     <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
         <div class="mt-3 text-center">
             <h3 id="modalTitle" class="text-xl leading-6 font-bold text-gray-900">Add New Recipe</h3>
@@ -264,7 +264,7 @@
 </div>
 
 {{-- Import Modal --}}
-<div id="importModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+<div id="importModal" class="fixed inset-0 z-[100] bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
     <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <h3 class="text-lg font-bold mb-4">Import Recipes</h3>
         <form action="{{ route('recipes.import') }}" method="POST" enctype="multipart/form-data">

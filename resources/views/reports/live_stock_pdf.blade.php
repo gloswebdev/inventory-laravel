@@ -42,7 +42,8 @@
             <tr>
                 <td class="product-info">
                     <strong>{{ $row['product']->name }}</strong><br>
-                    <small>{{ $row['product']->item_code }}</small>
+                    <small>{{ $row['product']->item_code }}</small><br>
+                    <small style="color: #666; font-style: italic;">Pack: {{ $row['product']->pack_name }} ({{ $row['product']->uom }})</small>
                 </td>
                 @foreach($branches as $branch)
                     @php $stock = $row['branch_stocks'][$branch->code]; @endphp
