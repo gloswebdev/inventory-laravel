@@ -4,14 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>InvoFlow Mobile</title>
 
     {{-- Increment the version (?v=...) below whenever you change manifest or icons to force browser update --}}
-    <link rel="manifest" href="{{ asset('manifest.json') }}?v=1.1">
-    <link rel="apple-touch-icon" href="{{ asset('app_icon_512.png') }}?v=1.1">
+    <link rel="manifest" href="{{ asset('manifest.json') }}?v=1.2">
+    <link rel="apple-touch-icon" href="{{ asset('app_icon_512.png') }}?v=1.2">
+    <link rel="apple-touch-startup-image" href="{{ asset('app_icon_512.png') }}?v=1.2">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
