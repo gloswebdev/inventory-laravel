@@ -48,13 +48,13 @@
                 </div>
 
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                    <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
-                        <table class="w-full text-left border-collapse relative">
+                    <div class="max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar">
+                        <table class="w-full text-left border-collapse relative table-fixed">
                             <thead class="sticky top-0 z-10 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
                                 <tr>
-                                    <th class="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">Product Details</th>
-                                    <th class="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200">Live Stock</th>
-                                    <th class="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32 text-right border-b border-slate-200">Order Qty</th>
+                                    <th class="px-2 sm:px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 w-1/2">Product Details</th>
+                                    <th class="px-2 sm:px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-200 w-[20%]">Live Stock</th>
+                                    <th class="px-2 sm:px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-200 w-[30%]">Order Qty</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -66,24 +66,24 @@
                                     data-unit-box="{{ $product->unit_box ?: 1 }}"
                                     data-weight-unit="{{ $product->weight_multiplier }}"
                                     data-uom="{{ $product->uom }}">
-                                    <td class="px-5 py-3">
-                                        <div class="font-bold text-slate-700 text-sm mb-1 line-clamp-1 truncate group-hover:text-indigo-700 transition-colors">{{ $product->name }}</div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{{ $product->item_code }}</span>
-                                            <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">{{ $product->pack_name }}</span>
+                                    <td class="px-2 sm:px-5 py-3 truncate">
+                                        <div class="font-bold text-slate-700 text-xs sm:text-sm mb-1 truncate group-hover:text-indigo-700 transition-colors" title="{{ $product->name }}">{{ $product->name }}</div>
+                                        <div class="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-mono font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{{ $product->item_code }}</span>
+                                            <span class="text-[8px] sm:text-[9px] font-semibold text-slate-400 uppercase tracking-widest">{{ $product->pack_name }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-3 text-center">
-                                        <div class="stock-box text-[11px] font-black text-emerald-600 leading-none">0.00</div>
-                                        <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">BOX</div>
-                                        <div class="stock-kg text-[9px] font-black text-slate-400 mt-1.5 leading-none">0.00</div>
-                                        <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest">{{ $product->uom == 'Ltr' ? 'LTR' : 'KG' }}</div>
+                                    <td class="px-2 sm:px-5 py-3 text-center">
+                                        <div class="stock-box text-[10px] sm:text-[11px] font-black text-emerald-600 leading-none">0.00</div>
+                                        <div class="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">BOX</div>
+                                        <div class="stock-kg text-[8px] sm:text-[9px] font-black text-slate-400 mt-1.5 leading-none">0.00</div>
+                                        <div class="text-[7px] sm:text-[8px] font-black text-slate-300 uppercase tracking-widest">{{ $product->uom == 'Ltr' ? 'LTR' : 'KG' }}</div>
                                     </td>
-                                    <td class="px-5 py-3 text-right">
+                                    <td class="px-2 sm:px-5 py-3 text-right">
                                         <input type="number" 
-                                               class="product-qty w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-mono font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-right transition-all" 
+                                               class="product-qty w-full max-w-[100px] ml-auto bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 sm:px-3 text-xs sm:text-sm font-mono font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-right transition-all" 
                                                placeholder="0" step="0.01">
-                                        <div class="selected-unit-label text-[9px] font-bold text-indigo-500 mt-1.5 uppercase tracking-widest">BOXES</div>
+                                        <div class="selected-unit-label text-[8px] sm:text-[9px] font-bold text-indigo-500 mt-1.5 uppercase tracking-widest">BOXES</div>
                                     </td>
                                 </tr>
                                 @endforeach
