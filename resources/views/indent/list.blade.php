@@ -114,7 +114,7 @@
                             </td>
                             <td class="px-8 py-5 text-right">
                                 <div class="flex justify-end gap-2 items-center">
-                                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div class="flex gap-2 transition-opacity">
                                         <button onclick="viewIndent({{ $indent->id }})" title="View" class="w-8 h-8 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition shadow-sm border border-indigo-100/50"><i class="fas fa-eye text-xs"></i></button>
                                         <button onclick="viewProgress({{ $indent->id }})" title="View Progress (Asked vs Completed)" class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100/50"><i class="fas fa-list-check text-xs"></i></button>
                                         @if(Auth::user()->hasPermission('planning_process', 'print'))
