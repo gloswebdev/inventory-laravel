@@ -12,6 +12,7 @@
     {{ session('system_success') }}
 </div>
 @endif
+
 @if(session('system_error'))
 <div class="flex items-center gap-3 px-5 py-3.5 mb-6 rounded-2xl text-sm font-semibold"
      style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fca5a5;color:#991b1b">
@@ -24,7 +25,7 @@
 <div class="flex items-center justify-between mb-7">
     <div>
         <h1 class="text-2xl font-black text-slate-800 tracking-tight">System Management</h1>
-        <p class="text-sm text-slate-500 mt-1">Backup, Restore & Updates — Admin Only</p>
+        <p class="text-sm text-slate-500 mt-1">Backup, Restore &amp; Updates &mdash; Admin Only</p>
     </div>
     <div class="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-2xl">
         <i class="fas fa-crown text-amber-500 text-xs"></i>
@@ -53,24 +54,24 @@
     <div class="px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
             <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Version</div>
-            <div class="text-sm font-bold text-slate-700">v{{ $version['version'] ?? '—' }}</div>
+            <div class="text-sm font-bold text-slate-700">v{{ $version['version'] ?? '?' }}</div>
         </div>
         <div>
             <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Release Date</div>
-            <div class="text-sm font-bold text-slate-700">{{ $version['release_date'] ?? '—' }}</div>
+            <div class="text-sm font-bold text-slate-700">{{ $version['release_date'] ?? '?' }}</div>
         </div>
         <div>
             <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Codename</div>
-            <div class="text-sm font-bold text-slate-700">{{ $version['codename'] ?? '—' }}</div>
+            <div class="text-sm font-bold text-slate-700">{{ $version['codename'] ?? '?' }}</div>
         </div>
         <div>
             <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Database</div>
             <div class="text-sm font-bold text-slate-700">
                 {{ $tableCount }} tables &middot;
                 @if($dbSizeBytes > 1048576)
-                    {{ round($dbSizeBytes/1048576, 1) }} MB
+                    {{ round($dbSizeBytes / 1048576, 1) }} MB
                 @else
-                    {{ round($dbSizeBytes/1024, 0) }} KB
+                    {{ round($dbSizeBytes / 1024, 0) }} KB
                 @endif
             </div>
         </div>
@@ -89,9 +90,10 @@
     @endif
 </div>
 
+{{-- THREE CARDS --}}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-    {{-- ── BACKUP CARD ─────────────────────────────────────────── --}}
+    {{-- BACKUP CARD --}}
     <div class="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-5 border-b border-slate-50">
             <div class="flex items-center gap-3">
@@ -109,19 +111,27 @@
             <div class="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 mb-5">
                 <div class="text-xs font-bold text-emerald-700 mb-1">Backup includes:</div>
                 <ul class="text-xs text-emerald-600 space-y-1">
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-500 text-[10px]"></i> Sari tables ka structure</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-500 text-[10px]"></i> Sari data rows (INSERT)</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-500 text-[10px]"></i> .sql format (import-ready)</li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-check text-emerald-500 text-[10px]"></i> Sari tables ka structure
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-check text-emerald-500 text-[10px]"></i> Sari data rows (INSERT)
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-check text-emerald-500 text-[10px]"></i> .sql format (import-ready)
+                    </li>
                 </ul>
             </div>
-
             <div class="text-xs text-slate-500 mb-4">
                 <span class="font-bold text-slate-700">{{ $tableCount }}</span> tables &middot;
                 <span class="font-bold text-slate-700">
-                    @if($dbSizeBytes > 1048576){{ round($dbSizeBytes/1048576,1) }} MB@else{{ round($dbSizeBytes/1024,0) }} KB@endif
+                    @if($dbSizeBytes > 1048576)
+                        {{ round($dbSizeBytes / 1048576, 1) }} MB
+                    @else
+                        {{ round($dbSizeBytes / 1024, 0) }} KB
+                    @endif
                 </span> data
             </div>
-
             <a href="{{ route('system.backup.download') }}"
                class="w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90 active:scale-95"
                style="background:linear-gradient(135deg,#10b981,#059669)">
@@ -131,7 +141,7 @@
         </div>
     </div>
 
-    {{-- ── RESTORE CARD ─────────────────────────────────────────── --}}
+    {{-- RESTORE CARD --}}
     <div class="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-5 border-b border-slate-50">
             <div class="flex items-center gap-3">
@@ -154,7 +164,6 @@
                     Restore karne se <strong>current data overwrite</strong> ho jayega. Pehle backup download karo!
                 </div>
             </div>
-
             <form method="POST" action="{{ route('system.restore.upload') }}" enctype="multipart/form-data"
                   onsubmit="return confirm('Are you sure? Current database data will be overwritten!')">
                 @csrf
@@ -169,7 +178,6 @@
                     <input type="file" id="sqlFile" name="sql_file" accept=".sql,.txt" class="hidden"
                            onchange="document.getElementById('sqlFileName').textContent = this.files[0]?.name || 'No file selected'">
                 </label>
-
                 <button type="submit"
                     class="w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90 active:scale-95"
                     style="background:linear-gradient(135deg,#f59e0b,#d97706)">
@@ -180,7 +188,7 @@
         </div>
     </div>
 
-    {{-- ── UPDATE CARD ─────────────────────────────────────────── --}}
+    {{-- UPDATE CARD --}}
     <div class="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-5 border-b border-slate-50">
             <div class="flex items-center gap-3">
@@ -198,20 +206,24 @@
             <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 mb-5">
                 <div class="text-xs font-bold text-indigo-700 mb-1">Update kaise kaam karta hai:</div>
                 <ul class="text-xs text-indigo-600 space-y-1">
-                    <li class="flex items-center gap-2"><i class="fas fa-shield-halved text-indigo-500 text-[10px]"></i> .env kabhi overwrite nahi hoga</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-shield-halved text-indigo-500 text-[10px]"></i> storage/ folder safe rahega</li>
-                    <li class="flex items-center gap-2"><i class="fas fa-bolt text-indigo-500 text-[10px]"></i> Cache auto-clear ho jayega</li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-shield-halved text-indigo-500 text-[10px]"></i> .env kabhi overwrite nahi hoga
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-shield-halved text-indigo-500 text-[10px]"></i> storage/ folder safe rahega
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-bolt text-indigo-500 text-[10px]"></i> Cache auto-clear ho jayega
+                    </li>
                 </ul>
             </div>
-
             <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 mb-4 text-xs text-slate-500">
                 <strong class="text-slate-700">ZIP banane ke liye:</strong> Local PC par<br>
-                <code class="text-indigo-600">.\make_deploy_zips.ps1</code> run karo →<br>
+                <code class="text-indigo-600">.\make_deploy_zips.ps1</code> run karo<br>
                 <span class="text-emerald-600">invoflow-app_*.zip</span> upload karo yahan
             </div>
-
             <form method="POST" action="{{ route('system.update.apply') }}" enctype="multipart/form-data"
-                  onsubmit="this.querySelector('button').innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.querySelector('button').disabled=true">
+                  id="updateForm">
                 @csrf
                 <label class="block mb-3">
                     <div class="text-xs font-bold text-slate-600 mb-2">invoflow-app ZIP Select Karo:</div>
@@ -224,8 +236,7 @@
                     <input type="file" id="zipFile" name="update_zip" accept=".zip" class="hidden"
                            onchange="document.getElementById('zipFileName').textContent = this.files[0]?.name || 'No file selected'">
                 </label>
-
-                <button type="submit"
+                <button type="submit" id="updateBtn"
                     class="w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90 active:scale-95"
                     style="background:linear-gradient(135deg,#6366f1,#4f46e5)">
                     <i class="fas fa-rocket"></i>
@@ -237,7 +248,7 @@
 
 </div>
 
-{{-- ── CACHE MANAGEMENT ─────────────────────────────────────── --}}
+{{-- CACHE MANAGEMENT --}}
 <div class="mt-6 rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
     <div class="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -250,7 +261,6 @@
                 <div class="text-xs text-slate-400">Update ke baad ya koi issue ho to cache clear karo</div>
             </div>
         </div>
-
         <form method="POST" action="{{ route('system.cache.clear') }}"
               onsubmit="return confirm('Cache clear karna chahte ho?')">
             @csrf
@@ -263,44 +273,25 @@
         </form>
     </div>
     <div class="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-        @php
-            $caches = [
-                ['Bootstrap Cache', base_path('bootstrap/cache'), '*.php', 'fas fa-cubes', '#6366f1'],
-                ['View Cache', storage_path('framework/views'), '*.php', 'fas fa-eye', '#10b981'],
-                ['Data Cache', storage_path('framework/cache/data'), '*', 'fas fa-database', '#f59e0b'],
-                ['Storage Size', storage_path(), null, 'fas fa-hdd', '#8b5cf6'],
-            ];
-        @endphp
-        @foreach($caches as [$label, $path, $glob, $icon, $color])
+        @foreach($cacheStats as $stat)
         <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
             <div class="flex items-center gap-2 mb-2">
-                <i class="{{ $icon }} text-xs" style="color:{{ $color }}"></i>
-                <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">{{ $label }}</span>
+                <i class="{{ $stat['icon'] }} text-xs" style="color:{{ $stat['color'] }}"></i>
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">{{ $stat['label'] }}</span>
             </div>
-            @if($glob)
-                @php $files = glob($path . '/' . $glob); $count = is_array($files) ? count($files) : 0; @endphp
-                <div class="text-xl font-black text-slate-800">{{ $count }}</div>
-                <div class="text-[10px] text-slate-400">cached files</div>
-            @else
-                @php
-                    $sz = 0;
-                    try {
-                        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS));
-                        foreach ($it as $f) { if ($f->isFile()) $sz += $f->getSize(); }
-                    } catch (\Exception $e) {}
-                @endphp
-                <div class="text-xl font-black text-slate-800">
-                    @if($sz > 1048576){{ round($sz/1048576,1) }} MB@else{{ round($sz/1024,0) }} KB@endif
-                </div>
-                <div class="text-[10px] text-slate-400">total size</div>
-            @endif
+            <div class="text-xl font-black text-slate-800">{{ $stat['count'] }}</div>
+            <div class="text-[10px] text-slate-400">{{ $stat['unit'] }}</div>
         </div>
         @endforeach
     </div>
 </div>
 
-<style>
-    .flash-success, .flash-error { display: none; }
-</style>
+<script>
+document.getElementById('updateForm').addEventListener('submit', function() {
+    var btn = document.getElementById('updateBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';
+    btn.disabled = true;
+});
+</script>
 
 @endsection

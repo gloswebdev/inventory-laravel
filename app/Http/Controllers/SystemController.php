@@ -39,7 +39,41 @@ class SystemController extends Controller
         $storagePath = storage_path();
         $storageSize = $this->dirSize($storagePath);
 
-        return view('system.index', compact('version', 'dbSizeBytes', 'tableCount', 'storageSize'));
+        // Cache stats
+        $cacheStats = [
+            [
+                'label' => 'Bootstrap Cache',
+                'icon'  => 'fas fa-cubes',
+                'color' => '#6366f1',
+                'count' => count(glob(base_path('bootstrap/cache/*.php')) ?: []),
+                'unit'  => 'cached files',
+            ],
+            [
+                'label' => 'View Cache',
+                'icon'  => 'fas fa-eye',
+                'color' => '#10b981',
+                'count' => count(glob(storage_path('framework/views/*.php')) ?: []),
+                'unit'  => 'cached files',
+            ],
+            [
+                'label' => 'Data Cache',
+                'icon'  => 'fas fa-database',
+                'color' => '#f59e0b',
+                'count' => count(glob(storage_path('framework/cache/data/*')) ?: []),
+                'unit'  => 'cached files',
+            ],
+            [
+                'label' => 'Storage Size',
+                'icon'  => 'fas fa-hdd',
+                'color' => '#8b5cf6',
+                'count' => $storageSize > 1048576
+                    ? round($storageSize / 1048576, 1) . ' MB'
+                    : round($storageSize / 1024, 0) . ' KB',
+                'unit'  => 'total size',
+            ],
+        ];
+
+        return view('system.index', compact('version', 'dbSizeBytes', 'tableCount', 'storageSize', 'cacheStats'));
     }
 
     /**
