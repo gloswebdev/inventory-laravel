@@ -169,4 +169,15 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::post('/planning/export', [App\Http\Controllers\MobileController::class, 'exportPlanning'])->name('mobile.planning.pdf');
 });
 
+// System Management (Admin Only)
+use App\Http\Controllers\SystemController;
+Route::middleware(['auth'])->group(function () {
+    Route::get('/system',                [SystemController::class, 'index'])->name('system.index');
+    Route::get('/system/backup/download',[SystemController::class, 'backupDownload'])->name('system.backup.download');
+    Route::post('/system/restore',       [SystemController::class, 'restoreUpload'])->name('system.restore.upload');
+    Route::post('/system/update',        [SystemController::class, 'applyUpdate'])->name('system.update.apply');
+    Route::post('/system/cache/clear',   [SystemController::class, 'clearCache'])->name('system.cache.clear');
+});
+
 require __DIR__.'/auth.php';
+

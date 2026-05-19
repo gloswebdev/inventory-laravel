@@ -305,6 +305,16 @@
             </a>
             @endif
 
+            @if(Auth::user()->role === 'admin')
+            <a href="{{ route('system.index') }}" class="nav-link {{ request()->routeIs('system.*') ? 'active' : '' }}">
+                <i class="fas fa-server nav-icon"></i>
+                <span>System</span>
+                <span class="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-md"
+                      style="background:rgba(99,102,241,0.2);color:#a5b4fc">ADMIN</span>
+            </a>
+            @endif
+
+
         </nav>
 
         {{-- Logout --}}
