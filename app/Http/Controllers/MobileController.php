@@ -964,11 +964,14 @@ class MobileController extends Controller implements HasMiddleware
                 $branch  = \App\Models\AppSetting::get('inventory_api_branch', 'ALL');
                 $item    = \App\Models\AppSetting::get('inventory_api_item', 'ALL');
 
-                $response = Http::timeout(30)->post("{$baseUrl}/ProductWiseInventory", [
-                    "apikey" => $apiKey,
-                    "Branch" => $branch,
-                    "Item"   => $item,
-                ]);
+                $response = Http::withoutVerifying()
+                    ->timeout(60)
+                    ->connectTimeout(15)
+                    ->post("{$baseUrl}/ProductWiseInventory", [
+                        "apikey" => $apiKey,
+                        "Branch" => $branch,
+                        "Item"   => $item,
+                    ]);
 
                 if ($response->successful()) {
                     $data = $response->json();
@@ -982,6 +985,7 @@ class MobileController extends Controller implements HasMiddleware
                         return $stockMap;
                     }
                 }
+                Log::warning('Mobile External Stock API bad/empty response', ['status' => $response->status()]);
             } catch (\Exception $e) {
                 Log::error('External Stock API Error (Mobile): ' . $e->getMessage());
             }

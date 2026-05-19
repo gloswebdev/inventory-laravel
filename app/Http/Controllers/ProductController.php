@@ -103,11 +103,14 @@ class ProductController extends Controller
                 $branch   = AppSetting::get('factory_stock_branch', '2');
                 $item     = AppSetting::get('inventory_api_item', 'ALL');
 
-                $response = Http::timeout(30)->post("{$baseUrl}/ProductWiseInventory", [
-                    'apikey' => $apiKey,
-                    'Branch' => $branch,
-                    'Item'   => $item,
-                ]);
+                $response = Http::withoutVerifying()
+                    ->timeout(60)
+                    ->connectTimeout(15)
+                    ->post("{$baseUrl}/ProductWiseInventory", [
+                        'apikey' => $apiKey,
+                        'Branch' => $branch,
+                        'Item'   => $item,
+                    ]);
 
                 if ($response->successful()) {
                     $data = $response->json();

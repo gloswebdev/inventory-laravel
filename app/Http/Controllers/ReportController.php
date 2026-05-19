@@ -246,11 +246,18 @@ class ReportController extends Controller
                 $branch  = AppSetting::get('inventory_api_branch', 'ALL');
                 $item    = AppSetting::get('inventory_api_item', 'ALL');
 
-                $response = Http::timeout(30)->post("{$baseUrl}/ProductWiseInventory", [
-                    "apikey" => $apiKey,
-                    "Branch" => $branch,
-                    "Item"   => $item,
-                ]);
+                Log::info('External Stock API Call', ['url' => $baseUrl, 'branch' => $branch]);
+
+                $response = Http::withoutVerifying()
+                    ->timeout(60)
+                    ->connectTimeout(15)
+                    ->post("{$baseUrl}/ProductWiseInventory", [
+                        "apikey" => $apiKey,
+                        "Branch" => $branch,
+                        "Item"   => $item,
+                    ]);
+
+                Log::info('External Stock API Response', ['status' => $response->status()]);
 
                 if ($response->successful()) {
                     $data = $response->json();
@@ -261,11 +268,18 @@ class ReportController extends Controller
                             $iCode = $item['User_Code'];
                             $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
                         }
+                        Log::info('External Stock loaded', ['items' => count($stockMap)]);
                         return $stockMap;
                     }
+                    Log::warning('External Stock API bad response', ['body' => $response->body()]);
+                } else {
+                    Log::error('External Stock API HTTP Error', ['status' => $response->status(), 'body' => $response->body()]);
                 }
             } catch (\Exception $e) {
-                Log::error('External Stock API Error (Desktop): ' . $e->getMessage());
+                Log::error('External Stock API Exception: ' . $e->getMessage(), [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
             }
             return [];
         });
