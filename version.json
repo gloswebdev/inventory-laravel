@@ -1,0 +1,17 @@
+{
+    "version": "1.0.0",
+    "release_date": "2026-05-19",
+    "codename": "Initial Release",
+    "changelog": [
+        "Initial production deployment",
+        "Product Master with sync support",
+        "Recipe & Production management",
+        "Indent Manager (Bulk Entry + Process)",
+        "MRP Production Planning",
+        "Reports: Stock Ledger & Live Stock",
+        "Mobile PWA interface",
+        "User Management & Permissions"
+    ],
+    "min_php": "8.2",
+    "requires_migration": false
+}
