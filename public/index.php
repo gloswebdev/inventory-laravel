@@ -7,7 +7,7 @@ define('LARAVEL_START', microtime(true));
 
 // ─── App Root Path ────────────────────────────────────────────────────────────
 // Standard Laravel: public/index.php → app root is one level up
-$appRoot = dirname(__DIR__) . '/invoflow';
+$appRoot = dirname(__DIR__);
 
 // Determine if the application is in maintenance mode...
 if (file_exists($maintenance = $appRoot . '/storage/framework/maintenance.php')) {
