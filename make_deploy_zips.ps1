@@ -1,8 +1,8 @@
 # InvoFlow - Hostinger Deploy ZIP Creator
-# Run: powershell -ExecutionPolicy Bypass -File make_deploy_zips.ps1
-# Usage: .\make_deploy_zips.ps1              (patch version auto)
-#        .\make_deploy_zips.ps1 -BumpType minor  (1.0.0 → 1.1.0)
-#        .\make_deploy_zips.ps1 -BumpType major  (1.0.0 → 2.0.0)
+# Run:   powershell -ExecutionPolicy Bypass -File make_deploy_zips.ps1
+# Usage: .\make_deploy_zips.ps1                  (patch bump: 1.0.0 -> 1.0.1)
+#        .\make_deploy_zips.ps1 -BumpType minor   (minor bump: 1.0.0 -> 1.1.0)
+#        .\make_deploy_zips.ps1 -BumpType major   (major bump: 1.0.0 -> 2.0.0)
 
 param(
     [ValidateSet('patch','minor','major')]
@@ -28,26 +28,26 @@ Write-Host "  InvoFlow - Hostinger ZIP Maker" -ForegroundColor Magenta
 Write-Host "  ================================" -ForegroundColor Magenta
 Write-Host ""
 
-# ── VERSION BUMP ──────────────────────────────────────────────────────────────
+# -- VERSION BUMP -------------------------------------------------------------
 $versionFile = Join-Path $projectRoot "version.json"
+$newVer = "unknown"
 if (Test-Path $versionFile) {
     $verData = Get-Content $versionFile -Raw | ConvertFrom-Json
     $parts   = $verData.version -split '\.'
-    $major   = [int]$parts[0]; $minor = [int]$parts[1]; $patch = [int]$parts[2]
-    switch ($BumpType) {
-        'major' { $major++; $minor = 0; $patch = 0 }
-        'minor' { $minor++; $patch = 0 }
-        'patch' { $patch++ }
-    }
+    $major   = [int]$parts[0]
+    $minor   = [int]$parts[1]
+    $patch   = [int]$parts[2]
+    if ($BumpType -eq 'major') { $major++; $minor = 0; $patch = 0 }
+    elseif ($BumpType -eq 'minor') { $minor++; $patch = 0 }
+    else { $patch++ }
     $oldVer = $verData.version
     $newVer = "$major.$minor.$patch"
     $verData.version      = $newVer
     $verData.release_date = (Get-Date -Format 'yyyy-MM-dd')
     $verData | ConvertTo-Json -Depth 5 | Set-Content $versionFile -Encoding UTF8
-    ok ("Version bumped: v$oldVer → v$newVer ($BumpType)")
+    ok ("Version bumped: v$oldVer -> v$newVer ($BumpType)")
 } else {
-    warn "version.json nahi mila — version bump skipped"
-    $newVer = "unknown"
+    warn "version.json nahi mila -- version bump skipped"
 }
 Write-Host ""
 
@@ -79,13 +79,17 @@ $tempPub = Join-Path $env:TEMP "invoflow_public_temp"
 if (Test-Path $tempPub) { Remove-Item $tempPub -Recurse -Force }
 Copy-Item (Join-Path $projectRoot "public") $tempPub -Recurse
 
-# Remove installer.php (security) but KEEP updater.php for update workflow
+# Remove installer.php (security), keep updater.php
 $installerTemp = Join-Path $tempPub "installer.php"
-if (Test-Path $installerTemp) { Remove-Item $installerTemp -Force; info "installer.php removed from public zip" }
+if (Test-Path $installerTemp) {
+    Remove-Item $installerTemp -Force
+    info "installer.php removed from public zip (security)"
+}
 
-# updater.php included — upload to public_html and use, then delete
 $updaterTemp = Join-Path $tempPub "updater.php"
-if (Test-Path $updaterTemp) { ok "updater.php included in public zip (use after upload, then delete!)" }
+if (Test-Path $updaterTemp) {
+    ok "updater.php included in public zip (delete from server after use!)"
+}
 
 info "Compressing public/ ..."
 Compress-Archive -Path ($tempPub + "\*") -DestinationPath $publicZip -CompressionLevel Optimal
@@ -155,10 +159,13 @@ if (Test-Path $vendorPath) {
     warn "vendor/ not found! Run: composer install --no-dev --optimize-autoloader"
 }
 
+$verCheck = Join-Path $tempApp "version.json"
+ok "version.json included in app ZIP (v$newVer)"
+
 # Summary
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Green
-Write-Host ("  ZIP FILES READY! v" + $newVer) -ForegroundColor Green
+Write-Host ("  ZIP FILES READY!  v" + $newVer) -ForegroundColor Green
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host ("  [APP]    invoflow-app_" + $timestamp + ".zip") -ForegroundColor White
@@ -167,22 +174,19 @@ Write-Host ""
 Write-Host ("  [PUBLIC] invoflow-public_" + $timestamp + ".zip") -ForegroundColor White
 Write-Host "           Upload to: ~/public_html/ on Hostinger" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  ── FRESH INSTALL (pehli baar) ──" -ForegroundColor Yellow
-Write-Host "  1. invoflow-app zip → ~/invoflow/ upload karke extract karo" -ForegroundColor Gray
-Write-Host "  2. invoflow-public zip → ~/public_html/ upload karke extract karo" -ForegroundColor Gray
+Write-Host "  --- FRESH INSTALL (pehli baar) ---" -ForegroundColor Yellow
+Write-Host "  1. invoflow-app zip -> ~/invoflow/ upload & extract" -ForegroundColor Gray
+Write-Host "  2. invoflow-public zip -> ~/public_html/ upload & extract" -ForegroundColor Gray
 Write-Host "  3. ~/invoflow/.env banao (HOSTINGER_DEPLOY_GUIDE.md STEP 6 dekho)" -ForegroundColor Gray
-Write-Host "  4. inventory_laravel_db.sql → phpMyAdmin se import karo" -ForegroundColor Gray
+Write-Host "  4. inventory_laravel_db.sql -> phpMyAdmin se import karo" -ForegroundColor Gray
 Write-Host "  5. Browser: yourdomain.com/installer.php?token=invoflow2024" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  ── VERSION UPDATE (already deployed hai) ──" -ForegroundColor Cyan
-Write-Host "  1. invoflow-app zip → ~/invoflow/ mein extract karo (overwrite)" -ForegroundColor Gray
-Write-Host "  2. invoflow-public zip → ~/public_html/ mein extract karo (overwrite)" -ForegroundColor Gray
+Write-Host "  --- VERSION UPDATE (already deployed) ---" -ForegroundColor Cyan
+Write-Host "  1. invoflow-app zip -> ~/invoflow/ extract (overwrite)" -ForegroundColor Gray
+Write-Host "  2. invoflow-public zip -> ~/public_html/ extract (overwrite)" -ForegroundColor Gray
 Write-Host "  3. Browser: yourdomain.com/updater.php?token=invoflow_update_2024" -ForegroundColor Gray
-Write-Host "     → Step 1: (skip - already extracted)" -ForegroundColor Gray
-Write-Host "     → Step 2: Run Migrations (if required)" -ForegroundColor Gray
-Write-Host "     → Step 3: Clear & Rebuild Cache" -ForegroundColor Gray
-Write-Host "     → Step 4: Save version.json (v$newVer)" -ForegroundColor Gray
-Write-Host "     → DELETE updater.php after done!" -ForegroundColor Gray
+Write-Host ("     -> Run Migrations (if required) -> Optimize Cache -> Save v" + $newVer) -ForegroundColor Gray
+Write-Host "     -> DELETE updater.php after done!" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  NOTE: updater.php public zip mein hai - use ke baad DELETE karo!" -ForegroundColor Yellow
 Write-Host ""
