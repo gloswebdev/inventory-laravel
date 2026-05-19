@@ -1362,13 +1362,18 @@ class MobileController extends Controller implements HasMiddleware
         ]);
 
         try {
-            \App\Models\User::create([
-                'name' => $request->name,
-                'username' => $request->username,
-                'role' => $request->role,
+            $user = \App\Models\User::create([
+                'name'           => $request->name,
+                'username'       => $request->username,
+                'role'           => $request->role,
                 'interface_type' => $request->interface_type,
-                'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+                'password'       => \Illuminate\Support\Facades\Hash::make($request->password),
             ]);
+
+            // Assign location/branch access if provided at creation
+            if ($request->has('branches') && is_array($request->branches) && count($request->branches) > 0) {
+                $user->branches()->sync($request->branches);
+            }
 
             return response()->json(['success' => true, 'message' => 'User created successfully!']);
         } catch (\Exception $e) {

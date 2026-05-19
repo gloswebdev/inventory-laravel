@@ -67,6 +67,24 @@
                     </select>
                 </div>
                 <input type="password" x-model="form.password" placeholder="Password (Min 4 chars)" class="w-full bg-white/60 backdrop-blur-md border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-700">
+
+                <!-- Branch / Location Access -->
+                <div class="space-y-3">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Location Access</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach($branches as $branch)
+                        <label class="flex items-center gap-3 p-3 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all cursor-pointer"
+                               :class="form.branches.includes({{ $branch->id }}) ? 'border-indigo-500 bg-white shadow-sm' : 'border-slate-100'">
+                            <input type="checkbox" value="{{ $branch->id }}" x-model="form.branches" class="hidden">
+                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0"
+                                 :class="form.branches.includes({{ $branch->id }}) ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'">
+                                <i class="fas fa-check text-[7px] text-white"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ $branch->name }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
             </div>
             <button @click="saveUser" class="w-full grad-indigo p-5 rounded-2xl text-white font-900 uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">Create User</button>
         </div>
@@ -146,7 +164,8 @@ function usersApp() {
             username: '',
             role: 'user',
             interface_type: 'mobile',
-            password: ''
+            password: '',
+            branches: []
         },
         permForm: {
             branches: [],
@@ -163,14 +182,23 @@ function usersApp() {
             });
         },
         async saveUser() {
+            if (!this.form.name || !this.form.username || !this.form.password) {
+                alert('Please fill all required fields.');
+                return;
+            }
             const res = await fetch('{{ route('mobile.users.store') }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                 body: JSON.stringify(this.form)
             });
             const data = await res.json();
-            if (data.success) window.location.reload();
-            else alert(data.message);
+            if (data.success) {
+                this.showAddUser = false;
+                this.form = { name: '', username: '', role: 'user', interface_type: 'mobile', password: '', branches: [] };
+                window.location.reload();
+            } else {
+                alert(data.message);
+            }
         },
         editUser(user) {
             this.currentUser = user;
