@@ -26,9 +26,16 @@ class SystemController extends Controller
         $this->adminOnly();
 
         $versionFile = base_path('version.json');
-        $version = file_exists($versionFile)
-            ? json_decode(file_get_contents($versionFile), true)
-            : ['version' => 'unknown', 'release_date' => '—', 'codename' => '—', 'changelog' => []];
+        $version     = ['version' => '?', 'release_date' => '?', 'codename' => '?', 'changelog' => []];
+        if (file_exists($versionFile)) {
+            $raw     = file_get_contents($versionFile);
+            $raw     = preg_replace('/^\xEF\xBB\xBF/', '', $raw); // strip BOM
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $version = $decoded;
+            }
+        }
+
 
         // DB stats
         $tables = DB::select('SHOW TABLE STATUS');
