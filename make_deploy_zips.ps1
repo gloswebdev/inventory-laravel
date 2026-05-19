@@ -1,5 +1,13 @@
 # InvoFlow - Hostinger Deploy ZIP Creator
 # Run: powershell -ExecutionPolicy Bypass -File make_deploy_zips.ps1
+# Usage: .\make_deploy_zips.ps1              (patch version auto)
+#        .\make_deploy_zips.ps1 -BumpType minor  (1.0.0 → 1.1.0)
+#        .\make_deploy_zips.ps1 -BumpType major  (1.0.0 → 2.0.0)
+
+param(
+    [ValidateSet('patch','minor','major')]
+    [string]$BumpType = 'patch'
+)
 
 $projectRoot = $PSScriptRoot
 $timestamp   = Get-Date -Format "yyyyMMdd_HHmm"
@@ -18,6 +26,29 @@ function step($msg) {
 Write-Host ""
 Write-Host "  InvoFlow - Hostinger ZIP Maker" -ForegroundColor Magenta
 Write-Host "  ================================" -ForegroundColor Magenta
+Write-Host ""
+
+# ── VERSION BUMP ──────────────────────────────────────────────────────────────
+$versionFile = Join-Path $projectRoot "version.json"
+if (Test-Path $versionFile) {
+    $verData = Get-Content $versionFile -Raw | ConvertFrom-Json
+    $parts   = $verData.version -split '\.'
+    $major   = [int]$parts[0]; $minor = [int]$parts[1]; $patch = [int]$parts[2]
+    switch ($BumpType) {
+        'major' { $major++; $minor = 0; $patch = 0 }
+        'minor' { $minor++; $patch = 0 }
+        'patch' { $patch++ }
+    }
+    $oldVer = $verData.version
+    $newVer = "$major.$minor.$patch"
+    $verData.version      = $newVer
+    $verData.release_date = (Get-Date -Format 'yyyy-MM-dd')
+    $verData | ConvertTo-Json -Depth 5 | Set-Content $versionFile -Encoding UTF8
+    ok ("Version bumped: v$oldVer → v$newVer ($BumpType)")
+} else {
+    warn "version.json nahi mila — version bump skipped"
+    $newVer = "unknown"
+}
 Write-Host ""
 
 # STEP 1: Patch index.php for Hostinger
@@ -48,8 +79,13 @@ $tempPub = Join-Path $env:TEMP "invoflow_public_temp"
 if (Test-Path $tempPub) { Remove-Item $tempPub -Recurse -Force }
 Copy-Item (Join-Path $projectRoot "public") $tempPub -Recurse
 
+# Remove installer.php (security) but KEEP updater.php for update workflow
 $installerTemp = Join-Path $tempPub "installer.php"
-if (Test-Path $installerTemp) { Remove-Item $installerTemp -Force }
+if (Test-Path $installerTemp) { Remove-Item $installerTemp -Force; info "installer.php removed from public zip" }
+
+# updater.php included — upload to public_html and use, then delete
+$updaterTemp = Join-Path $tempPub "updater.php"
+if (Test-Path $updaterTemp) { ok "updater.php included in public zip (use after upload, then delete!)" }
 
 info "Compressing public/ ..."
 Compress-Archive -Path ($tempPub + "\*") -DestinationPath $publicZip -CompressionLevel Optimal
@@ -122,7 +158,7 @@ if (Test-Path $vendorPath) {
 # Summary
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Green
-Write-Host "  ZIP FILES READY!" -ForegroundColor Green
+Write-Host ("  ZIP FILES READY! v" + $newVer) -ForegroundColor Green
 Write-Host "  ============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host ("  [APP]    invoflow-app_" + $timestamp + ".zip") -ForegroundColor White
@@ -131,13 +167,22 @@ Write-Host ""
 Write-Host ("  [PUBLIC] invoflow-public_" + $timestamp + ".zip") -ForegroundColor White
 Write-Host "           Upload to: ~/public_html/ on Hostinger" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  NEXT STEPS:" -ForegroundColor Yellow
-Write-Host "  1. Upload invoflow-app zip to ~/invoflow/ and Extract" -ForegroundColor Gray
-Write-Host "  2. Upload invoflow-public zip to ~/public_html/ and Extract" -ForegroundColor Gray
-Write-Host "  3. Create .env in ~/invoflow/ (see HOSTINGER_DEPLOY_GUIDE.md STEP 6)" -ForegroundColor Gray
-Write-Host "  4. Import inventory_laravel_db.sql via phpMyAdmin" -ForegroundColor Gray
-Write-Host "  5. SSH: cd ~/invoflow then bash deploy.sh" -ForegroundColor Gray
-Write-Host "  6. OR browser: https://yourdomain.com/installer.php?token=invoflow2024" -ForegroundColor Gray
+Write-Host "  ── FRESH INSTALL (pehli baar) ──" -ForegroundColor Yellow
+Write-Host "  1. invoflow-app zip → ~/invoflow/ upload karke extract karo" -ForegroundColor Gray
+Write-Host "  2. invoflow-public zip → ~/public_html/ upload karke extract karo" -ForegroundColor Gray
+Write-Host "  3. ~/invoflow/.env banao (HOSTINGER_DEPLOY_GUIDE.md STEP 6 dekho)" -ForegroundColor Gray
+Write-Host "  4. inventory_laravel_db.sql → phpMyAdmin se import karo" -ForegroundColor Gray
+Write-Host "  5. Browser: yourdomain.com/installer.php?token=invoflow2024" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  NOTE: installer.php is inside public zip - delete after use!" -ForegroundColor Yellow
+Write-Host "  ── VERSION UPDATE (already deployed hai) ──" -ForegroundColor Cyan
+Write-Host "  1. invoflow-app zip → ~/invoflow/ mein extract karo (overwrite)" -ForegroundColor Gray
+Write-Host "  2. invoflow-public zip → ~/public_html/ mein extract karo (overwrite)" -ForegroundColor Gray
+Write-Host "  3. Browser: yourdomain.com/updater.php?token=invoflow_update_2024" -ForegroundColor Gray
+Write-Host "     → Step 1: (skip - already extracted)" -ForegroundColor Gray
+Write-Host "     → Step 2: Run Migrations (if required)" -ForegroundColor Gray
+Write-Host "     → Step 3: Clear & Rebuild Cache" -ForegroundColor Gray
+Write-Host "     → Step 4: Save version.json (v$newVer)" -ForegroundColor Gray
+Write-Host "     → DELETE updater.php after done!" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  NOTE: updater.php public zip mein hai - use ke baad DELETE karo!" -ForegroundColor Yellow
 Write-Host ""
