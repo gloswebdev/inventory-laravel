@@ -98,8 +98,9 @@
                     'mobile_recipes' => ['bg' => 'bg-amber-500', 'text' => 'text-white', 'shadow' => 'shadow-amber-200'],
                     'mobile_adjustments' => ['bg' => 'bg-orange-500', 'text' => 'text-white', 'shadow' => 'shadow-orange-200'],
                     'mobile_ledger' => ['bg' => 'bg-rose-600', 'text' => 'text-white', 'shadow' => 'shadow-rose-200'],
-                    'mobile_users' => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
-                    'mobile_settings' => ['bg' => 'bg-slate-800', 'text' => 'text-white', 'shadow' => 'shadow-slate-300'],
+                    'mobile_users'    => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
+                    'mobile_settings' => ['bg' => 'bg-slate-800',  'text' => 'text-white', 'shadow' => 'shadow-slate-300'],
+                    'mobile_costing'  => ['bg' => 'bg-yellow-500', 'text' => 'text-white', 'shadow' => 'shadow-yellow-200'],
                 ];
             @endphp
 

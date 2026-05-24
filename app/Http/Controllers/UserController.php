@@ -33,8 +33,10 @@ class UserController extends Controller
         'mobile_adjustments' => 'Mobile: Stock Adjustments',
         'mobile_ledger' => 'Mobile: Stock Ledger',
         'mobile_products' => 'Mobile: Product Master',
-        'mobile_users' => 'Mobile: User Manager',
+        'mobile_users'  => 'Mobile: User Manager',
         'mobile_settings' => 'Mobile: System Settings',
+        'costing'       => 'Costing Manager',
+        'mobile_costing' => 'Mobile: Costing',
     ];
 
     /**
@@ -113,7 +115,15 @@ class UserController extends Controller
         ],
         'mobile_settings' => [
             'management' => 'Branch Mapping Management'
-        ]
+        ],
+        'costing' => [
+            'fetch_prices' => 'Sync Prices from ERP/Product Master',
+            'export'       => 'Export Cost Report (PDF)',
+        ],
+        'mobile_costing' => [
+            'calculate' => 'Calculate Batch Cost',
+            'export'    => 'Export Cost PDF',
+        ],
     ];
 
     public function index(Request $request)

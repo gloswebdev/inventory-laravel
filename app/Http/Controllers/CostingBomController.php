@@ -2,21 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Recipe;
-use App\Models\RecipeItem;
+use App\Models\CostingBom;
+use App\Models\CostingBomItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
-class RecipeController extends Controller
+class CostingBomController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Recipe::with(['finishedProduct.type', 'items.rawMaterial']);
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            abort(403, 'Access denied to Costing BOM module.');
+        }
 
-        // Apply Access Control
+        $query = CostingBom::with(['finishedProduct.type', 'items.rawMaterial']);
         $user = Auth::user();
+
+        // Apply access control (similar to Recipe Master)
         if ($user->role !== 'admin') {
             $permittedTypeIds = $user->getPermittedProductTypeIds();
             $permittedRMTypes = $user->getPermittedRMTypes();
@@ -31,14 +35,15 @@ class RecipeController extends Controller
             });
         }
 
-        if ($request->has('search') && $request->search != '') {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->whereHas('finishedProduct', function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('item_code', 'like', "%{$search}%");
             });
         }
 
-        if ($request->has('type_id') && $request->type_id != '') {
+        if ($request->filled('type_id')) {
             $query->whereHas('finishedProduct', function($q) use ($request) {
                 $q->where('product_type_id', $request->type_id);
             });
@@ -46,15 +51,15 @@ class RecipeController extends Controller
 
         $perPage = $request->get('per_page', 20);
         if ($perPage === 'all') {
-            $recipes = $query->orderByDesc('created_at')->get();
+            $boms = $query->orderByDesc('created_at')->get();
         } else {
-            $recipes = $query->orderByDesc('created_at')->paginate($perPage)->withQueryString();
+            $boms = $query->orderByDesc('created_at')->paginate($perPage)->withQueryString();
         }
-        
+
         $fgQuery = Product::orderBy('name');
         $rmQuery = Product::orderBy('name');
         $typesQuery = \App\Models\ProductType::orderBy('type_name');
-        
+
         if ($user->role !== 'admin') {
             $this->applyTypeFilters($fgQuery);
             $this->applyTypeFilters($rmQuery);
@@ -63,64 +68,21 @@ class RecipeController extends Controller
             $typesQuery->whereIn('id', $permittedTypeIds);
         }
 
-        $finishedGoods = $fgQuery->get();
-        $rawMaterials = $rmQuery->get();
+        $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
+        $rawMaterials = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
         $types = $typesQuery->get();
 
-        return view('recipes.index', compact('recipes', 'finishedGoods', 'rawMaterials', 'types'));
-    }
-
-    public function bulkDelete(Request $request)
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:recipes,id'
-        ]);
-
-        DB::transaction(function () use ($request) {
-            Recipe::whereIn('id', $request->ids)->delete();
-        });
-
-        return response()->json(['success' => true]);
-    }
-
-    public function update(Request $request, Recipe $recipe)
-    {
-        $validated = $request->validate([
-            'finished_product_id' => 'required|exists:products,id|unique:recipes,finished_product_id,' . $recipe->id,
-            'yield_quantity' => 'required|numeric|min:0.001',
-            'yield_uom' => 'required|string|max:50',
-            'items' => 'required|array|min:1',
-            'items.*.raw_material_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|numeric|min:0.001',
-        ]);
-
-        DB::transaction(function () use ($recipe, $validated) {
-            $recipe->update([
-                'finished_product_id' => $validated['finished_product_id'],
-                'yield_quantity'      => $validated['yield_quantity'],
-                'yield_uom'           => $validated['yield_uom'],
-            ]);
-            $recipe->items()->delete();
-            foreach ($validated['items'] as $item) {
-                RecipeItem::create([
-                    'recipe_id'       => $recipe->id,
-                    'raw_material_id' => $item['raw_material_id'],
-                    'quantity'        => $item['quantity'],
-                ]);
-            }
-        });
-
-        if (request()->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Recipe updated successfully.']);
-        }
-        return redirect()->route('recipes.index')->with('success', 'Recipe updated successfully.');
+        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types'));
     }
 
     public function store(Request $request)
     {
+        if (!Auth::user()->hasPermission('costing', 'create')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
         $validated = $request->validate([
-            'finished_product_id' => 'required|exists:products,id|unique:recipes,finished_product_id',
+            'finished_product_id' => 'required|exists:products,id|unique:costing_boms,finished_product_id',
             'yield_quantity' => 'required|numeric|min:0.001',
             'yield_uom' => 'required|string|max:50',
             'items' => 'required|array|min:1',
@@ -129,15 +91,15 @@ class RecipeController extends Controller
         ]);
 
         DB::transaction(function () use ($validated) {
-            $recipe = Recipe::create([
+            $bom = CostingBom::create([
                 'finished_product_id' => $validated['finished_product_id'],
                 'yield_quantity'      => $validated['yield_quantity'],
                 'yield_uom'           => $validated['yield_uom'],
             ]);
 
             foreach ($validated['items'] as $item) {
-                RecipeItem::create([
-                    'recipe_id'       => $recipe->id,
+                CostingBomItem::create([
+                    'costing_bom_id'  => $bom->id,
                     'raw_material_id' => $item['raw_material_id'],
                     'quantity'        => $item['quantity'],
                 ]);
@@ -145,41 +107,89 @@ class RecipeController extends Controller
         });
 
         if (request()->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Recipe created successfully.']);
+            return response()->json(['success' => true, 'message' => 'Costing BOM created successfully.']);
         }
-        return redirect()->route('recipes.index')->with('success', 'Recipe created successfully.');
+        return redirect()->route('costing.boms.index')->with('success', 'Costing BOM created successfully.');
     }
 
+    public function update(Request $request, CostingBom $costingBom)
+    {
+        if (!Auth::user()->hasPermission('costing', 'edit')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'finished_product_id' => 'required|exists:products,id|unique:costing_boms,finished_product_id,' . $costingBom->id,
+            'yield_quantity' => 'required|numeric|min:0.001',
+            'yield_uom' => 'required|string|max:50',
+            'items' => 'required|array|min:1',
+            'items.*.raw_material_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.001',
+        ]);
+
+        DB::transaction(function () use ($costingBom, $validated) {
+            $costingBom->update([
+                'finished_product_id' => $validated['finished_product_id'],
+                'yield_quantity'      => $validated['yield_quantity'],
+                'yield_uom'           => $validated['yield_uom'],
+            ]);
+
+            $costingBom->items()->delete();
+
+            foreach ($validated['items'] as $item) {
+                CostingBomItem::create([
+                    'costing_bom_id'  => $costingBom->id,
+                    'raw_material_id' => $item['raw_material_id'],
+                    'quantity'        => $item['quantity'],
+                ]);
+            }
+        });
+
+        if (request()->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Costing BOM updated successfully.']);
+        }
+        return redirect()->route('costing.boms.index')->with('success', 'Costing BOM updated successfully.');
+    }
+
+    public function destroy(CostingBom $costingBom)
+    {
+        if (!Auth::user()->hasPermission('costing', 'delete')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $costingBom->delete();
+
+        if (request()->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Costing BOM deleted successfully.']);
+        }
+        return redirect()->route('costing.boms.index')->with('success', 'Costing BOM deleted successfully.');
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'delete')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:costing_boms,id'
+        ]);
+
+        DB::transaction(function () use ($request) {
+            CostingBom::whereIn('id', $request->ids)->delete();
+        });
+
+        return response()->json(['success' => true, 'message' => 'Selected Costing BOMs deleted.']);
+    }
 
     public function export(Request $request)
     {
-        return (new \App\Exports\RecipesExport($request->search))->download('recipes_master.xlsx');
-    }
-
-
-    public function importTemplate()
-    {
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\RecipeTemplateExport, 'recipe_import_template.xlsx');
-    }
-
-    public function import(Request $request)
-    {
-        $request->validate([
-            'excel_file' => 'required|mimes:xlsx,csv,xls',
-        ]);
-
-        \Maatwebsite\Excel\Facades\Excel::import(new \App\Imports\RecipesImport, $request->file('excel_file'));
-
-        return redirect()->route('recipes.index')->with('success', 'Recipes imported successfully.');
-    }
-
-    public function destroy(Recipe $recipe)
-    {
-        $recipe->delete();
-        if (request()->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Recipe deleted.']);
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            abort(403);
         }
-        return redirect()->route('recipes.index')->with('success', 'Recipe deleted successfully.');
+
+        return (new \App\Exports\CostingBomsExport($request->search))->download('costing_boms.xlsx');
     }
 
     protected function applyTypeFilters($query)

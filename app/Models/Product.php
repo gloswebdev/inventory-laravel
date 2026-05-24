@@ -48,12 +48,23 @@ class Product extends Model
         return $this->hasMany(Recipe::class, 'finished_product_id');
     }
 
+    public function costingBoms()
+    {
+        return $this->hasMany(CostingBom::class, 'finished_product_id');
+    }
+
     /**
      * Get the multiplier to convert unit quantity to KG/LTR
      */
     public function getWeightMultiplierAttribute()
     {
-        $value = (float)($this->weight_unit ?: 1);
+        $val = trim($this->weight_unit ?: '');
+        $value = is_numeric($val) ? (float)$val : 1.0;
+        
+        if ($value <= 0) {
+            $value = 1.0;
+        }
+
         $unit = strtoupper($this->weight_in ?: $this->uom ?: '');
 
         // If unit is grams or ml, divide by 1000 to get KG/LTR
@@ -62,9 +73,7 @@ class Product extends Model
         }
 
         // Check if value itself looks like it's in grams/ml but labeled as KG/LTR
-        // (e.g. 1000 LTR instead of 1000 ML)
         if ($value >= 100 && (str_contains($unit, 'KG') || str_contains($unit, 'LTR') || str_contains($unit, 'LIT'))) {
-            // Heuristic: If it's 100+, it's likely grams/ml mislabeled
             return $value / 1000;
         }
 

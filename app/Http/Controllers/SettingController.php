@@ -36,6 +36,12 @@ class SettingController extends Controller
             'product_master_page_number'=> 'required|string',
             'product_master_rows'       => 'required|string',
             'product_master_txn_type'   => 'required|string',
+            // Costing API (optional — blank = auto FY)
+            'costing_api_from_date'     => 'nullable|string',
+            'costing_api_to_date'       => 'nullable|string',
+            'costing_api_account'       => 'nullable|string',
+            'costing_api_item'          => 'nullable|string',
+            'costing_api_branch'        => 'nullable|string',
         ]);
 
         $keys = [
@@ -43,10 +49,13 @@ class SettingController extends Controller
             'inventory_api_branch', 'inventory_api_item', 'factory_stock_branch',
             'product_master_itemdetcode', 'product_master_usercode', 'product_master_branchcode',
             'product_master_page_number', 'product_master_rows', 'product_master_txn_type',
+            // Costing API settings
+            'costing_api_from_date', 'costing_api_to_date',
+            'costing_api_account', 'costing_api_item', 'costing_api_branch',
         ];
 
         foreach ($keys as $key) {
-            AppSetting::set($key, $request->input($key));
+            AppSetting::set($key, $request->input($key, ''));
         }
 
         // Bust the stock cache so new settings take effect immediately

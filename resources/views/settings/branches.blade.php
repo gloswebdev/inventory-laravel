@@ -169,6 +169,94 @@
                     </div>
                 </div>
 
+                <hr class="border-slate-100">
+
+                {{-- ---- SECTION 4: Costing / Purchase Register API ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center text-xs font-black">4</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">Costing API &mdash; Purchase Register</h4>
+                        <span class="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-[8px] font-bold rounded">COSTING MODULE</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Costing → Sync Prices from ERP</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-yellow-700 text-[10px]">POST /LogicPurchaseRegisterDetail</code>
+                    </p>
+
+                    <div class="bg-yellow-50/60 border border-yellow-100 rounded-xl p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    From Date
+                                    <span class="font-normal text-gray-400 normal-case">(leave blank = auto FY start)</span>
+                                </label>
+                                <input type="text" name="costing_api_from_date"
+                                    value="{{ $settings['costing_api_from_date']->value ?? '' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition bg-white"
+                                    placeholder="e.g. 2026-04-01 (auto if blank)">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    To Date
+                                    <span class="font-normal text-gray-400 normal-case">(leave blank = auto FY end)</span>
+                                </label>
+                                <input type="text" name="costing_api_to_date"
+                                    value="{{ $settings['costing_api_to_date']->value ?? '' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition bg-white"
+                                    placeholder="e.g. 2027-03-31 (auto if blank)">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Account
+                                </label>
+                                <input type="text" name="costing_api_account"
+                                    value="{{ $settings['costing_api_account']->value ?? 'all' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition bg-white"
+                                    placeholder="all">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-yellow-100">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Item
+                                </label>
+                                <input type="text" name="costing_api_item"
+                                    value="{{ $settings['costing_api_item']->value ?? 'all' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition bg-white"
+                                    placeholder="all">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    Branch
+                                </label>
+                                <input type="text" name="costing_api_branch"
+                                    value="{{ $settings['costing_api_branch']->value ?? 'all' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition bg-white"
+                                    placeholder="all">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                    apikey
+                                    <span class="font-normal text-gray-400 normal-case">(auto from above)</span>
+                                </label>
+                                <div class="bg-white border border-dashed border-gray-200 rounded-xl py-2.5 px-4 text-xs text-gray-400 font-mono">
+                                    ••••••••••••••••••
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Info box --}}
+                        <div class="flex items-start gap-3 bg-white border border-yellow-100 rounded-xl p-3">
+                            <i class="fas fa-circle-info text-yellow-500 text-sm mt-0.5"></i>
+                            <div class="text-[11px] text-slate-500 leading-relaxed">
+                                <strong class="text-slate-700">Auto FY dates:</strong> If From/To date fields are left blank, the system automatically calculates the current Financial Year
+                                (April 1 → March 31). The <strong>latest purchase rate</strong> per item code (<code class="bg-slate-100 px-1 rounded text-yellow-700">User_Code</code> field) is picked from
+                                the <code class="bg-slate-100 px-1 rounded text-yellow-700">CaseRate</code> column.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>{{-- /p-6 --}}
         </div>{{-- /card --}}
     </form>

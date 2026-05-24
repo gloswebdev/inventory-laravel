@@ -272,6 +272,30 @@
             </div>
             @endif
 
+            @if(Auth::user()->hasPermission('costing', 'view'))
+            <div x-data="{ open: {{ (request()->routeIs('costing.index') || request()->routeIs('costing.show') || request()->routeIs('costing.boms.*')) ? 'true' : 'false' }} }">
+                <button @click="open = !open"
+                    class="nav-link w-[calc(100%-20px)] justify-between {{ (request()->routeIs('costing.index') || request()->routeIs('costing.show') || request()->routeIs('costing.boms.*')) ? 'active' : '' }}">
+                    <div class="flex items-center gap-[11px]">
+                        <i class="fas fa-coins nav-icon"></i>
+                        <span>Costing</span>
+                    </div>
+                    <i class="fas fa-chevron-down text-[9px] text-slate-500 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+                </button>
+                <div x-show="open" x-cloak
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0 -translate-y-1"
+                    x-transition:enter-end="opacity-100 translate-y-0">
+                    <a href="{{ route('costing.index') }}" class="sub-nav-link {{ (request()->routeIs('costing.index') || request()->routeIs('costing.show')) ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Cost Calculator
+                    </a>
+                    <a href="{{ route('costing.boms.index') }}" class="sub-nav-link {{ request()->routeIs('costing.boms.*') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Costing BOMs
+                    </a>
+                </div>
+            </div>
+            @endif
+
             <div class="nav-section-label mt-2">System</div>
 
             @if(Auth::user()->hasPermission('users', 'view'))

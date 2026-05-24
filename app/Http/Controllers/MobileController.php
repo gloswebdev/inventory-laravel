@@ -8,6 +8,8 @@ use App\Models\StockLedger;
 use Illuminate\Http\Request;
 use App\Models\Branch;
 use App\Models\Recipe;
+use App\Models\CostingBom;
+use App\Models\CostingBomItem;
 use App\Models\Production;
 use App\Models\ProductionItem;
 use App\Models\Adjustment;
@@ -37,21 +39,50 @@ class MobileController extends Controller implements HasMiddleware
                 $route = $request->route()->getName();
                 
                 $permissionMap = [
-                    'mobile.stock' => 'mobile_stock',
-                    'mobile.production' => 'mobile_production',
-                    'mobile.production.store' => 'mobile_production',
-                    'mobile.planning' => 'mobile_planning',
-                    'mobile.planning.calculate' => 'mobile_planning',
-                    'mobile.indents' => 'mobile_indents',
-                    'mobile.indents.store' => 'mobile_indents',
-                    'mobile.indents.process' => 'mobile_indents',
-                    'mobile.indents.completion' => 'mobile_indents',
-                    'mobile.indents.excel' => 'mobile_indents',
-                    'mobile.indents.pdf' => 'mobile_indents',
-                    'mobile.indents.process.excel' => 'mobile_indents',
-                    'mobile.indents.process.pdf' => 'mobile_indents',
-                    'mobile.stock.excel' => 'mobile_stock',
-                    'mobile.stock.pdf' => 'mobile_stock',
+                    'mobile.stock'                  => 'mobile_stock',
+                    'mobile.production'             => 'mobile_production',
+                    'mobile.production.store'       => 'mobile_production',
+                    'mobile.planning'               => 'mobile_planning',
+                    'mobile.planning.calculate'     => 'mobile_planning',
+                    'mobile.planning.pdf'           => 'mobile_planning',
+                    'mobile.indents'                => 'mobile_indents',
+                    'mobile.indents.store'          => 'mobile_indents',
+                    'mobile.indent.show'            => 'mobile_indents',
+                    'mobile.indents.print'          => 'mobile_indents',
+                    'mobile.indents.process'        => 'mobile_indents',
+                    'mobile.indents.completion'     => 'mobile_indents',
+                    'mobile.indents.excel'          => 'mobile_indents',
+                    'mobile.indents.pdf'            => 'mobile_indents',
+                    'mobile.indents.process.excel'  => 'mobile_indents',
+                    'mobile.indents.process.pdf'    => 'mobile_indents',
+                    'mobile.fg-stock'               => 'mobile_indents',
+                    'mobile.stock.excel'            => 'mobile_stock',
+                    'mobile.stock.pdf'              => 'mobile_stock',
+                    'mobile.recipes'                => 'mobile_recipes',
+                    'mobile.recipes.show'           => 'mobile_recipes',
+                    'mobile.recipes.store'          => 'mobile_recipes',
+                    'mobile.recipes.update'         => 'mobile_recipes',
+                    'mobile.recipes.destroy'        => 'mobile_recipes',
+                    'mobile.adjustments'            => 'mobile_adjustments',
+                    'mobile.adjustments.store'      => 'mobile_adjustments',
+                    'mobile.ledger'                 => 'mobile_ledger',
+                    'mobile.products'               => 'mobile_products',
+                    'mobile.products.store'         => 'mobile_products',
+                    'mobile.products.update'        => 'mobile_products',
+                    'mobile.products.sync'          => 'mobile_products',
+                    'mobile.users'                  => 'mobile_users',
+                    'mobile.users.store'            => 'mobile_users',
+                    'mobile.users.permissions'      => 'mobile_users',
+                    'mobile.settings'               => 'mobile_settings',
+                    'mobile.settings.branch.store'        => 'mobile_settings',
+                    'mobile.settings.branch.delete'       => 'mobile_settings',
+                    'mobile.settings.product-types'       => 'mobile_settings',
+                    'mobile.settings.product-types.store' => 'mobile_settings',
+                    'mobile.settings.product-groups'      => 'mobile_settings',
+                    'mobile.settings.product-groups.store'=> 'mobile_settings',
+                    'mobile.costing'                => 'mobile_costing',
+                    'mobile.costing.calculate'      => 'mobile_costing',
+                    'mobile.costing.export'         => 'mobile_costing',
                 ];
 
                 if (isset($permissionMap[$route])) {
@@ -138,11 +169,18 @@ class MobileController extends Controller implements HasMiddleware
                 'permission' => 'mobile_users'
             ],
             [
-                'name' => 'Settings',
-                'icon' => 'fas fa-gears',
-                'route' => 'mobile.settings',
-                'color' => 'bg-cyan-600',
+                'name'       => 'Settings',
+                'icon'       => 'fas fa-gears',
+                'route'      => 'mobile.settings',
+                'color'      => 'bg-cyan-600',
                 'permission' => 'mobile_settings'
+            ],
+            [
+                'name'       => 'Costing',
+                'icon'       => 'fas fa-coins',
+                'route'      => 'mobile.costing',
+                'color'      => 'bg-yellow-500',
+                'permission' => 'mobile_costing'
             ],
         ];
 
@@ -1664,5 +1702,209 @@ class MobileController extends Controller implements HasMiddleware
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    // ─────────────────────────────────────────────
+    //  COSTING MODULE
+    // ─────────────────────────────────────────────
+
+    /**
+     * Mobile Costing — product cost calculator page
+     */
+    public function costing()
+    {
+        if (!Auth::user()->hasPermission('mobile_costing', 'view')) {
+            abort(403, 'Unauthorized access to Costing module.');
+        }
+
+        $user = Auth::user();
+        $query = \App\Models\Product::with(['costingBoms.items.rawMaterial', 'type'])
+                    ->whereHas('costingBoms')
+                    ->orderBy('name');
+
+        if ($user->role !== 'admin') {
+            $query->whereIn('product_type_id', $user->getPermittedProductTypeIds());
+        }
+
+        $products  = $query->get();
+        $priceMap  = \App\Models\ProductPrice::allAsMap();
+        $types     = \App\Models\ProductType::orderBy('type_name')->get();
+
+        return view('mobile.costing', compact('products', 'priceMap', 'types'));
+    }
+
+    /**
+     * Mobile Costing — AJAX calculate cost
+     */
+    public function calculateCosting(\Illuminate\Http\Request $request)
+    {
+        if (!Auth::user()->hasPermission('mobile_costing', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        $request->validate([
+            'products'            => 'required|array|min:1',
+            'products.*.id'       => 'required|exists:products,id',
+            'products.*.quantity' => 'required|numeric|min:0.001',
+            'products.*.purity'   => 'nullable|numeric|min:1|max:100',
+            'products.*.density'  => 'nullable|numeric|min:0.1|max:3',
+        ]);
+
+        $priceMap   = \App\Models\ProductPrice::allAsMap();
+        $results    = [];
+        $grandTotal = 0;
+
+        foreach ($request->products as $input) {
+            $product = \App\Models\Product::with('costingBoms.items.rawMaterial')->find($input['id']);
+            if (!$product) continue;
+
+            $qty     = (float) $input['quantity'];
+            $purity  = (float) ($input['purity'] ?? 100);
+            $density = (float) ($input['density'] ?? 1);
+
+            $recipe = $product->costingBoms->first();
+
+            if (!$recipe) {
+                $results[] = [
+                    'product_id'    => $product->id,
+                    'product_name'  => $product->name,
+                    'quantity'      => $qty,
+                    'purity'        => $purity,
+                    'density'       => $density,
+                    'cost_per_unit' => 0,
+                    'total_cost'    => 0,
+                    'has_recipe'    => false,
+                    'breakdown'     => [],
+                ];
+                continue;
+            }
+
+            $weightMultiplier = (float)($product->weight_multiplier ?? 1);
+            $baseQty          = $qty * $weightMultiplier * $density;
+            $breakdown        = [];
+            $totalCost        = 0;
+
+            foreach ($recipe->items as $item) {
+                $rm = $item->rawMaterial;
+                if (!$rm) continue;
+
+                $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
+                
+                if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
+                    $requiredQty = $requiredQty / ($purity / 100);
+                }
+
+                $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
+                $subCost      = $requiredQty * $pricePerUnit;
+                $totalCost   += $subCost;
+
+                $breakdown[] = [
+                    'rm_name'      => $rm->name,
+                    'item_code'    => $rm->item_code,
+                    'uom'          => $rm->uom,
+                    'required_qty' => round($requiredQty, 3),
+                    'price'        => $pricePerUnit,
+                    'sub_cost'     => round($subCost, 2),
+                    'has_price'    => $pricePerUnit > 0,
+                ];
+            }
+
+            $costPerUnit  = $qty > 0 ? $totalCost / $qty : 0;
+            $grandTotal  += $totalCost;
+
+            $results[] = [
+                'product_id'    => $product->id,
+                'product_name'  => $product->name,
+                'pack_name'     => $product->pack_name,
+                'quantity'      => $qty,
+                'purity'        => $purity,
+                'density'       => $density,
+                'cost_per_unit' => round($costPerUnit, 2),
+                'total_cost'    => round($totalCost, 2),
+                'has_recipe'    => true,
+                'breakdown'     => $breakdown,
+            ];
+        }
+
+        return response()->json([
+            'success'     => true,
+            'results'     => $results,
+            'grand_total' => round($grandTotal, 2),
+        ]);
+    }
+
+    /**
+     * Mobile Costing — Export PDF
+     */
+    public function exportCosting(\Illuminate\Http\Request $request)
+    {
+        if (!Auth::user()->hasPermission('mobile_costing', 'view')) {
+            abort(403);
+        }
+
+        $productIds = $request->input('product_ids', []);
+        $quantities = $request->input('quantities', []);
+        $purities   = $request->input('purities', []);
+        $densities  = $request->input('densities', []);
+        $priceMap   = \App\Models\ProductPrice::allAsMap();
+        $results    = [];
+        $grandTotal = 0;
+
+        $query = \App\Models\Product::with('costingBoms.items.rawMaterial')->whereHas('costingBoms');
+        if (!empty($productIds)) {
+            $query->whereIn('id', $productIds);
+        }
+        $products = $query->orderBy('name')->get();
+
+        foreach ($products as $product) {
+            $qty     = (float)($quantities[$product->id] ?? 1);
+            $purity  = (float)($purities[$product->id] ?? 100);
+            $density = (float)($densities[$product->id] ?? 1);
+            
+            $recipe = $product->costingBoms->first();
+            if (!$recipe) continue;
+
+            $baseQty   = $qty * (float)($product->weight_multiplier ?? 1) * $density;
+            $breakdown = [];
+            $totalCost = 0;
+
+            foreach ($recipe->items as $item) {
+                $rm = $item->rawMaterial;
+                if (!$rm) continue;
+                $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
+                
+                if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
+                    $requiredQty = $requiredQty / ($purity / 100);
+                }
+
+                $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
+                $subCost      = $requiredQty * $pricePerUnit;
+                $totalCost   += $subCost;
+                $breakdown[] = [
+                    'rm_name'      => $rm->name,
+                    'uom'          => $rm->uom,
+                    'required_qty' => round($requiredQty, 3),
+                    'price'        => $pricePerUnit,
+                    'sub_cost'     => round($subCost, 2),
+                ];
+            }
+
+            $grandTotal += $totalCost;
+            $results[]   = [
+                'product'      => $product,
+                'quantity'     => $qty,
+                'purity'       => $purity,
+                'density'      => $density,
+                'total_cost'   => round($totalCost, 2),
+                'cost_per_unit'=> $qty > 0 ? round($totalCost / $qty, 2) : 0,
+                'breakdown'    => $breakdown,
+                'has_recipe'   => true,
+            ];
+        }
+
+        $pdf = Pdf::loadView('costing.pdf', compact('results', 'grandTotal'))
+                  ->setPaper('a4', 'portrait');
+
+        return $pdf->download('Mobile_Cost_Report_' . now()->format('Y-m-d_His') . '.pdf');
     }
 }

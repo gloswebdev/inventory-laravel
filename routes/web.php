@@ -7,6 +7,8 @@ use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\AdjustmentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\CostingController;
+use App\Http\Controllers\CostingBomController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -89,6 +91,26 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     });
 
 
+    // Costing Module
+    Route::prefix('costing')->name('costing.')->group(function () {
+        Route::get('/',                   [CostingController::class, 'index'])->name('index');
+        Route::get('/product/{product}',  [CostingController::class, 'show'])->name('show');
+        Route::post('/calculate',         [CostingController::class, 'calculate'])->name('calculate');
+        Route::post('/fetch-prices',      [CostingController::class, 'fetchPrices'])->name('fetch-prices');
+        Route::post('/update-price',      [CostingController::class, 'updatePrice'])->name('update-price');
+        Route::get('/export',             [CostingController::class, 'export'])->name('export');
+    });
+
+    // Costing BOM Master
+    Route::post('costing-boms/bulk-delete', [CostingBomController::class, 'bulkDelete'])->name('costing.boms.bulk-delete');
+    Route::get('costing-boms/export', [CostingBomController::class, 'export'])->name('costing.boms.export');
+    Route::resource('costing-boms', CostingBomController::class)->names([
+        'index'   => 'costing.boms.index',
+        'store'   => 'costing.boms.store',
+        'update'  => 'costing.boms.update',
+        'destroy' => 'costing.boms.destroy',
+    ]);
+
     // Reports
     Route::get('reports/stock-ledger', [ReportController::class, 'stockLedger'])->name('reports.stock-ledger');
     Route::get('reports/live-stock', [ReportController::class, 'liveStock'])->name('reports.live-stock');
@@ -137,6 +159,11 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/indents/{indent}/process/pdf', [App\Http\Controllers\MobileController::class, 'exportProcessPdf'])->name('mobile.indents.process.pdf');
     Route::get('/stock/excel', [App\Http\Controllers\MobileController::class, 'exportStockExcel'])->name('mobile.stock.excel');
     Route::get('/stock/pdf', [App\Http\Controllers\MobileController::class, 'exportStockPdf'])->name('mobile.stock.pdf');
+    // Costing
+    Route::get('/costing',            [App\Http\Controllers\MobileController::class, 'costing'])->name('mobile.costing');
+    Route::post('/costing/calculate', [App\Http\Controllers\MobileController::class, 'calculateCosting'])->name('mobile.costing.calculate');
+    Route::post('/costing/export',    [App\Http\Controllers\MobileController::class, 'exportCosting'])->name('mobile.costing.export');
+
     // Recipes
     Route::get('/recipes', [App\Http\Controllers\MobileController::class, 'recipes'])->name('mobile.recipes');
     Route::get('/recipes/{recipe}', [App\Http\Controllers\MobileController::class, 'showRecipe'])->name('mobile.recipes.show');
