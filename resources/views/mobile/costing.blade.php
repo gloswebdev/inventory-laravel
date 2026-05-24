@@ -114,35 +114,14 @@
                         </div>
                     </div>
                     
-                    <!-- Purity, Formulation & Density Grid -->
-                    <div class="grid grid-cols-3 gap-2 pt-2.5 border-t border-yellow-100/50">
-                        <!-- Tech Purity -->
-                        <div>
-                            <label class="text-[8px] font-black text-yellow-800 uppercase tracking-tight block mb-1 truncate">Purity (%):</label>
-                            <input type="number"
-                                   :value="getPurity({{ $product->id }})"
-                                   @input.stop="setPurity({{ $product->id }}, $event.target.value)"
-                                   min="1" max="100" step="0.1"
-                                   class="w-full text-center font-black text-xs text-slate-800 bg-white border border-yellow-200 rounded-xl py-2 outline-none focus:ring-2 focus:ring-yellow-400">
-                        </div>
-                        <!-- Formulation -->
-                        <div>
-                            <label class="text-[8px] font-black text-yellow-800 uppercase tracking-tight block mb-1 truncate">Formulation (%):</label>
-                            <input type="number"
-                                   :value="getFormulation({{ $product->id }})"
-                                   @input.stop="setFormulation({{ $product->id }}, $event.target.value)"
-                                   min="0.1" max="100" step="0.1"
-                                   class="w-full text-center font-black text-xs text-slate-800 bg-white border border-yellow-200 rounded-xl py-2 outline-none focus:ring-2 focus:ring-yellow-400">
-                        </div>
-                        <!-- Density -->
-                        <div>
-                            <label class="text-[8px] font-black text-yellow-800 uppercase tracking-tight block mb-1 truncate">Density (g/ml):</label>
-                            <input type="number"
-                                   :value="getDensity({{ $product->id }})"
-                                   @input.stop="setDensity({{ $product->id }}, $event.target.value)"
-                                   min="0.1" max="3" step="0.01"
-                                   class="w-full text-center font-black text-xs text-slate-800 bg-white border border-yellow-200 rounded-xl py-2 outline-none focus:ring-2 focus:ring-yellow-400">
-                        </div>
+                    <!-- Density Row -->
+                    <div class="pt-2.5 border-t border-yellow-100/50 flex items-center justify-between gap-2">
+                        <label class="text-[10px] font-black text-yellow-800 uppercase tracking-wider block mb-1">Density (g/ml):</label>
+                        <input type="number"
+                               :value="getDensity({{ $product->id }})"
+                               @input.stop="setDensity({{ $product->id }}, $event.target.value)"
+                               min="0.1" max="3" step="0.01"
+                               class="w-20 text-center font-black text-xs text-slate-800 bg-white border border-yellow-200 rounded-xl py-1.5 outline-none focus:ring-2 focus:ring-yellow-400">
                     </div>
                 </div>
             </div>
@@ -338,8 +317,6 @@ function mobileCostingApp() {
                         products: this.selected.map(s => ({
                             id: s.id,
                             quantity: parseFloat(s.quantity) || 1,
-                            purity: parseFloat(s.purity) || 100,
-                            formulation: parseFloat(s.formulation) || 100,
                             density: parseFloat(s.density) || 1.0
                         }))
                     }),
@@ -376,18 +353,6 @@ function mobileCostingApp() {
                 qInput.name   = `quantities[${s.id}]`;
                 qInput.value  = s.quantity;
                 fields.appendChild(qInput);
-
-                const pInput  = document.createElement('input');
-                pInput.type   = 'hidden';
-                pInput.name   = `purities[${s.id}]`;
-                pInput.value  = s.purity || 100;
-                fields.appendChild(pInput);
-
-                const fInput  = document.createElement('input');
-                fInput.type   = 'hidden';
-                fInput.name   = `formulations[${s.id}]`;
-                fInput.value  = s.formulation || 100;
-                fields.appendChild(fInput);
 
                 const dInput  = document.createElement('input');
                 dInput.type   = 'hidden';

@@ -111,9 +111,16 @@
                     <td class="py-3 px-5">
                         <div class="font-bold text-slate-800 text-sm">{{ $bom->finishedProduct->name ?? '—' }}</div>
                         <div class="flex items-center gap-2 mt-1">
-                            @php $typeName = $bom->finishedProduct->type->type_name ?? 'N/A'; @endphp
+                            @php 
+                                $typeName = $bom->finishedProduct->type->type_name ?? 'N/A'; 
+                                preg_match('/(\d+(?:\.\d+)?)\s*%/', $bom->finishedProduct->name ?? '', $matches);
+                                $formulation = isset($matches[1]) ? $matches[1] . '%' : '100%';
+                            @endphp
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
                                 {{ $typeName }}
+                            </span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100">
+                                Formulation: {{ $formulation }}
                             </span>
                             @if($bom->finishedProduct->item_code)
                             <span class="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{{ $bom->finishedProduct->item_code }}</span>
@@ -233,6 +240,11 @@
                             </template>
                         </select>
                     </div>
+                    <template x-if="bomModal.form.finished_product_id">
+                        <div class="text-[10px] text-blue-700 font-black mt-1.5 ml-1 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl inline-block">
+                            <i class="fas fa-flask"></i> Formulation: <span x-text="getFormulation(bomModal.form.finished_product_id)"></span>
+                        </div>
+                    </template>
                 </div>
 
                 {{-- Yield --}}
@@ -285,6 +297,11 @@
                                                     x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                         </template>
                                     </select>
+                                    <template x-if="item.raw_material_id">
+                                        <div class="text-[9px] text-amber-700 font-black mt-1 ml-1 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
+                                            <i class="fas fa-percent animate-pulse"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
+                                        </div>
+                                    </template>
                                 </div>
                                 <div class="col-span-3">
                                     <input type="number" step="0.001" x-model="item.quantity"
@@ -324,6 +341,7 @@
 const __finishedGoods = @json($finishedGoods);
 const __rawMaterials  = @json($rawMaterials);
 const __bomIds        = @json($boms->pluck('id'));
+const __purities      = @json($purities);
 
 function bomApp() {
     return {
@@ -364,6 +382,20 @@ function bomApp() {
         getItemUom(id) {
             const rm = __rawMaterials.find(r => r.id == id);
             return rm ? rm.uom : '';
+        },
+
+        getFormulation(fgId) {
+            const fg = __finishedGoods.find(f => f.id == fgId);
+            if (!fg) return '';
+            const match = fg.name.match(/(\d+(?:\.\d+)?)\s*%/);
+            return match ? match[1] + '%' : '100%';
+        },
+
+        getPurity(rmId) {
+            const rm = __rawMaterials.find(r => r.id == rmId);
+            if (!rm) return '—';
+            const purity = __purities[rm.item_code];
+            return purity ? purity + '%' : '—';
         },
 
         openBomModal() {

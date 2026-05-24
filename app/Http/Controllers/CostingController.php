@@ -61,9 +61,7 @@ class CostingController extends Controller
         // Pre-compute per-unit cost for each product using costing BOMs
         $costData = [];
         foreach ($products as $product) {
-            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
-            $defaultFormulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
-            $costData[$product->id] = $this->computeCost($product, $priceMap, 1, 100, $defaultFormulation, 1);
+            $costData[$product->id] = $this->computeCost($product, $priceMap, 1, 1);
         }
 
         $activeTab = 'calculator';
@@ -110,8 +108,6 @@ class CostingController extends Controller
             'products'              => 'required|array|min:1',
             'products.*.id'         => 'required|exists:products,id',
             'products.*.quantity'   => 'required|numeric|min:0.001',
-            'products.*.purity'     => 'nullable|numeric|min:1|max:100',
-            'products.*.formulation'=> 'nullable|numeric|min:0.1|max:100',
             'products.*.density'    => 'nullable|numeric|min:0.1|max:3',
         ]);
 
@@ -124,19 +120,33 @@ class CostingController extends Controller
             if (!$product) continue;
 
             $qty         = (float) $input['quantity'];
-            $purity      = (float) ($input['purity'] ?? 100);
-            $formulation = (float) ($input['formulation'] ?? 100);
             $density     = (float) ($input['density'] ?? 1);
 
-            $costData = $this->computeCost($product, $priceMap, $qty, $purity, $formulation, $density);
+            $costData = $this->computeCost($product, $priceMap, $qty, $density);
             $grandTotal += $costData['total_cost'];
+
+            // Find purity of TECHNICAL raw material in BOM
+            $recipe = $product->costingBoms->first();
+            $rmPurity = 100.0;
+            if ($recipe) {
+                foreach ($recipe->items as $item) {
+                    if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
+                        $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                        if ($rmPurity <= 0) $rmPurity = 100.0;
+                        break;
+                    }
+                }
+            }
+
+            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
+            $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
 
             $results[] = [
                 'product_id'    => $product->id,
                 'product_name'  => $product->name,
                 'pack_name'     => $product->pack_name,
                 'quantity'      => $qty,
-                'purity'        => $purity,
+                'purity'        => $rmPurity,
                 'formulation'   => $formulation,
                 'density'       => $density,
                 'cost_per_unit' => $costData['cost_per_unit'],
@@ -204,12 +214,13 @@ class CostingController extends Controller
                 return response()->json(['success' => false, 'message' => 'No data returned from ERP API.'], 422);
             }
 
-            // Build a map: User_Code => latest CaseRate
+            // Build a map: User_Code => latest CaseRate & Purity
             $latestByCode = [];
 
             foreach ($data['resultdata'] as $row) {
                 $itemCode  = trim($row['User_Code'] ?? '');
                 $caseRate  = (float)($row['CaseRate'] ?? 0);
+                $purity    = isset($row['Purity']) ? (float)$row['Purity'] : null;
                 $vouchDate = \Carbon\Carbon::createFromFormat('d/m/Y', $row['Vouch_Date'] ?? '01/01/2000')->timestamp ?? 0;
 
                 if (empty($itemCode) || $caseRate <= 0) continue;
@@ -217,8 +228,9 @@ class CostingController extends Controller
                 // Keep the row with the most recent voucher date
                 if (!isset($latestByCode[$itemCode]) || $vouchDate > $latestByCode[$itemCode]['date']) {
                     $latestByCode[$itemCode] = [
-                        'price' => $caseRate,
-                        'date'  => $vouchDate,
+                        'price'  => $caseRate,
+                        'purity' => $purity,
+                        'date'   => $vouchDate,
                     ];
                 }
             }
@@ -233,6 +245,7 @@ class CostingController extends Controller
                     ['item_code' => $itemCode],
                     [
                         'price_per_unit' => $entry['price'],
+                        'purity'         => $entry['purity'],
                         'price_source'   => 'erp',
                         'fetched_at'     => now(),
                     ]
@@ -296,8 +309,6 @@ class CostingController extends Controller
 
         $productIds   = $request->input('product_ids', []);
         $quantities   = $request->input('quantities', []);
-        $purities     = $request->input('purities', []);
-        $formulations = $request->input('formulations', []);
         $densities    = $request->input('densities', []);
         $priceMap     = ProductPrice::allAsMap();
 
@@ -312,16 +323,31 @@ class CostingController extends Controller
 
         foreach ($products as $product) {
             $qty         = (float)($quantities[$product->id] ?? 1);
-            $purity      = (float)($purities[$product->id] ?? 100);
-            $formulation = (float)($formulations[$product->id] ?? 100);
             $density     = (float)($densities[$product->id] ?? 1);
 
-            $costData = $this->computeCost($product, $priceMap, $qty, $purity, $formulation, $density);
+            $costData = $this->computeCost($product, $priceMap, $qty, $density);
             $grandTotal += $costData['total_cost'];
+            
+            // Find purity of TECHNICAL raw material in BOM
+            $recipe = $product->costingBoms->first();
+            $rmPurity = 100.0;
+            if ($recipe) {
+                foreach ($recipe->items as $item) {
+                    if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
+                        $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                        if ($rmPurity <= 0) $rmPurity = 100.0;
+                        break;
+                    }
+                }
+            }
+
+            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
+            $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+
             $results[] = array_merge($costData, [
                 'product'     => $product,
                 'quantity'    => $qty,
-                'purity'      => $purity,
+                'purity'      => $rmPurity,
                 'formulation' => $formulation,
                 'density'     => $density,
             ]);
@@ -340,7 +366,7 @@ class CostingController extends Controller
     /**
      * Compute the manufacturing cost for a product given a quantity.
      */
-    private function computeCost(Product $product, array $priceMap, float $quantity, float $purity = 100, float $formulation = 100, float $density = 1): array
+    private function computeCost(Product $product, array $priceMap, float $quantity, float $density = 1): array
     {
         $recipe = $product->costingBoms->first();
 
@@ -353,7 +379,10 @@ class CostingController extends Controller
             ];
         }
 
-        $breakdown    = $this->buildBreakdown($recipe, $priceMap, $quantity, $product, $purity, $formulation, $density);
+        preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
+        $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+
+        $breakdown    = $this->buildBreakdown($recipe, $priceMap, $quantity, $product, $formulation, $density);
         $totalCost    = collect($breakdown)->sum('sub_cost');
         $costPerUnit  = $quantity > 0 ? $totalCost / $quantity : 0;
 
@@ -368,7 +397,7 @@ class CostingController extends Controller
     /**
      * Build the per-item cost breakdown array.
      */
-    private function buildBreakdown(CostingBom $recipe, array $priceMap, float $quantity = 1, ?Product $finishedProduct = null, float $purity = 100, float $formulation = 100, float $density = 1): array
+    private function buildBreakdown(CostingBom $recipe, array $priceMap, float $quantity = 1, ?Product $finishedProduct = null, float $formulation = 100, float $density = 1): array
     {
         $breakdown = [];
         $fp        = $finishedProduct ?? $recipe->finishedProduct;
@@ -386,7 +415,9 @@ class CostingController extends Controller
             
             // Adjust required technical raw material quantity by formulation and purity percentage
             if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                $requiredQty = ($baseQty * $formulation) / $purity;
+                $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
+                if ($rmPurity <= 0) $rmPurity = 100.0;
+                $requiredQty = ($baseQty * $formulation) / $rmPurity;
             }
 
             $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);

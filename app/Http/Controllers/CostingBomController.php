@@ -69,10 +69,11 @@ class CostingBomController extends Controller
         }
 
         $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
-        $rawMaterials = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
-        $types = $typesQuery->get();
+        $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
+        $types         = $typesQuery->get();
+        $purities      = \App\Models\ProductPrice::allPuritiesAsMap();
 
-        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types'));
+        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities'));
     }
 
     public function store(Request $request)

@@ -9,12 +9,14 @@ class ProductPrice extends Model
     protected $fillable = [
         'item_code',
         'price_per_unit',
+        'purity',
         'price_source',
         'fetched_at',
     ];
 
     protected $casts = [
         'price_per_unit' => 'float',
+        'purity'         => 'float',
         'fetched_at'     => 'datetime',
     ];
 
@@ -32,5 +34,13 @@ class ProductPrice extends Model
     public static function allAsMap(): array
     {
         return static::pluck('price_per_unit', 'item_code')->toArray();
+    }
+
+    /**
+     * Bulk-load purities as an associative array [item_code => purity]
+     */
+    public static function allPuritiesAsMap(): array
+    {
+        return static::pluck('purity', 'item_code')->toArray();
     }
 }

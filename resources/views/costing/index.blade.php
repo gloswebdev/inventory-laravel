@@ -157,16 +157,6 @@
                                        class="w-20 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
                             </div>
                             <div class="flex items-center gap-1.5 flex-shrink-0">
-                                <label class="text-[10px] text-slate-500 font-bold">Tech Purity (%):</label>
-                                <input type="number" x-model="item.purity" min="1" max="100" step="0.1"
-                                       class="w-16 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-shrink-0">
-                                <label class="text-[10px] text-slate-500 font-bold">Formulation (%):</label>
-                                <input type="number" x-model="item.formulation" min="0.1" max="100" step="0.1"
-                                       class="w-16 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-shrink-0">
                                 <label class="text-[10px] text-slate-500 font-bold">Density:</label>
                                 <input type="number" x-model="item.density" min="0.1" max="3" step="0.01"
                                        class="w-14 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
@@ -357,7 +347,7 @@ function costingApp() {
                 const resp = await fetch('{{ route('costing.calculate') }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-                    body: JSON.stringify({ products: this.selected.map(s => ({ id: s.id, quantity: parseFloat(s.quantity) || 1, purity: parseFloat(s.purity) || 100, formulation: parseFloat(s.formulation) || 100, density: parseFloat(s.density) || 1.0 })) })
+                    body: JSON.stringify({ products: this.selected.map(s => ({ id: s.id, quantity: parseFloat(s.quantity) || 1, density: parseFloat(s.density) || 1.0 })) })
                 });
                 const data = await resp.json();
                 if (data.success) { this.results = data.results; this.grandTotal = data.grand_total; }

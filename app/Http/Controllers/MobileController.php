@@ -1746,8 +1746,6 @@ class MobileController extends Controller implements HasMiddleware
             'products'            => 'required|array|min:1',
             'products.*.id'       => 'required|exists:products,id',
             'products.*.quantity' => 'required|numeric|min:0.001',
-            'products.*.purity'   => 'nullable|numeric|min:1|max:100',
-            'products.*.formulation'=> 'nullable|numeric|min:0.1|max:100',
             'products.*.density'  => 'nullable|numeric|min:0.1|max:3',
         ]);
 
@@ -1760,8 +1758,6 @@ class MobileController extends Controller implements HasMiddleware
             if (!$product) continue;
 
             $qty         = (float) $input['quantity'];
-            $purity      = (float) ($input['purity'] ?? 100);
-            $formulation = (float) ($input['formulation'] ?? 100);
             $density     = (float) ($input['density'] ?? 1);
 
             $recipe = $product->costingBoms->first();
@@ -1771,8 +1767,8 @@ class MobileController extends Controller implements HasMiddleware
                     'product_id'    => $product->id,
                     'product_name'  => $product->name,
                     'quantity'      => $qty,
-                    'purity'        => $purity,
-                    'formulation'   => $formulation,
+                    'purity'        => 100,
+                    'formulation'   => 100,
                     'density'       => $density,
                     'cost_per_unit' => 0,
                     'total_cost'    => 0,
@@ -1780,6 +1776,19 @@ class MobileController extends Controller implements HasMiddleware
                     'breakdown'     => [],
                 ];
                 continue;
+            }
+
+            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
+            $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+
+            // Find purity of TECHNICAL raw material in BOM
+            $rmPurity = 100.0;
+            foreach ($recipe->items as $item) {
+                if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
+                    $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                    if ($rmPurity <= 0) $rmPurity = 100.0;
+                    break;
+                }
             }
 
             $weightMultiplier = (float)($product->weight_multiplier ?? 1);
@@ -1794,7 +1803,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $requiredQty = ($baseQty * $formulation) / $purity;
+                    $requiredQty = ($baseQty * $formulation) / $rmPurity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
@@ -1820,7 +1829,7 @@ class MobileController extends Controller implements HasMiddleware
                 'product_name'  => $product->name,
                 'pack_name'     => $product->pack_name,
                 'quantity'      => $qty,
-                'purity'        => $purity,
+                'purity'        => $rmPurity,
                 'formulation'   => $formulation,
                 'density'       => $density,
                 'cost_per_unit' => round($costPerUnit, 2),
@@ -1848,8 +1857,6 @@ class MobileController extends Controller implements HasMiddleware
 
         $productIds   = $request->input('product_ids', []);
         $quantities   = $request->input('quantities', []);
-        $purities     = $request->input('purities', []);
-        $formulations = $request->input('formulations', []);
         $densities    = $request->input('densities', []);
         $priceMap     = \App\Models\ProductPrice::allAsMap();
         $results      = [];
@@ -1863,12 +1870,23 @@ class MobileController extends Controller implements HasMiddleware
 
         foreach ($products as $product) {
             $qty         = (float)($quantities[$product->id] ?? 1);
-            $purity      = (float)($purities[$product->id] ?? 100);
-            $formulation = (float)($formulations[$product->id] ?? 100);
             $density     = (float)($densities[$product->id] ?? 1);
             
             $recipe = $product->costingBoms->first();
             if (!$recipe) continue;
+
+            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
+            $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+
+            // Find purity of TECHNICAL raw material in BOM
+            $rmPurity = 100.0;
+            foreach ($recipe->items as $item) {
+                if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
+                    $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                    if ($rmPurity <= 0) $rmPurity = 100.0;
+                    break;
+                }
+            }
 
             $baseQty   = $qty * (float)($product->weight_multiplier ?? 1) * $density;
             $breakdown = [];
@@ -1880,7 +1898,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $requiredQty = ($baseQty * $formulation) / $purity;
+                    $requiredQty = ($baseQty * $formulation) / $rmPurity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
@@ -1899,7 +1917,7 @@ class MobileController extends Controller implements HasMiddleware
             $results[]   = [
                 'product'      => $product,
                 'quantity'     => $qty,
-                'purity'       => $purity,
+                'purity'       => $rmPurity,
                 'formulation'  => $formulation,
                 'density'      => $density,
                 'total_cost'   => round($totalCost, 2),
