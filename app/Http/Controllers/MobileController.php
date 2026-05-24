@@ -254,11 +254,14 @@ class MobileController extends Controller implements HasMiddleware
         return view('mobile.dashboard', compact('modules', 'stats', 'activities'));
     }
 
-    /**
-     * Mobile Stock Viewer
-     */
     public function stock(Request $request)
     {
+        if ($request->has('refresh')) {
+            Cache::forget('external_stock_data_grouped');
+            return redirect()->route('mobile.stock', $request->except('refresh'))
+                             ->with('success', 'Live stock data synced successfully from Algebra ERP!');
+        }
+
         $user = Auth::user();
         $permittedCodes = $user->getPermittedBranchCodes();
         

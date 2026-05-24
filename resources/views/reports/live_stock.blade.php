@@ -80,12 +80,17 @@
     </div>
 
     <div class="flex justify-between items-center mb-4">
-        <div>
+        <div class="flex items-center gap-3">
             @if(Auth::user()->hasFeature('reports', 'branch_reorder'))
             <button type="button" onclick="openReorderModal()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold py-2 px-4 rounded shadow-sm text-sm flex items-center">
                 <i class="fas fa-sort mr-2"></i> Reorder Branches
             </button>
             @endif
+            <a href="{{ route('reports.live-stock', array_merge(request()->query(), ['refresh' => 1])) }}" 
+               onclick="this.classList.add('pointer-events-none', 'opacity-60'); this.querySelector('i').classList.add('fa-spin');"
+               class="bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold py-2 px-4 rounded shadow-sm text-sm flex items-center transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i> Sync Stock Now
+            </a>
         </div>
         <div class="flex gap-2">
             @if(Auth::user()->hasPermission('reports', 'excel'))

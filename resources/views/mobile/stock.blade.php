@@ -11,6 +11,12 @@
             <p class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Real-time inventory insights</p>
         </div>
         <div class="flex items-center gap-2">
+            <a href="{{ route('mobile.stock', array_merge(request()->query(), ['refresh' => 1])) }}" 
+               @click="syncing = true"
+               :class="syncing ? 'pointer-events-none opacity-60' : ''"
+               class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 border border-white/60 shadow-md active:scale-90 transition-all">
+                <i class="fas text-xs" :class="syncing ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i>
+            </a>
             @if(Auth::user()->hasPermission('mobile_stock', 'excel'))
             <button @click="exportStock('excel')" class="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 border border-white/60 shadow-md active:scale-90 transition-all">
                 <i class="fas fa-file-excel text-xs"></i>
@@ -239,6 +245,7 @@
             hasMore: @json($hasMore),
             nextPage: 2,
             loading: false,
+            syncing: false,
 
             getPackColor(packName) {
                 if (!packName) return 'bg-slate-50 text-slate-500 border-slate-200';

@@ -52,6 +52,12 @@ class ReportController extends Controller
 
     public function liveStock(Request $request)
     {
+        if ($request->has('refresh')) {
+            Cache::forget('external_stock_data_grouped');
+            return redirect()->route('reports.live-stock', $request->except('refresh'))
+                             ->with('success', 'Live stock data synced successfully from Algebra ERP!');
+        }
+
         $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $types = ProductType::orderBy('type_name')->get();
         $rmTypes = Cache::remember('distinct_rm_types', 3600, function() {
