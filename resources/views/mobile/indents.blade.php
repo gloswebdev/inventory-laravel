@@ -63,6 +63,21 @@
                 </div>
             </div>
 
+            <div class="space-y-3 relative z-10">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3">Item Type</label>
+                <div class="relative">
+                    <select x-model="selectedTypeId" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60 rounded-2xl py-4 px-6 text-xs font-bold text-slate-800 font-900 focus:ring-2 focus:ring-violet-500 appearance-none transition-all">
+                        <option value="">All Types</option>
+                        @foreach($productTypes as $type)
+                        <option value="{{ $type->id }}" {{ $type->id == $defaultTypeId ? 'selected' : '' }}>{{ $type->type_name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300">
+                        <i class="fas fa-filter text-[10px]"></i>
+                    </div>
+                </div>
+            </div>
+
             <!-- Product Rows -->
             <div class="space-y-5 relative z-10">
                 <template x-for="(row, index) in form.products" :key="index">
@@ -83,7 +98,7 @@
                                     <div class="relative">
                                         <select x-model="row.id" @change="onProductSelect(index)" class="w-full bg-white/40 backdrop-blur-sm border-none rounded-xl py-3 px-4 text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-violet-500 appearance-none">
                                             <option value="">Select Item...</option>
-                                            <template x-for="p in products" :key="p.id">
+                                            <template x-for="p in filteredProductsByType" :key="p.id">
                                                 <option :value="p.id" x-text="p.name + ' (' + (p.pack_name || '---') + ') | Stock: ' + (stockMap[p.id] ? stockMap[p.id].stock_box : '0')"></option>
                                             </template>
                                         </select>
@@ -429,7 +444,7 @@
         </div>
 
         <div class="flex-1 overflow-y-auto px-8 space-y-4 pb-32 custom-scrollbar">
-            <template x-for="p in filteredProducts" :key="p.id">
+            <template x-for="p in filteredProductsByTypeAndSearch" :key="p.id">
                 <label class="flex items-center gap-5 p-5 bg-white/70 backdrop-blur-xl rounded-[2rem] border-2 border-white/80 transition-all active:scale-[0.98] cursor-pointer" :class="selectedProducts.includes(p.id) ? 'border-violet-400 bg-violet-50/50 shadow-xl shadow-violet-200/50' : 'hover:border-violet-200 hover:shadow-lg'">
                     <input type="checkbox" :value="p.id" x-model="selectedProducts" class="w-7 h-7 rounded-xl text-violet-600 border-white/70 focus:ring-violet-500 shadow-md">
                     <div class="flex-1 min-w-0">
@@ -548,14 +563,26 @@ function indentApp() {
         stockMap: {},
         externalStock: {},
         editingIndentId: null,
+        selectedTypeId: '{{ $defaultTypeId }}',
         
-        get filteredProducts() {
-            if (!this.searchQuery) return this.products;
-            const q = this.searchQuery.toLowerCase();
-            return this.products.filter(p => 
-                p.name.toLowerCase().includes(q) || 
-                (p.item_code && p.item_code.toLowerCase().includes(q))
-            );
+        get filteredProductsByType() {
+            if (!this.selectedTypeId) return this.products;
+            return this.products.filter(p => p.product_type_id == this.selectedTypeId);
+        },
+
+        get filteredProductsByTypeAndSearch() {
+            let list = this.products;
+            if (this.selectedTypeId) {
+                list = list.filter(p => p.product_type_id == this.selectedTypeId);
+            }
+            if (this.searchQuery) {
+                const q = this.searchQuery.toLowerCase();
+                list = list.filter(p => 
+                    p.name.toLowerCase().includes(q) || 
+                    (p.item_code && p.item_code.toLowerCase().includes(q))
+                );
+            }
+            return list;
         },
 
         init() {

@@ -24,10 +24,10 @@
             </div>
             
             <div class="p-7 bg-slate-50/30 flex-grow space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Target Branch</label>
-                        <select id="branch_code" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm font-bold text-slate-700 shadow-sm" onchange="updateAllStock()">
+                        <select id="branch_code" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-bold text-slate-700 shadow-sm" onchange="updateAllStock()">
                             <option value="">Consolidated View</option>
                             @foreach($branches as $branch)
                                 <option value="{{ $branch->code }}">{{ $branch->name }} ({{ $branch->code }})</option>
@@ -36,13 +36,22 @@
                     </div>
                     <div>
                         <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Indent Date</label>
-                        <input type="date" id="indent_date" value="{{ date('Y-m-d') }}" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm font-bold text-slate-700 shadow-sm">
+                        <input type="date" id="indent_date" value="{{ date('Y-m-d') }}" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-bold text-slate-700 shadow-sm">
                     </div>
                     <div>
-                        <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Order Unit (Global)</label>
-                        <select id="global_unit" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm font-black text-indigo-700 uppercase shadow-sm" onchange="syncGlobalUnit()">
+                        <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Order Unit</label>
+                        <select id="global_unit" class="w-full bg-indigo-50 border border-indigo-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-black text-indigo-700 uppercase shadow-sm" onchange="syncGlobalUnit()">
                             <option value="box">Boxes</option>
                             <option value="kg">KG / LTR</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Item Type</label>
+                        <select id="item_type_filter" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-bold text-slate-700 shadow-sm" onchange="filterProductsByType()">
+                            <option value="">All Types</option>
+                            @foreach($productTypes as $type)
+                                <option value="{{ $type->id }}" {{ $type->id == $defaultTypeId ? 'selected' : '' }}>{{ $type->type_name }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -65,7 +74,8 @@
                                     data-pack="{{ $product->pack_name }}"
                                     data-unit-box="{{ $product->unit_box ?: 1 }}"
                                     data-weight-unit="{{ $product->weight_multiplier }}"
-                                    data-uom="{{ $product->uom }}">
+                                    data-uom="{{ $product->uom }}"
+                                    data-type-id="{{ $product->product_type_id }}">
                                     <td class="px-2 sm:px-5 py-3 truncate">
                                         <div class="font-bold text-slate-700 text-xs sm:text-sm mb-1 truncate group-hover:text-indigo-700 transition-colors" title="{{ $product->name }}">{{ $product->name }}</div>
                                         <div class="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
@@ -474,8 +484,23 @@
         }
     }
 
+    function filterProductsByType() {
+        const typeId = document.getElementById('item_type_filter').value;
+        const rows = document.querySelectorAll('.product-row');
+        rows.forEach(row => {
+            if (!typeId || row.dataset.typeId === typeId) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
     // Call once on load
-    document.addEventListener('DOMContentLoaded', updateAllStock);
+    document.addEventListener('DOMContentLoaded', () => {
+        updateAllStock();
+        filterProductsByType();
+    });
 
     async function previewIndent() {
         const rows = document.querySelectorAll('.product-row');

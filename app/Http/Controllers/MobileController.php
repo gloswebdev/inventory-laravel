@@ -738,8 +738,7 @@ class MobileController extends Controller implements HasMiddleware
         $permittedTypeIds = $user->getPermittedProductTypeIds();
         $permittedRMTypes = $user->getPermittedRMTypes();
         
-        // Use Actual IDs for Finished Good (6) and Semi Finished Good (7)
-        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
+        $productsQuery = Product::orderBy('name');
         
         if ($user->role !== 'admin') {
             $productsQuery->whereIn('product_type_id', $permittedTypeIds)
@@ -753,8 +752,11 @@ class MobileController extends Controller implements HasMiddleware
         $products = $productsQuery->get();
         $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
         $users = \App\Models\User::orderBy('name')->get(); // For filtering
+        $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
+        $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
+        $defaultTypeId = $defaultType ? $defaultType->id : 6;
 
-        return view('mobile.indents', compact('indents', 'products', 'branches', 'users'));
+        return view('mobile.indents', compact('indents', 'products', 'branches', 'users', 'productTypes', 'defaultTypeId'));
     }
 
     /**

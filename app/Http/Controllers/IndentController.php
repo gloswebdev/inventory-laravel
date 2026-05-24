@@ -19,7 +19,7 @@ class IndentController extends Controller
      */
     public function index(Request $request)
     {
-        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
+        $productsQuery = Product::orderBy('name');
         $this->applyTypeFilters($productsQuery);
         $finishedGoods = $productsQuery->get();
         
@@ -46,8 +46,10 @@ class IndentController extends Controller
         $history = $query->orderByDesc('created_at')->limit(50)->get();
         $users = \App\Models\User::orderBy('name')->get();
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
+        $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
+        $defaultTypeId = $defaultType ? $defaultType->id : 6;
 
-        return view('indent.index', compact('finishedGoods', 'branches', 'history', 'users', 'productTypes'));
+        return view('indent.index', compact('finishedGoods', 'branches', 'history', 'users', 'productTypes', 'defaultTypeId'));
     }
 
     /**
@@ -142,7 +144,7 @@ class IndentController extends Controller
     {
         $branchCode = $request->get('branch_code');
         
-        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
+        $productsQuery = Product::orderBy('name');
         $this->applyTypeFilters($productsQuery);
         $products = $productsQuery->get();
         $externalStock = $this->getExternalStock();
