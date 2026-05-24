@@ -230,6 +230,30 @@
 </div>
 
 <script>
+    function getPackBadgeClass(packName) {
+        if (!packName) return 'bg-slate-50 text-slate-500 border-slate-200';
+        const name = packName.toUpperCase().trim();
+        if (name.includes('1 KG') || name.includes('1 LTR') || name.includes('1KG') || name.includes('1LTR')) {
+            return 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
+        }
+        if (name.includes('500 GM') || name.includes('500 ML') || name.includes('500GM') || name.includes('500ML')) {
+            return 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
+        }
+        if (name.includes('250 GM') || name.includes('250 ML') || name.includes('250GM') || name.includes('250ML')) {
+            return 'bg-rose-50 text-rose-700 border-rose-200/60';
+        }
+        if (name.includes('100 GM') || name.includes('100 ML') || name.includes('100GM') || name.includes('100ML')) {
+            return 'bg-amber-50 text-amber-700 border-amber-200/60';
+        }
+        if (name.includes('50 GM') || name.includes('50 ML') || name.includes('50GM') || name.includes('50ML')) {
+            return 'bg-cyan-50 text-cyan-700 border-cyan-200/60';
+        }
+        if (name.includes('5 LTR') || name.includes('5 KG') || name.includes('5LTR') || name.includes('5KG')) {
+            return 'bg-teal-50 text-teal-700 border-teal-200/60';
+        }
+        return 'bg-violet-50 text-violet-700 border-violet-200/60';
+    }
+
     function viewIndent(id) {
         const modal = document.getElementById('viewModal');
         const loader = `<tr class="modal-loading"><td colspan="4" class="py-10 text-center text-gray-400 italic">Loading details...</td></tr>`;
@@ -250,7 +274,7 @@
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="py-4">
                                     <div class="font-bold text-slate-800 text-sm">${item.product_name}</div>
-                                    <div class="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">${item.product?.pack_name || ''}</div>
+                                    <div class="mt-1.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border ${getPackBadgeClass(item.product?.pack_name)}">${item.product?.pack_name || ''}</span></div>
                                 </td>
                                 <td class="py-4 text-center">
                                     <div class="text-xs font-black text-emerald-600">${parseFloat(item.stock_box).toFixed(2)} BOX</div>
@@ -310,7 +334,7 @@
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="py-4">
                                     <div class="font-bold text-slate-800 text-sm">${item.product_name}</div>
-                                    <div class="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">${item.product?.pack_name || ''}</div>
+                                    <div class="mt-1.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border ${getPackBadgeClass(item.product?.pack_name)}">${item.product?.pack_name || ''}</span></div>
                                 </td>
                                 <td class="py-4 text-center font-bold text-slate-600 text-sm">${asked.toFixed(0)}</td>
                                 <td class="py-4 text-center font-black text-indigo-600 text-lg">${completed.toFixed(0)}</td>

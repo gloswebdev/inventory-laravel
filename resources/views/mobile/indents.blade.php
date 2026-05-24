@@ -88,7 +88,7 @@
                                     <div class="space-y-1">
                                         <div class="text-[13px] font-900 text-slate-800 font-900 truncate uppercase" x-text="row.name"></div>
                                         <div class="flex items-center gap-2 mt-1">
-                                            <span class="px-2 py-0.5 bg-violet-50 text-violet-500 rounded text-[8px] font-black uppercase tracking-widest" x-text="row.pack || '---'"></span>
+                                            <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border" :class="getPackColor(row.pack)" x-text="row.pack || '---'"></span>
                                             <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
                                             <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="row.item_code"></span>
                                         </div>
@@ -366,7 +366,10 @@
                         <div class="flex items-center justify-between p-5 bg-white/70 backdrop-blur-md border border-white/80 rounded-[2rem] shadow-md transform transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-100/50">
                             <div class="flex-1 min-w-0 pr-4">
                                 <div class="text-[11px] font-900 text-slate-800 font-900 uppercase truncate" x-text="item.product_name"></div>
-                                <div class="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-0.5" x-text="item.product?.item_code"></div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[8px] bg-slate-100/80 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-widest" x-text="item.product?.item_code"></span>
+                                    <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border" :class="getPackColor(item.product?.pack_name)" x-text="item.product?.pack_name || '---'"></span>
+                                </div>
                                 <div class="mt-2 flex flex-wrap items-center gap-2">
                                     <div class="flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-lg">
                                         <span class="text-[7px] font-black text-emerald-500 uppercase">Live Stock</span>
@@ -409,7 +412,10 @@
                     <div class="grid grid-cols-4 gap-4 items-center p-4 bg-white/70 backdrop-blur-xl rounded-2xl border border-white/80 shadow-sm hover:shadow-md transition-all">
                         <div class="col-span-2">
                             <div class="text-[11px] font-900 text-slate-800 font-900 uppercase truncate" x-text="item.product_name"></div>
-                            <div class="text-[8px] text-slate-400 font-bold italic" x-text="item.product?.item_code"></div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-[8px] bg-slate-100/80 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-widest" x-text="item.product?.item_code"></span>
+                                <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border" :class="getPackColor(item.product?.pack_name)" x-text="item.product?.pack_name || '---'"></span>
+                            </div>
                         </div>
                         <div class="text-center text-[12px] font-900 text-slate-600" x-text="item.final_qty_box"></div>
                         <div class="text-right">
@@ -455,7 +461,7 @@
                         <div class="flex items-center gap-3 mt-1.5">
                             <span class="text-[9px] bg-slate-100/80 text-slate-500 px-2.5 py-1 rounded-lg font-black uppercase tracking-widest shadow-inner" x-text="p.item_code"></span>
                             <div class="w-1 h-1 bg-slate-200 rounded-full"></div>
-                            <span class="text-[9px] text-slate-400 font-black uppercase tracking-widest italic" x-text="p.pack_name"></span>
+                            <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border" :class="getPackColor(p.pack_name)" x-text="p.pack_name || '---'"></span>
                         </div>
                     </div>
                 </label>
@@ -503,7 +509,10 @@
                     <div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-white/60 shadow-md group">
                         <div class="flex-1 min-w-0 pr-5">
                             <div class="text-[11px] font-900 text-slate-800 font-900 truncate uppercase" x-text="p.name"></div>
-                            <div class="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-1" x-text="p.item_code"></div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-[8px] bg-slate-100/80 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-widest" x-text="p.item_code"></span>
+                                <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border" :class="getPackColor(p.pack)" x-text="p.pack || '---'"></span>
+                            </div>
                         </div>
                         <div class="text-right shrink-0">
                             <div class="text-[13px] font-900 text-slate-800 font-900 tracking-tighter" x-text="p.demand_qty + ' ' + form.global_unit.toUpperCase()"></div>
@@ -564,6 +573,30 @@ function indentApp() {
         externalStock: {},
         editingIndentId: null,
         selectedTypeId: '{{ $defaultTypeId }}',
+
+        getPackColor(packName) {
+            if (!packName) return 'bg-slate-50 text-slate-500 border-slate-200';
+            const name = packName.toUpperCase().trim();
+            if (name.includes('1 KG') || name.includes('1 LTR') || name.includes('1KG') || name.includes('1LTR')) {
+                return 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
+            }
+            if (name.includes('500 GM') || name.includes('500 ML') || name.includes('500GM') || name.includes('500ML')) {
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
+            }
+            if (name.includes('250 GM') || name.includes('250 ML') || name.includes('250GM') || name.includes('250ML')) {
+                return 'bg-rose-50 text-rose-700 border-rose-200/60';
+            }
+            if (name.includes('100 GM') || name.includes('100 ML') || name.includes('100GM') || name.includes('100ML')) {
+                return 'bg-amber-50 text-amber-700 border-amber-200/60';
+            }
+            if (name.includes('50 GM') || name.includes('50 ML') || name.includes('50GM') || name.includes('50ML')) {
+                return 'bg-cyan-50 text-cyan-700 border-cyan-200/60';
+            }
+            if (name.includes('5 LTR') || name.includes('5 KG') || name.includes('5LTR') || name.includes('5KG')) {
+                return 'bg-teal-50 text-teal-700 border-teal-200/60';
+            }
+            return 'bg-violet-50 text-violet-700 border-violet-200/60';
+        },
         
         get filteredProductsByType() {
             if (!this.selectedTypeId) return this.products;

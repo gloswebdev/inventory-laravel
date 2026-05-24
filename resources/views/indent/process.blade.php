@@ -1,6 +1,33 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    if (!function_exists('getPackBadgeClass')) {
+        function getPackBadgeClass($packName) {
+            if (!$packName) return 'bg-slate-50 text-slate-500 border-slate-200';
+            $name = strtoupper(trim($packName));
+            if (str_contains($name, '1 KG') || str_contains($name, '1 LTR') || str_contains($name, '1KG') || str_contains($name, '1LTR')) {
+                return 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
+            }
+            if (str_contains($name, '500 GM') || str_contains($name, '500 ML') || str_contains($name, '500GM') || str_contains($name, '500ML')) {
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
+            }
+            if (str_contains($name, '250 GM') || str_contains($name, '250 ML') || str_contains($name, '250GM') || str_contains($name, '250ML')) {
+                return 'bg-rose-50 text-rose-700 border-rose-200/60';
+            }
+            if (str_contains($name, '100 GM') || str_contains($name, '100 ML') || str_contains($name, '100GM') || str_contains($name, '100ML')) {
+                return 'bg-amber-50 text-amber-700 border-amber-200/60';
+            }
+            if (str_contains($name, '50 GM') || str_contains($name, '50 ML') || str_contains($name, '50GM') || str_contains($name, '50ML')) {
+                return 'bg-cyan-50 text-cyan-700 border-cyan-200/60';
+            }
+            if (str_contains($name, '5 LTR') || str_contains($name, '5 KG') || str_contains($name, '5LTR') || str_contains($name, '5KG')) {
+                return 'bg-teal-50 text-teal-700 border-teal-200/60';
+            }
+            return 'bg-violet-50 text-violet-700 border-violet-200/60';
+        }
+    }
+@endphp
 <div x-data="{ showCompletionModal: false, showReorderModal: false }" class="min-h-screen bg-[#f8fafc] py-8">
     <div class="max-w-[95%] mx-auto">
         <!-- Header Card -->
@@ -78,7 +105,7 @@
                         <tr class="hover:bg-slate-50/70 transition-colors group">
                             <td class="sticky left-0 bg-white group-hover:bg-slate-50 px-8 py-5 z-10 border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)] transition-colors">
                                 <div class="font-bold text-slate-800 text-sm group-hover:text-indigo-700 transition-colors">{{ $item->product_name }}</div>
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">{{ $item->product->pack_name ?? 'N/A' }}</div>
+                                <div class="mt-1.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border {{ getPackBadgeClass($item->product->pack_name ?? '') }}">{{ $item->product->pack_name ?? 'N/A' }}</span></div>
                             </td>
                             <td class="px-6 py-5 text-center bg-indigo-50/10 group-hover:bg-indigo-50/30 transition-colors border-r border-slate-50">
                                 <span class="text-xl font-black text-indigo-600 tracking-tight">{{ number_format($item->final_qty_box, 0) }}</span>
@@ -186,7 +213,7 @@
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="py-4">
                                     <div class="font-bold text-slate-800 text-sm">{{ $item->product_name }}</div>
-                                    <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">{{ $item->product->pack_name ?? '' }}</div>
+                                    <div class="mt-1.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border {{ getPackBadgeClass($item->product->pack_name ?? '') }}">{{ $item->product->pack_name ?? '' }}</span></div>
                                 </td>
                                 <td class="py-4 text-center font-black text-indigo-600 text-lg">
                                     {{ number_format($item->final_qty_box, 0) }}

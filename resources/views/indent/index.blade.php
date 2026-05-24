@@ -3,6 +3,34 @@
 @section('header', 'Indent Manager')
 
 @section('content')
+@php
+    if (!function_exists('getPackBadgeClass')) {
+        function getPackBadgeClass($packName) {
+            if (!$packName) return 'bg-slate-50 text-slate-500 border-slate-200';
+            $name = strtoupper(trim($packName));
+            if (str_contains($name, '1 KG') || str_contains($name, '1 LTR') || str_contains($name, '1KG') || str_contains($name, '1LTR')) {
+                return 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
+            }
+            if (str_contains($name, '500 GM') || str_contains($name, '500 ML') || str_contains($name, '500GM') || str_contains($name, '500ML')) {
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
+            }
+            if (str_contains($name, '250 GM') || str_contains($name, '250 ML') || str_contains($name, '250GM') || str_contains($name, '250ML')) {
+                return 'bg-rose-50 text-rose-700 border-rose-200/60';
+            }
+            if (str_contains($name, '100 GM') || str_contains($name, '100 ML') || str_contains($name, '100GM') || str_contains($name, '100ML')) {
+                return 'bg-amber-50 text-amber-700 border-amber-200/60';
+            }
+            if (str_contains($name, '50 GM') || str_contains($name, '50 ML') || str_contains($name, '50GM') || str_contains($name, '50ML')) {
+                return 'bg-cyan-50 text-cyan-700 border-cyan-200/60';
+            }
+            if (str_contains($name, '5 LTR') || str_contains($name, '5 KG') || str_contains($name, '5LTR') || str_contains($name, '5KG')) {
+                return 'bg-teal-50 text-teal-700 border-teal-200/60';
+            }
+            return 'bg-violet-50 text-violet-700 border-violet-200/60';
+        }
+    }
+@endphp
+
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
     <!-- Left Panel: Bulk Entry (40%) -->
     <div class="lg:col-span-12 xl:col-span-5 flex flex-col gap-6">
@@ -80,7 +108,7 @@
                                         <div class="font-bold text-slate-700 text-xs sm:text-sm mb-1 truncate group-hover:text-indigo-700 transition-colors" title="{{ $product->name }}">{{ $product->name }}</div>
                                         <div class="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-mono font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{{ $product->item_code }}</span>
-                                            <span class="text-[8px] sm:text-[9px] font-semibold text-slate-400 uppercase tracking-widest">{{ $product->pack_name }}</span>
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border {{ getPackBadgeClass($product->pack_name) }}">{{ $product->pack_name }}</span>
                                         </div>
                                     </td>
                                     <td class="px-2 sm:px-5 py-3 text-center">
@@ -446,6 +474,30 @@
 <script>
     let stockCache = {};
 
+    function getPackBadgeClass(packName) {
+        if (!packName) return 'bg-slate-50 text-slate-500 border-slate-200';
+        const name = packName.toUpperCase().trim();
+        if (name.includes('1 KG') || name.includes('1 LTR') || name.includes('1KG') || name.includes('1LTR')) {
+            return 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
+        }
+        if (name.includes('500 GM') || name.includes('500 ML') || name.includes('500GM') || name.includes('500ML')) {
+            return 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
+        }
+        if (name.includes('250 GM') || name.includes('250 ML') || name.includes('250GM') || name.includes('250ML')) {
+            return 'bg-rose-50 text-rose-700 border-rose-200/60';
+        }
+        if (name.includes('100 GM') || name.includes('100 ML') || name.includes('100GM') || name.includes('100ML')) {
+            return 'bg-amber-50 text-amber-700 border-amber-200/60';
+        }
+        if (name.includes('50 GM') || name.includes('50 ML') || name.includes('50GM') || name.includes('50ML')) {
+            return 'bg-cyan-50 text-cyan-700 border-cyan-200/60';
+        }
+        if (name.includes('5 LTR') || name.includes('5 KG') || name.includes('5LTR') || name.includes('5KG')) {
+            return 'bg-teal-50 text-teal-700 border-teal-200/60';
+        }
+        return 'bg-violet-50 text-violet-700 border-violet-200/60';
+    }
+
     function syncGlobalUnit() {
         const unit = document.getElementById('global_unit').value;
         const labels = document.querySelectorAll('.selected-unit-label');
@@ -545,7 +597,7 @@
                 tr.innerHTML = `
                     <td class="py-4 px-6">
                         <div class="font-bold text-slate-800 text-sm group-hover:text-indigo-700 transition-colors">${pName}</div>
-                        <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-1">${pPack}</div>
+                        <div class="mt-1.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-bold border ${getPackBadgeClass(pPack)}">${pPack}</span></div>
                     </td>
                     <td class="py-4 text-center px-4">
                         <div class="text-xs font-black text-emerald-600">${parseFloat(stock.stock_boxes).toFixed(2)} BOX</div>
