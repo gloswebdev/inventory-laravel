@@ -1786,6 +1786,9 @@ class MobileController extends Controller implements HasMiddleware
             foreach ($recipe->items as $item) {
                 if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
                     $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                    if ($rmPurity <= 0 && $item->purity > 0) {
+                        $rmPurity = (float) $item->purity;
+                    }
                     if ($rmPurity <= 0) $rmPurity = 100.0;
                     break;
                 }
@@ -1803,7 +1806,14 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $requiredQty = ($baseQty * $formulation) / $rmPurity;
+                    $itemPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
+                    if ($itemPurity <= 0 && $item->purity > 0) {
+                        $itemPurity = (float) $item->purity;
+                    }
+                    if ($itemPurity <= 0) {
+                        $itemPurity = 100.0;
+                    }
+                    $requiredQty = ($baseQty * $formulation) / $itemPurity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
@@ -1883,6 +1893,9 @@ class MobileController extends Controller implements HasMiddleware
             foreach ($recipe->items as $item) {
                 if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
                     $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                    if ($rmPurity <= 0 && $item->purity > 0) {
+                        $rmPurity = (float) $item->purity;
+                    }
                     if ($rmPurity <= 0) $rmPurity = 100.0;
                     break;
                 }
@@ -1898,7 +1911,14 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $requiredQty = ($baseQty * $formulation) / $rmPurity;
+                    $itemPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
+                    if ($itemPurity <= 0 && $item->purity > 0) {
+                        $itemPurity = (float) $item->purity;
+                    }
+                    if ($itemPurity <= 0) {
+                        $itemPurity = 100.0;
+                    }
+                    $requiredQty = ($baseQty * $formulation) / $itemPurity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);

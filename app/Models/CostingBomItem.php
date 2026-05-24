@@ -16,6 +16,7 @@ class CostingBomItem extends Model
         'costing_bom_id',
         'raw_material_id',
         'quantity',
+        'purity',
     ];
 
     public function costingBom(): BelongsTo

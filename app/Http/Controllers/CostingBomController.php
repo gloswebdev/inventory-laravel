@@ -89,6 +89,7 @@ class CostingBomController extends Controller
             'items' => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
+            'items.*.purity' => 'nullable|numeric|min:0.1|max:100',
         ]);
 
         DB::transaction(function () use ($validated) {
@@ -103,6 +104,7 @@ class CostingBomController extends Controller
                     'costing_bom_id'  => $bom->id,
                     'raw_material_id' => $item['raw_material_id'],
                     'quantity'        => $item['quantity'],
+                    'purity'          => $item['purity'] ?? null,
                 ]);
             }
         });
@@ -126,6 +128,7 @@ class CostingBomController extends Controller
             'items' => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
+            'items.*.purity' => 'nullable|numeric|min:0.1|max:100',
         ]);
 
         DB::transaction(function () use ($costingBom, $validated) {
@@ -142,6 +145,7 @@ class CostingBomController extends Controller
                     'costing_bom_id'  => $costingBom->id,
                     'raw_material_id' => $item['raw_material_id'],
                     'quantity'        => $item['quantity'],
+                    'purity'          => $item['purity'] ?? null,
                 ]);
             }
         });

@@ -132,6 +132,9 @@ class CostingController extends Controller
                 foreach ($recipe->items as $item) {
                     if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
                         $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                        if ($rmPurity <= 0 && $item->purity > 0) {
+                            $rmPurity = (float) $item->purity;
+                        }
                         if ($rmPurity <= 0) $rmPurity = 100.0;
                         break;
                     }
@@ -335,6 +338,9 @@ class CostingController extends Controller
                 foreach ($recipe->items as $item) {
                     if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
                         $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
+                        if ($rmPurity <= 0 && $item->purity > 0) {
+                            $rmPurity = (float) $item->purity;
+                        }
                         if ($rmPurity <= 0) $rmPurity = 100.0;
                         break;
                     }
@@ -416,7 +422,12 @@ class CostingController extends Controller
             // Adjust required technical raw material quantity by formulation and purity percentage
             if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
                 $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
-                if ($rmPurity <= 0) $rmPurity = 100.0;
+                if ($rmPurity <= 0 && $item->purity > 0) {
+                    $rmPurity = (float) $item->purity;
+                }
+                if ($rmPurity <= 0) {
+                    $rmPurity = 100.0;
+                }
                 $requiredQty = ($baseQty * $formulation) / $rmPurity;
             }
 

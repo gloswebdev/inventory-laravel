@@ -141,6 +141,15 @@
                                 <span class="font-semibold text-slate-700 truncate max-w-[160px]">{{ $item->rawMaterial->name ?? '?' }}</span>
                                 <span class="text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">{{ $item->quantity }}</span>
                                 <span class="text-slate-400 text-[10px]">{{ $item->rawMaterial->uom ?? '' }}</span>
+                                @if(strtoupper(trim($item->rawMaterial->rm_type ?? '')) === 'TECHNICAL')
+                                    @php
+                                        $priceModel = \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->first();
+                                        $purity = ($priceModel && $priceModel->purity !== null) ? $priceModel->purity : $item->purity;
+                                    @endphp
+                                    <span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 whitespace-nowrap">
+                                        Purity: {{ $purity ? $purity . '%' : '—' }}
+                                    </span>
+                                @endif
                             </div>
                             @endforeach
                             @if($bom->items->count() > 4)
@@ -297,9 +306,24 @@
                                                     x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                         </template>
                                     </select>
-                                    <template x-if="item.raw_material_id">
-                                        <div class="text-[9px] text-amber-700 font-black mt-1 ml-1 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
-                                            <i class="fas fa-percent animate-pulse"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
+                                    <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
+                                        <div>
+                                            <!-- Show fetched purity if not null -->
+                                            <template x-if="getPurityVal(item.raw_material_id) !== null">
+                                                <div class="text-[9px] text-amber-700 font-black mt-1 ml-1 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
+                                                    <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
+                                                </div>
+                                            </template>
+                                            
+                                            <!-- Show manual purity input if fetched is null -->
+                                            <template x-if="getPurityVal(item.raw_material_id) === null">
+                                                <div class="mt-1.5 flex items-center gap-1">
+                                                    <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
+                                                    <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
+                                                           class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                           placeholder="100">
+                                                </div>
+                                            </template>
                                         </div>
                                     </template>
                                 </div>
@@ -395,14 +419,25 @@ function bomApp() {
             const rm = __rawMaterials.find(r => r.id == rmId);
             if (!rm) return '—';
             const purity = __purities[rm.item_code];
-            return purity ? purity + '%' : '—';
+            return purity !== undefined && purity !== null ? purity + '%' : '—';
+        },
+
+        isTechnical(rmId) {
+            const rm = __rawMaterials.find(r => r.id == rmId);
+            return rm && rm.rm_type === 'TECHNICAL';
+        },
+
+        getPurityVal(rmId) {
+            const rm = __rawMaterials.find(r => r.id == rmId);
+            if (!rm) return null;
+            return __purities[rm.item_code] !== undefined && __purities[rm.item_code] !== null ? parseFloat(__purities[rm.item_code]) : null;
         },
 
         openBomModal() {
             this.bomModal.editId = null;
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
-            this.bomModal.form = { finished_product_id: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', rm_type_filter: '' }] };
+            this.bomModal.form = { finished_product_id: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '' }] };
             this.bomModal.show = true;
         },
 
@@ -418,6 +453,7 @@ function bomApp() {
                 items: (recipe.items || []).map(i => ({
                     raw_material_id: i.raw_material_id,
                     quantity: i.quantity,
+                    purity: i.purity || '',
                     rm_type_filter: ''
                 }))
             };
@@ -425,7 +461,7 @@ function bomApp() {
         },
 
         addRMRow() {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', rm_type_filter: '' });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '' });
         },
 
         async submitBom() {
