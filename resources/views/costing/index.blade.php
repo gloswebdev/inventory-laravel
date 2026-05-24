@@ -162,6 +162,11 @@
                                        class="w-16 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
                             </div>
                             <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <label class="text-[10px] text-slate-500 font-bold">Formulation (%):</label>
+                                <input type="number" x-model="item.formulation" min="0.1" max="100" step="0.1"
+                                       class="w-16 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
                                 <label class="text-[10px] text-slate-500 font-bold">Density:</label>
                                 <input type="number" x-model="item.density" min="0.1" max="3" step="0.01"
                                        class="w-14 text-center text-xs font-black border border-amber-200 rounded-lg py-1.5 focus:ring-2 focus:ring-amber-400 outline-none">
@@ -224,7 +229,7 @@
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-black text-slate-800 truncate" x-text="r.product_name"></div>
-                                <div class="text-[10px] text-slate-400 font-bold" x-text="'Qty: ' + r.quantity + ' | Purity: ' + r.purity + '% | Density: ' + r.density + ' | ₹' + (r.cost_per_unit||0).toLocaleString('en-IN',{minimumFractionDigits:2}) + '/unit'"></div>
+                                <div class="text-[10px] text-slate-400 font-bold" x-text="'Qty: ' + r.quantity + ' | Purity: ' + r.purity + '% | Formulation: ' + r.formulation + '% | Density: ' + r.density + ' | ₹' + (r.cost_per_unit||0).toLocaleString('en-IN',{minimumFractionDigits:2}) + '/unit'"></div>
                             </div>
                             <div class="text-right flex-shrink-0">
                                 <div class="text-sm font-black text-amber-600" x-text="'₹ ' + (r.total_cost||0).toLocaleString('en-IN',{minimumFractionDigits:2})"></div>
@@ -328,7 +333,11 @@ function costingApp() {
         isSelected(id) { return this.selected.some(s => s.id === id); },
         toggleProduct(id, name, pack_name) {
             if (this.isSelected(id)) { this.selected = this.selected.filter(s => s.id !== id); }
-            else { this.selected.push({ id, name, pack_name, quantity: 1, purity: 100, density: 1.0 }); }
+            else {
+                const match = name.match(/(\d+(?:\.\d+)?)\s*%/);
+                const defaultFormulation = match ? parseFloat(match[1]) : 100;
+                this.selected.push({ id, name, pack_name, quantity: 1, purity: 100, formulation: defaultFormulation, density: 1.0 });
+            }
         },
         removeProduct(id) { this.selected = this.selected.filter(s => s.id !== id); },
 
@@ -348,7 +357,7 @@ function costingApp() {
                 const resp = await fetch('{{ route('costing.calculate') }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-                    body: JSON.stringify({ products: this.selected.map(s => ({ id: s.id, quantity: parseFloat(s.quantity) || 1, purity: parseFloat(s.purity) || 100, density: parseFloat(s.density) || 1.0 })) })
+                    body: JSON.stringify({ products: this.selected.map(s => ({ id: s.id, quantity: parseFloat(s.quantity) || 1, purity: parseFloat(s.purity) || 100, formulation: parseFloat(s.formulation) || 100, density: parseFloat(s.density) || 1.0 })) })
                 });
                 const data = await resp.json();
                 if (data.success) { this.results = data.results; this.grandTotal = data.grand_total; }
@@ -410,6 +419,12 @@ function costingApp() {
                 pInput.name   = `purities[${s.id}]`;
                 pInput.value  = s.purity || 100;
                 fields.appendChild(pInput);
+
+                const fInput  = document.createElement('input');
+                fInput.type   = 'hidden';
+                fInput.name   = `formulations[${s.id}]`;
+                fInput.value  = s.formulation || 100;
+                fields.appendChild(fInput);
 
                 const dInput  = document.createElement('input');
                 dInput.type   = 'hidden';

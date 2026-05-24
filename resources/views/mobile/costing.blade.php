@@ -114,20 +114,29 @@
                         </div>
                     </div>
                     
-                    <!-- Purity & Density Grid -->
-                    <div class="grid grid-cols-2 gap-3 pt-2.5 border-t border-yellow-100/50">
+                    <!-- Purity, Formulation & Density Grid -->
+                    <div class="grid grid-cols-3 gap-2 pt-2.5 border-t border-yellow-100/50">
                         <!-- Tech Purity -->
                         <div>
-                            <label class="text-[9px] font-black text-yellow-800 uppercase tracking-wider block mb-1">Tech Purity (%):</label>
+                            <label class="text-[8px] font-black text-yellow-800 uppercase tracking-tight block mb-1 truncate">Purity (%):</label>
                             <input type="number"
                                    :value="getPurity({{ $product->id }})"
                                    @input.stop="setPurity({{ $product->id }}, $event.target.value)"
                                    min="1" max="100" step="0.1"
                                    class="w-full text-center font-black text-xs text-slate-800 bg-white border border-yellow-200 rounded-xl py-2 outline-none focus:ring-2 focus:ring-yellow-400">
                         </div>
+                        <!-- Formulation -->
+                        <div>
+                            <label class="text-[8px] font-black text-yellow-800 uppercase tracking-tight block mb-1 truncate">Formulation (%):</label>
+                            <input type="number"
+                                   :value="getFormulation({{ $product->id }})"
+                                   @input.stop="setFormulation({{ $product->id }}, $event.target.value)"
+                                   min="0.1" max="100" step="0.1"
+                                   class="w-full text-center font-black text-xs text-slate-800 bg-white border border-yellow-200 rounded-xl py-2 outline-none focus:ring-2 focus:ring-yellow-400">
+                        </div>
                         <!-- Density -->
                         <div>
-                            <label class="text-[9px] font-black text-yellow-800 uppercase tracking-wider block mb-1">Density (g/ml):</label>
+                            <label class="text-[8px] font-black text-yellow-800 uppercase tracking-tight block mb-1 truncate">Density (g/ml):</label>
                             <input type="number"
                                    :value="getDensity({{ $product->id }})"
                                    @input.stop="setDensity({{ $product->id }}, $event.target.value)"
@@ -176,7 +185,7 @@
                     <div class="flex-1 min-w-0">
                         <div class="font-900 text-slate-800 text-[13px] truncate" x-text="r.product_name"></div>
                         <div class="text-[9px] font-bold text-slate-400 mt-0.5"
-                             x-text="'Qty: ' + r.quantity + ' | Purity: ' + r.purity + '% | Density: ' + r.density + ' | ₹' + (r.cost_per_unit || 0).toLocaleString('en-IN', {minimumFractionDigits:2}) + '/unit'"></div>
+                             x-text="'Qty: ' + r.quantity + ' | Purity: ' + r.purity + '% | Formulation: ' + r.formulation + '% | Density: ' + r.density + ' | ₹' + (r.cost_per_unit || 0).toLocaleString('en-IN', {minimumFractionDigits:2}) + '/unit'"></div>
                     </div>
                     <div class="text-right flex-shrink-0">
                         <div class="font-900 text-yellow-700 text-base" x-text="'₹' + (r.total_cost || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})"></div>
@@ -274,6 +283,16 @@ function mobileCostingApp() {
             if (item) item.purity = Math.max(1, Math.min(100, parseFloat(val) || 100));
         },
 
+        getFormulation(id) {
+            const item = this.selected.find(s => s.id === id);
+            return item ? item.formulation : 100;
+        },
+
+        setFormulation(id, val) {
+            const item = this.selected.find(s => s.id === id);
+            if (item) item.formulation = Math.max(0.1, Math.min(100, parseFloat(val) || 100));
+        },
+
         getDensity(id) {
             const item = this.selected.find(s => s.id === id);
             return item ? item.density : 1.0;
@@ -288,7 +307,9 @@ function mobileCostingApp() {
             if (this.isSelected(id)) {
                 this.selected = this.selected.filter(s => s.id !== id);
             } else {
-                this.selected.push({ id, name, pack_name, quantity: 1, purity: 100, density: 1.0 });
+                const match = name.match(/(\d+(?:\.\d+)?)\s*%/);
+                const defaultFormulation = match ? parseFloat(match[1]) : 100;
+                this.selected.push({ id, name, pack_name, quantity: 1, purity: 100, formulation: defaultFormulation, density: 1.0 });
             }
         },
 
@@ -318,6 +339,7 @@ function mobileCostingApp() {
                             id: s.id,
                             quantity: parseFloat(s.quantity) || 1,
                             purity: parseFloat(s.purity) || 100,
+                            formulation: parseFloat(s.formulation) || 100,
                             density: parseFloat(s.density) || 1.0
                         }))
                     }),
@@ -360,6 +382,12 @@ function mobileCostingApp() {
                 pInput.name   = `purities[${s.id}]`;
                 pInput.value  = s.purity || 100;
                 fields.appendChild(pInput);
+
+                const fInput  = document.createElement('input');
+                fInput.type   = 'hidden';
+                fInput.name   = `formulations[${s.id}]`;
+                fInput.value  = s.formulation || 100;
+                fields.appendChild(fInput);
 
                 const dInput  = document.createElement('input');
                 dInput.type   = 'hidden';

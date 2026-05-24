@@ -46,6 +46,7 @@
                         {{ $r['product']->pack_name }} &nbsp;&bull;&nbsp;
                         Qty: {{ number_format($r['quantity'], 2) }} &nbsp;&bull;&nbsp;
                         Purity: {{ number_format($r['purity'] ?? 100, 1) }}% &nbsp;&bull;&nbsp;
+                        Formulation: {{ number_format($r['formulation'] ?? 100, 1) }}% &nbsp;&bull;&nbsp;
                         Density: {{ number_format($r['density'] ?? 1.0, 2) }} &nbsp;&bull;&nbsp;
                         Cost/Unit: ₹{{ number_format($r['cost_per_unit'], 2) }}
                     </div>

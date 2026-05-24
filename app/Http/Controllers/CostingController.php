@@ -61,7 +61,9 @@ class CostingController extends Controller
         // Pre-compute per-unit cost for each product using costing BOMs
         $costData = [];
         foreach ($products as $product) {
-            $costData[$product->id] = $this->computeCost($product, $priceMap, 1, 100, 1);
+            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
+            $defaultFormulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+            $costData[$product->id] = $this->computeCost($product, $priceMap, 1, 100, $defaultFormulation, 1);
         }
 
         $activeTab = 'calculator';
@@ -109,6 +111,7 @@ class CostingController extends Controller
             'products.*.id'         => 'required|exists:products,id',
             'products.*.quantity'   => 'required|numeric|min:0.001',
             'products.*.purity'     => 'nullable|numeric|min:1|max:100',
+            'products.*.formulation'=> 'nullable|numeric|min:0.1|max:100',
             'products.*.density'    => 'nullable|numeric|min:0.1|max:3',
         ]);
 
@@ -120,11 +123,12 @@ class CostingController extends Controller
             $product = Product::with('costingBoms.items.rawMaterial')->find($input['id']);
             if (!$product) continue;
 
-            $qty      = (float) $input['quantity'];
-            $purity   = (float) ($input['purity'] ?? 100);
-            $density  = (float) ($input['density'] ?? 1);
+            $qty         = (float) $input['quantity'];
+            $purity      = (float) ($input['purity'] ?? 100);
+            $formulation = (float) ($input['formulation'] ?? 100);
+            $density     = (float) ($input['density'] ?? 1);
 
-            $costData = $this->computeCost($product, $priceMap, $qty, $purity, $density);
+            $costData = $this->computeCost($product, $priceMap, $qty, $purity, $formulation, $density);
             $grandTotal += $costData['total_cost'];
 
             $results[] = [
@@ -133,6 +137,7 @@ class CostingController extends Controller
                 'pack_name'     => $product->pack_name,
                 'quantity'      => $qty,
                 'purity'        => $purity,
+                'formulation'   => $formulation,
                 'density'       => $density,
                 'cost_per_unit' => $costData['cost_per_unit'],
                 'total_cost'    => $costData['total_cost'],
@@ -289,11 +294,12 @@ class CostingController extends Controller
             abort(403);
         }
 
-        $productIds = $request->input('product_ids', []);
-        $quantities = $request->input('quantities', []);
-        $purities   = $request->input('purities', []);
-        $densities  = $request->input('densities', []);
-        $priceMap   = ProductPrice::allAsMap();
+        $productIds   = $request->input('product_ids', []);
+        $quantities   = $request->input('quantities', []);
+        $purities     = $request->input('purities', []);
+        $formulations = $request->input('formulations', []);
+        $densities    = $request->input('densities', []);
+        $priceMap     = ProductPrice::allAsMap();
 
         $results    = [];
         $grandTotal = 0;
@@ -305,17 +311,19 @@ class CostingController extends Controller
         $products = $query->orderBy('name')->get();
 
         foreach ($products as $product) {
-            $qty      = (float)($quantities[$product->id] ?? 1);
-            $purity   = (float)($purities[$product->id] ?? 100);
-            $density  = (float)($densities[$product->id] ?? 1);
+            $qty         = (float)($quantities[$product->id] ?? 1);
+            $purity      = (float)($purities[$product->id] ?? 100);
+            $formulation = (float)($formulations[$product->id] ?? 100);
+            $density     = (float)($densities[$product->id] ?? 1);
 
-            $costData = $this->computeCost($product, $priceMap, $qty, $purity, $density);
+            $costData = $this->computeCost($product, $priceMap, $qty, $purity, $formulation, $density);
             $grandTotal += $costData['total_cost'];
             $results[] = array_merge($costData, [
-                'product'  => $product,
-                'quantity' => $qty,
-                'purity'   => $purity,
-                'density'  => $density,
+                'product'     => $product,
+                'quantity'    => $qty,
+                'purity'      => $purity,
+                'formulation' => $formulation,
+                'density'     => $density,
             ]);
         }
 
@@ -332,7 +340,7 @@ class CostingController extends Controller
     /**
      * Compute the manufacturing cost for a product given a quantity.
      */
-    private function computeCost(Product $product, array $priceMap, float $quantity, float $purity = 100, float $density = 1): array
+    private function computeCost(Product $product, array $priceMap, float $quantity, float $purity = 100, float $formulation = 100, float $density = 1): array
     {
         $recipe = $product->costingBoms->first();
 
@@ -345,7 +353,7 @@ class CostingController extends Controller
             ];
         }
 
-        $breakdown    = $this->buildBreakdown($recipe, $priceMap, $quantity, $product, $purity, $density);
+        $breakdown    = $this->buildBreakdown($recipe, $priceMap, $quantity, $product, $purity, $formulation, $density);
         $totalCost    = collect($breakdown)->sum('sub_cost');
         $costPerUnit  = $quantity > 0 ? $totalCost / $quantity : 0;
 
@@ -360,7 +368,7 @@ class CostingController extends Controller
     /**
      * Build the per-item cost breakdown array.
      */
-    private function buildBreakdown(CostingBom $recipe, array $priceMap, float $quantity = 1, ?Product $finishedProduct = null, float $purity = 100, float $density = 1): array
+    private function buildBreakdown(CostingBom $recipe, array $priceMap, float $quantity = 1, ?Product $finishedProduct = null, float $purity = 100, float $formulation = 100, float $density = 1): array
     {
         $breakdown = [];
         $fp        = $finishedProduct ?? $recipe->finishedProduct;
@@ -376,9 +384,9 @@ class CostingController extends Controller
             // Qty of RM needed for this batch
             $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
             
-            // Adjust required technical raw material quantity by purity percentage
+            // Adjust required technical raw material quantity by formulation and purity percentage
             if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                $requiredQty = $requiredQty / ($purity / 100);
+                $requiredQty = ($baseQty * $formulation) / $purity;
             }
 
             $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);

@@ -1747,6 +1747,7 @@ class MobileController extends Controller implements HasMiddleware
             'products.*.id'       => 'required|exists:products,id',
             'products.*.quantity' => 'required|numeric|min:0.001',
             'products.*.purity'   => 'nullable|numeric|min:1|max:100',
+            'products.*.formulation'=> 'nullable|numeric|min:0.1|max:100',
             'products.*.density'  => 'nullable|numeric|min:0.1|max:3',
         ]);
 
@@ -1758,9 +1759,10 @@ class MobileController extends Controller implements HasMiddleware
             $product = \App\Models\Product::with('costingBoms.items.rawMaterial')->find($input['id']);
             if (!$product) continue;
 
-            $qty     = (float) $input['quantity'];
-            $purity  = (float) ($input['purity'] ?? 100);
-            $density = (float) ($input['density'] ?? 1);
+            $qty         = (float) $input['quantity'];
+            $purity      = (float) ($input['purity'] ?? 100);
+            $formulation = (float) ($input['formulation'] ?? 100);
+            $density     = (float) ($input['density'] ?? 1);
 
             $recipe = $product->costingBoms->first();
 
@@ -1770,6 +1772,7 @@ class MobileController extends Controller implements HasMiddleware
                     'product_name'  => $product->name,
                     'quantity'      => $qty,
                     'purity'        => $purity,
+                    'formulation'   => $formulation,
                     'density'       => $density,
                     'cost_per_unit' => 0,
                     'total_cost'    => 0,
@@ -1791,7 +1794,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $requiredQty = $requiredQty / ($purity / 100);
+                    $requiredQty = ($baseQty * $formulation) / $purity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
@@ -1818,6 +1821,7 @@ class MobileController extends Controller implements HasMiddleware
                 'pack_name'     => $product->pack_name,
                 'quantity'      => $qty,
                 'purity'        => $purity,
+                'formulation'   => $formulation,
                 'density'       => $density,
                 'cost_per_unit' => round($costPerUnit, 2),
                 'total_cost'    => round($totalCost, 2),
@@ -1842,13 +1846,14 @@ class MobileController extends Controller implements HasMiddleware
             abort(403);
         }
 
-        $productIds = $request->input('product_ids', []);
-        $quantities = $request->input('quantities', []);
-        $purities   = $request->input('purities', []);
-        $densities  = $request->input('densities', []);
-        $priceMap   = \App\Models\ProductPrice::allAsMap();
-        $results    = [];
-        $grandTotal = 0;
+        $productIds   = $request->input('product_ids', []);
+        $quantities   = $request->input('quantities', []);
+        $purities     = $request->input('purities', []);
+        $formulations = $request->input('formulations', []);
+        $densities    = $request->input('densities', []);
+        $priceMap     = \App\Models\ProductPrice::allAsMap();
+        $results      = [];
+        $grandTotal   = 0;
 
         $query = \App\Models\Product::with('costingBoms.items.rawMaterial')->whereHas('costingBoms');
         if (!empty($productIds)) {
@@ -1857,9 +1862,10 @@ class MobileController extends Controller implements HasMiddleware
         $products = $query->orderBy('name')->get();
 
         foreach ($products as $product) {
-            $qty     = (float)($quantities[$product->id] ?? 1);
-            $purity  = (float)($purities[$product->id] ?? 100);
-            $density = (float)($densities[$product->id] ?? 1);
+            $qty         = (float)($quantities[$product->id] ?? 1);
+            $purity      = (float)($purities[$product->id] ?? 100);
+            $formulation = (float)($formulations[$product->id] ?? 100);
+            $density     = (float)($densities[$product->id] ?? 1);
             
             $recipe = $product->costingBoms->first();
             if (!$recipe) continue;
@@ -1874,7 +1880,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $requiredQty = $requiredQty / ($purity / 100);
+                    $requiredQty = ($baseQty * $formulation) / $purity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
@@ -1894,6 +1900,7 @@ class MobileController extends Controller implements HasMiddleware
                 'product'      => $product,
                 'quantity'     => $qty,
                 'purity'       => $purity,
+                'formulation'  => $formulation,
                 'density'      => $density,
                 'total_cost'   => round($totalCost, 2),
                 'cost_per_unit'=> $qty > 0 ? round($totalCost / $qty, 2) : 0,
