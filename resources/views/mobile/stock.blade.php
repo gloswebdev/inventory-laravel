@@ -64,7 +64,7 @@
             <div>
                 <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-3 mb-2 block">Type</label>
                 <div class="relative">
-                    <select x-model="typeId" @change="refreshPage()" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60/50 rounded-2xl py-4 px-5 text-[10px] font-bold text-slate-700 appearance-none shadow-md">
+                    <select id="mTypeIdFilter" x-model="typeId" @change="refreshPage()" class="w-full bg-white/40 backdrop-blur-sm border-2 border-white/60/50 rounded-2xl py-4 px-5 text-[10px] font-bold text-slate-700 appearance-none shadow-md">
                         <option value="">All Types</option>
                         @foreach($productTypes as $type)
                             <option value="{{ $type->id }}">{{ $type->type_name }}</option>
@@ -121,6 +121,47 @@
                 </div>
             </div>
             @endif
+        </div>
+    </div>
+
+    {{-- Selective Products Bottom-Sheet Picker --}}
+    <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-5 rounded-[2.5rem] border border-white/50">
+        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mb-2 flex items-center justify-between">
+            <span>Selective Products <span class="font-normal normal-case text-slate-300">(empty = all)</span></span>
+            <span id="mpms-badge" style="background:#6366f1;color:#fff;border-radius:9999px;font-size:0.55rem;font-weight:900;padding:2px 8px;display:none;">0 selected</span>
+        </label>
+        <div id="mpms-wrapper"
+            onclick="mpmsOpen()"
+            style="min-height:48px;border-radius:1rem;background:rgba(255,255,255,0.5);border:2px solid rgba(255,255,255,0.6);padding:8px 14px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.06);">
+            <div id="mpms-tags" style="display:contents;"></div>
+            <span id="mpms-placeholder" style="font-size:0.72rem;font-weight:700;color:#94a3b8;"><i class="fas fa-filter mr-1 text-[0.6rem]"></i>Tap to pick products...</span>
+        </div>
+        <div id="mpms-inputs"></div>
+    </div>
+
+    {{-- Bottom Sheet Modal --}}
+    <div id="mpms-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,22,35,0.6);backdrop-filter:blur(4px);" onclick="if(event.target===this) mpmsClose()">
+        <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:2rem 2rem 0 0;max-height:82vh;display:flex;flex-direction:column;">
+            <div style="width:36px;height:4px;background:#e2e8f0;border-radius:2px;margin:10px auto 0;flex-shrink:0;"></div>
+            <div style="padding:16px 20px 12px;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <div style="font-size:0.8rem;font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:0.08em;">Pick Products</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span id="mpms-modal-count" style="background:#6366f1;color:#fff;border-radius:9999px;font-size:0.6rem;font-weight:900;padding:2px 8px;display:none;">0 selected</span>
+                        <button onclick="mpmsClose()" style="width:32px;height:32px;border-radius:50%;background:#f1f5f9;border:none;font-size:1rem;cursor:pointer;color:#64748b;">×</button>
+                    </div>
+                </div>
+                <div style="position:relative;">
+                    <input id="mpms-search" type="search" placeholder="Search name, code or pack size..." autocomplete="off"
+                        oninput="mpmsSearch(this.value)"
+                        style="width:100%;border:1.5px solid #e2e8f0;border-radius:0.75rem;padding:10px 40px 10px 14px;font-size:0.78rem;font-weight:600;color:#1e293b;background:#f8fafc;outline:none;box-sizing:border-box;">
+                    <i class="fas fa-search" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.7rem;pointer-events:none;"></i>
+                </div>
+            </div>
+            <div id="mpms-list" style="overflow-y:auto;flex:1;padding:8px 0;"></div>
+            <div style="padding:16px 20px;border-top:1px solid #f1f5f9;flex-shrink:0;safe-area-inset-bottom:env(safe-area-inset-bottom);">
+                <button onclick="mpmsDone()" style="width:100%;padding:14px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;border-radius:1rem;font-size:0.78rem;font-weight:900;cursor:pointer;letter-spacing:0.05em;text-transform:uppercase;">Done &nbsp;✓</button>
+            </div>
         </div>
     </div>
 
@@ -266,6 +307,10 @@
                 if (this.search) url.searchParams.set('search', this.search);
                 if (this.typeId) url.searchParams.set('type_id', this.typeId);
                 if (this.rmType) url.searchParams.set('rm_type', this.rmType);
+                // Append selected product IDs
+                document.querySelectorAll('#mpms-inputs input').forEach(inp => {
+                    url.searchParams.append('product_ids[]', inp.value);
+                });
                 window.location.href = url.toString();
             },
 
@@ -309,9 +354,192 @@
                 if (this.search) url.searchParams.set('search', this.search);
                 if (this.typeId) url.searchParams.set('type_id', this.typeId);
                 if (this.rmType) url.searchParams.set('rm_type', this.rmType);
+                document.querySelectorAll('#mpms-inputs input').forEach(inp => {
+                    url.searchParams.append('product_ids[]', inp.value);
+                });
                 window.location.href = url.toString();
             }
         }
     }
+</script>
+
+<style>
+    .mpms-item { display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid #f8fafc;cursor:pointer;transition:background 0.1s; }
+    .mpms-item:active { background:#f0f9ff; }
+    .mpms-item.sel { background:#f0fdf4; }
+    .mpms-check { width:20px;height:20px;border-radius:5px;border:2px solid #e2e8f0;flex-shrink:0;transition:all 0.1s; }
+    .mpms-item.sel .mpms-check { background:#22c55e;border-color:#22c55e;position:relative; }
+    .mpms-item.sel .mpms-check::after { content:'✓';position:absolute;top:-1px;left:2px;color:#fff;font-size:11px;font-weight:900; }
+    .mpms-name { font-size:0.78rem;font-weight:700;color:#1e293b;flex:1;line-height:1.3; }
+    .mpms-code { font-size:0.62rem;font-weight:900;color:#6366f1;background:#eef2ff;border-radius:4px;padding:2px 5px;flex-shrink:0; }
+    .mpms-pack { font-size:0.6rem;font-weight:800;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:4px;padding:1px 5px;flex-shrink:0; }
+    .mpms-tag { display:inline-flex;align-items:center;gap:3px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:5px;font-size:0.62rem;font-weight:800;padding:2px 5px 2px 7px;line-height:1.4; }
+    .mpms-tag button { border:none;background:none;cursor:pointer;color:#818cf8;font-size:0.9rem;line-height:1;padding:0 2px; }
+    .mpms-empty { padding:24px;text-align:center;color:#94a3b8;font-size:0.75rem;font-style:italic; }
+</style>
+
+<script>
+    @php
+        $mpmsAllProducts = $allProducts->map(function($p) {
+            return [
+                'id'              => (string) $p->id,
+                'name'            => $p->name,
+                'item_code'       => $p->item_code,
+                'pack_name'       => $p->pack_name ?? '',
+                'product_type_id' => (string) ($p->product_type_id ?? ''),
+            ];
+        })->values()->all();
+        $mpmsInitIds = array_map('strval', request()->input('product_ids', []));
+    @endphp
+
+    const MPMS_ALL  = @json($mpmsAllProducts);
+    const MPMS_INIT = @json($mpmsInitIds);
+
+    let mpmsSelected = new Map();
+    let mpmsFiltered = MPMS_ALL;
+    let mpmsJustDone = false;
+
+    function mpmsGetFiltered(typeId) {
+        if (!typeId) return MPMS_ALL;
+        return MPMS_ALL.filter(p => p.product_type_id === String(typeId));
+    }
+
+    function mpmsEsc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function mpmsRenderTags() {
+        const tags = document.getElementById('mpms-tags');
+        const ph   = document.getElementById('mpms-placeholder');
+        const badge = document.getElementById('mpms-badge');
+        const mBadge = document.getElementById('mpms-modal-count');
+        const inp   = document.getElementById('mpms-inputs');
+
+        tags.innerHTML = '';
+        inp.innerHTML  = '';
+
+        const count = mpmsSelected.size;
+        badge.textContent  = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+        ph.style.display = count > 0 ? 'none' : 'inline';
+
+        if (mBadge) {
+            mBadge.textContent  = count + ' selected';
+            mBadge.style.display = count > 0 ? 'inline-block' : 'none';
+        }
+
+        mpmsSelected.forEach((p, id) => {
+            // Tag
+            const t = document.createElement('span');
+            t.className = 'mpms-tag';
+            t.innerHTML = `${mpmsEsc(p.item_code)}<button type="button" onclick="mpmsRemove('${id}');event.stopPropagation();">×</button>`;
+            tags.appendChild(t);
+            // Hidden input
+            const h = document.createElement('input');
+            h.type = 'hidden'; h.name = 'product_ids[]'; h.value = id;
+            inp.appendChild(h);
+        });
+    }
+
+    function mpmsRenderList(query) {
+        const list = document.getElementById('mpms-list');
+        const q = (query || '').toLowerCase().trim();
+        const shown = q
+            ? mpmsFiltered.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                p.item_code.toLowerCase().includes(q) ||
+                (p.pack_name && p.pack_name.toLowerCase().includes(q))
+              )
+            : mpmsFiltered;
+
+        if (shown.length === 0) {
+            list.innerHTML = '<div class="mpms-empty">No products found</div>';
+            return;
+        }
+        list.innerHTML = '';
+        shown.forEach(p => {
+            const isSel = mpmsSelected.has(p.id);
+            const div = document.createElement('div');
+            div.className = 'mpms-item' + (isSel ? ' sel' : '');
+            div.innerHTML = `<span class="mpms-check"></span><span class="mpms-name">${mpmsEsc(p.name)}</span><span class="mpms-code">${mpmsEsc(p.item_code)}</span>${p.pack_name ? '<span class="mpms-pack">' + mpmsEsc(p.pack_name) + '</span>' : ''}`;
+            div.ontouchstart = () => {}; // enable :active on iOS
+            div.onclick = () => mpmsToggle(p);
+            list.appendChild(div);
+        });
+    }
+
+    function mpmsToggle(p) {
+        if (mpmsSelected.has(p.id)) mpmsSelected.delete(p.id);
+        else mpmsSelected.set(p.id, p);
+        mpmsRenderTags();
+        mpmsRenderList(document.getElementById('mpms-search')?.value);
+    }
+
+    function mpmsRemove(id) {
+        mpmsSelected.delete(id);
+        mpmsRenderTags();
+    }
+
+    function mpmsOpen() {
+        const typeEl = document.getElementById('mTypeIdFilter');
+        mpmsFiltered = mpmsGetFiltered(typeEl ? typeEl.value : '');
+        mpmsRenderList('');
+        document.getElementById('mpms-search').value = '';
+        document.getElementById('mpms-modal').style.display = 'block';
+        document.getElementById('mpms-search').focus();
+    }
+
+    function mpmsClose() {
+        document.getElementById('mpms-modal').style.display = 'none';
+    }
+
+    function mpmsDone() {
+        mpmsClose();
+        // Use Alpine v3 API to access stockApp data
+        let url = new URL('{{ route('mobile.stock') }}');
+        const alpineEl = document.querySelector('[x-data]');
+        if (alpineEl) {
+            try {
+                const app = Alpine.$data(alpineEl);
+                if (app.selectedBranch) url.searchParams.set('branch', app.selectedBranch);
+                if (app.displayUnit && app.displayUnit !== 'unit') url.searchParams.set('display_unit', app.displayUnit);
+                if (app.stockFilter && app.stockFilter !== 'all') url.searchParams.set('stock_filter', app.stockFilter);
+                if (app.search) url.searchParams.set('search', app.search);
+                if (app.typeId) url.searchParams.set('type_id', app.typeId);
+                if (app.rmType) url.searchParams.set('rm_type', app.rmType);
+            } catch(e) {
+                console.warn('Alpine data access failed, using URL params only:', e);
+            }
+        }
+        // Append selected product IDs from hidden inputs
+        document.querySelectorAll('#mpms-inputs input').forEach(inp => {
+            url.searchParams.append('product_ids[]', inp.value);
+        });
+        window.location.href = url.toString();
+    }
+
+    function mpmsSearch(val) {
+        mpmsRenderList(val);
+    }
+
+    // Sync type filter with product picker
+    document.addEventListener('DOMContentLoaded', function () {
+        const typeEl = document.getElementById('mTypeIdFilter');
+        if (typeEl) {
+            typeEl.addEventListener('change', function () {
+                mpmsFiltered = mpmsGetFiltered(this.value);
+                mpmsSelected.clear();
+                mpmsRenderTags();
+            });
+            mpmsFiltered = mpmsGetFiltered(typeEl.value);
+        }
+
+        // Restore pre-selected from URL
+        MPMS_INIT.forEach(id => {
+            const found = MPMS_ALL.find(p => p.id === id);
+            if (found) mpmsSelected.set(id, found);
+        });
+        mpmsRenderTags();
+    });
 </script>
 @endsection

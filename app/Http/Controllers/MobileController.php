@@ -298,6 +298,12 @@ class MobileController extends Controller implements HasMiddleware
             $productsQuery->where('rm_type', $request->rm_type);
         }
         
+        // Selective Products Filter
+        $productIds = $request->input('product_ids', []);
+        if (!empty($productIds)) {
+            $productsQuery->whereIn('id', $productIds);
+        }
+        
         // Pagination (20 items)
         $paginatedProducts = $productsQuery->paginate(20);
         $products = $paginatedProducts->items();
@@ -379,16 +385,29 @@ class MobileController extends Controller implements HasMiddleware
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
         $rmTypes = \App\Models\ProductAttribute::where('type', 'rm_type')->orderBy('value')->get();
 
+        // All products for the selective picker
+        $allProductsQuery = Product::orderBy('name')->select('id', 'name', 'item_code', 'pack_name', 'product_type_id');
+        if ($user->role !== 'admin') {
+            $allProductsQuery->whereIn('product_type_id', $permittedTypeIds)
+                ->where(function($q) use ($permittedRMTypes) {
+                    $q->whereIn('rm_type', $permittedRMTypes)
+                      ->orWhereNull('rm_type')
+                      ->orWhere('rm_type', '');
+                });
+        }
+        $allProducts = $allProductsQuery->get();
+
         return view('mobile.stock', [
-            'products' => $filteredProducts,
-            'branches' => $branches,
+            'products'       => $filteredProducts,
+            'branches'       => $branches,
             'selectedBranch' => $selectedBranch,
-            'stocks' => $stocks,
-            'displayUnit' => $displayUnit,
-            'stockFilter' => $stockFilter,
-            'hasMore' => $paginatedProducts->hasMorePages(),
-            'productTypes' => $productTypes,
-            'rmTypes' => $rmTypes
+            'stocks'         => $stocks,
+            'displayUnit'    => $displayUnit,
+            'stockFilter'    => $stockFilter,
+            'hasMore'        => $paginatedProducts->hasMorePages(),
+            'productTypes'   => $productTypes,
+            'rmTypes'        => $rmTypes,
+            'allProducts'    => $allProducts,
         ]);
     }
 
@@ -433,6 +452,11 @@ class MobileController extends Controller implements HasMiddleware
 
         if ($request->filled('rm_type')) {
             $query->where('rm_type', $request->rm_type);
+        }
+
+        $productIds = $request->input('product_ids', []);
+        if (!empty($productIds)) {
+            $query->whereIn('id', $productIds);
         }
 
         $products = $query->get();
@@ -498,7 +522,13 @@ class MobileController extends Controller implements HasMiddleware
             $query->where('rm_type', $request->rm_type);
         }
 
+        $productIds = $request->input('product_ids', []);
+        if (!empty($productIds)) {
+            $query->whereIn('id', $productIds);
+        }
+
         $products = $query->get();
+
         $selectedBranch = $request->get('branch');
 
         $reportData = [];

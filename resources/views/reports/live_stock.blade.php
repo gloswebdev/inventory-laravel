@@ -14,67 +14,98 @@
 
     {{-- Filter Bar --}}
     <div class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <form action="{{ route('reports.live-stock') }}" method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            @if(Auth::user()->hasFeature('reports', 'search'))
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Search Product</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Name or Code..." class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
-            </div>
-            @endif
-            @if(Auth::user()->hasFeature('reports', 'category_filter'))
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Product Type</label>
-                <select name="type_id" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
-                    <option value="">All Types</option>
-                    @foreach($types as $type)
-                        <option value="{{ $type->id }}" {{ request('type_id') == $type->id ? 'selected' : '' }}>{{ $type->type_name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">RM Type</label>
-                <select name="rm_type" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
-                    <option value="">All RM Types</option>
-                    @foreach($rmTypes as $rmType)
-                        <option value="{{ $rmType }}" {{ request('rm_type') == $rmType ? 'selected' : '' }}>{{ $rmType }}</option>
-                    @endforeach
-                </select>
-            </div>
-            @endif
-            @if(Auth::user()->hasFeature('reports', 'display_unit'))
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Display Unit</label>
-                <select name="display_unit" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
-                    <option value="unit" {{ request('display_unit') == 'unit' ? 'selected' : '' }}>Units / Pcs</option>
-                    <option value="kg" {{ request('display_unit') == 'kg' ? 'selected' : '' }}>kg / Ltr</option>
-                </select>
-            </div>
-            @endif
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Per Page</label>
-                <select name="per_page" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
-                    <option value="20" {{ request('per_page') == 20 ? 'selected' : '' }}>20</option>
-                    <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
-                    <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
-                    <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
-                </select>
-            </div>
-            @if(Auth::user()->hasFeature('reports', 'stock_filter'))
-            <div>
-                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Stock Filter</label>
-                <select name="stock_filter" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
-                    <option value="all" {{ request('stock_filter') == 'all' ? 'selected' : '' }}>Show All</option>
-                    <option value="ignore_zero" {{ request('stock_filter') == 'ignore_zero' ? 'selected' : '' }}>Ignore 0 Stock</option>
-                </select>
-            </div>
-            @endif
-            <div class="flex gap-2">
-                <button type="submit" class="flex-grow bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow text-sm">
-                    <i class="fas fa-filter mr-1"></i> Filter
-                </button>
-                @if(request()->anyFilled(['search', 'type_id', 'rm_type', 'display_unit', 'per_page', 'stock_filter']))
-                    <a href="{{ route('reports.live-stock') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow text-sm">Clear</a>
+        <form action="{{ route('reports.live-stock') }}" method="GET" id="liveStockFilterForm">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                @if(Auth::user()->hasFeature('reports', 'search'))
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Search Product</label>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Name or Code..." class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
+                </div>
                 @endif
+                @if(Auth::user()->hasFeature('reports', 'category_filter'))
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Product Type</label>
+                    <select id="typeIdFilter" name="type_id" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
+                        <option value="">All Types</option>
+                        @foreach($types as $type)
+                            <option value="{{ $type->id }}" {{ request('type_id') == $type->id ? 'selected' : '' }}>{{ $type->type_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">RM Type</label>
+                    <select name="rm_type" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
+                        <option value="">All RM Types</option>
+                        @foreach($rmTypes as $rmType)
+                            <option value="{{ $rmType }}" {{ request('rm_type') == $rmType ? 'selected' : '' }}>{{ $rmType }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+                @if(Auth::user()->hasFeature('reports', 'display_unit'))
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Display Unit</label>
+                    <select name="display_unit" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
+                        <option value="unit" {{ request('display_unit') == 'unit' ? 'selected' : '' }}>Units / Pcs</option>
+                        <option value="kg" {{ request('display_unit') == 'kg' ? 'selected' : '' }}>kg / Ltr</option>
+                    </select>
+                </div>
+                @endif
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Per Page</label>
+                    <select name="per_page" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
+                        <option value="20" {{ request('per_page') == 20 ? 'selected' : '' }}>20</option>
+                        <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                        <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
+                        <option value="all" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
+                    </select>
+                </div>
+                @if(Auth::user()->hasFeature('reports', 'stock_filter'))
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Stock Filter</label>
+                    <select name="stock_filter" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
+                        <option value="all" {{ request('stock_filter') == 'all' ? 'selected' : '' }}>Show All</option>
+                        <option value="ignore_zero" {{ request('stock_filter') == 'ignore_zero' ? 'selected' : '' }}>Ignore 0 Stock</option>
+                    </select>
+                </div>
+                @endif
+            </div>
+
+            {{-- Selective Products Multi-Pick Row --}}
+            <div class="mt-4 border-t border-gray-200 pt-4">
+                <div class="flex items-end gap-4">
+                    <div class="flex-grow" style="position:relative">
+                        <label class="block text-xs font-bold text-gray-600 uppercase mb-1" style="display:flex;justify-content:space-between;align-items:center">
+                            <span>Selective Products <span class="text-gray-400 font-normal normal-case">(leave empty = show all)</span></span>
+                            <span id="pms-badge" style="background:#6366f1;color:#fff;border-radius:9999px;font-size:0.6rem;font-weight:900;padding:1px 7px;display:none;">0 selected</span>
+                        </label>
+                        {{-- Custom Multi-Select Widget --}}
+                        <div id="pms-wrapper" style="border:1px solid #d1d5db;border-radius:6px;background:#fff;min-height:38px;cursor:text;padding:4px 8px 4px 6px;display:flex;flex-wrap:wrap;align-items:center;gap:3px;box-shadow:0 1px 2px rgba(0,0,0,0.05);" onclick="document.getElementById('pms-search').focus()">
+                            <div id="pms-tags" style="display:contents"></div>
+                            <input id="pms-search" type="text" placeholder="Type to search and pick products..." autocomplete="off"
+                                style="border:none;outline:none;font-size:0.8rem;min-width:200px;flex:1;padding:2px 4px;background:transparent;"
+                                oninput="pmsSearch(this.value)"
+                                onfocus="pmsOpen()"
+                                onkeydown="pmsKeydown(event)">
+                        </div>
+                        {{-- Dropdown (rendered via JS into body) --}}
+                        <div id="pms-dropdown" style="display:none;position:fixed;z-index:99999;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.15);max-height:260px;overflow-y:auto;min-width:340px;">
+                            <div id="pms-list"></div>
+                        </div>
+                        {{-- Hidden inputs for form submission --}}
+                        <div id="pms-inputs"></div>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded shadow text-sm flex items-center gap-1">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        @if(request()->anyFilled(['search', 'type_id', 'rm_type', 'display_unit', 'per_page', 'stock_filter']) || request()->filled('product_ids'))
+                            <a href="{{ route('reports.live-stock') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center gap-1">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                        @endif
+                    </div>
+                </div>
             </div>
         </form>
     </div>
@@ -260,23 +291,242 @@
 
 <style>
     /* Sticky Column Shadow */
-    .sticky {
-        position: sticky;
-        left: 0;
-        z-index: 5;
-    }
+    .sticky { position: sticky; left: 0; z-index: 5; }
     th.sticky { z-index: 15; }
-    
-    /* Chrome-specific shadow for sticky column */
     td.sticky::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: -5px;
-        bottom: 0;
-        width: 5px;
+        content: ''; position: absolute; top: 0; right: -5px; bottom: 0; width: 5px;
         background: linear-gradient(to right, rgba(0,0,0,0.05), transparent);
         pointer-events: none;
     }
+    /* Custom multi-select */
+    #pms-wrapper:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.25) !important; }
+    .pms-tag {
+        display:inline-flex;align-items:center;gap:3px;
+        background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;
+        border-radius:4px;font-size:0.68rem;font-weight:700;padding:1px 4px 1px 6px;
+    }
+    .pms-tag button { border:none;background:none;cursor:pointer;color:#6b7280;font-size:0.75rem;line-height:1;padding:0 1px; }
+    .pms-tag button:hover { color:#dc2626; }
+    .pms-item {
+        padding:7px 12px;cursor:pointer;font-size:0.8rem;display:flex;align-items:center;gap:6px;
+        border-bottom:1px solid #f1f5f9;
+    }
+    .pms-item:last-child { border-bottom:none; }
+    .pms-item:hover, .pms-item.highlighted { background:#eff6ff; }
+    .pms-item.selected { background:#f0fdf4; }
+    .pms-item .pms-name { font-weight:600;color:#1e293b;flex:1; }
+    .pms-item .pms-code { color:#6366f1;font-weight:800;font-size:0.65rem; }
+    .pms-item .pms-pack {
+        font-size:0.6rem;font-weight:700;font-style:normal;
+        background:#fef3c7;color:#92400e;border:1px solid #fcd34d;
+        border-radius:3px;padding:1px 5px;margin-left:2px;white-space:nowrap;
+    }
+    .pms-item .pms-check { width:14px;height:14px;border-radius:3px;border:2px solid #d1d5db;flex-shrink:0; }
+    .pms-item.selected .pms-check { background:#22c55e;border-color:#22c55e; position:relative; }
+    .pms-item.selected .pms-check::after { content:'✓';position:absolute;top:-2px;left:1px;color:#fff;font-size:10px;font-weight:900; }
+    .pms-empty { padding:12px;text-align:center;color:#94a3b8;font-size:0.78rem;font-style:italic; }
 </style>
+
+<script>
+    @php
+        $allProductsForJs = $allProducts->map(function($p) {
+            return [
+                'id'              => (string) $p->id,
+                'name'            => $p->name,
+                'item_code'       => $p->item_code,
+                'pack_name'       => $p->pack_name ?? '',
+                'product_type_id' => (string) ($p->product_type_id ?? ''),
+            ];
+        })->values()->all();
+        $preSelectedIdsForJs = array_map('strval', request()->input('product_ids', []));
+    @endphp
+
+    const PMS_ALL   = @json($allProductsForJs);
+    const PMS_INIT  = @json($preSelectedIdsForJs);
+
+    let pmsSelected    = new Map(); // id -> product object
+    let pmsFiltered    = [];
+    let pmsHighlight   = -1;
+    let pmsOpen_flag   = false;
+    let pmsJustToggled = false; // prevents clickOutside closing after DOM re-render
+
+    function pmsGetFiltered(typeId) {
+        if (!typeId) return PMS_ALL;
+        return PMS_ALL.filter(p => p.product_type_id === String(typeId));
+    }
+
+    function pmsRenderTags() {
+        const tags = document.getElementById('pms-tags');
+        tags.innerHTML = '';
+        pmsSelected.forEach((p, id) => {
+            const t = document.createElement('span');
+            t.className = 'pms-tag';
+            t.innerHTML = `${p.item_code}${p.pack_name ? ' <em style="font-style:normal;font-weight:400;">· ' + p.pack_name + '</em>' : ''}<button type="button" onclick="pmsRemove('${id}')" title="Remove">×</button>`;
+            tags.appendChild(t);
+        });
+        // Update hidden inputs
+        const inp = document.getElementById('pms-inputs');
+        inp.innerHTML = '';
+        pmsSelected.forEach((p, id) => {
+            const h = document.createElement('input');
+            h.type = 'hidden'; h.name = 'product_ids[]'; h.value = id;
+            inp.appendChild(h);
+        });
+        // Badge
+        const badge = document.getElementById('pms-badge');
+        const count = pmsSelected.size;
+        badge.textContent = count + ' selected';
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+
+    function pmsRenderList(query) {
+        const list = document.getElementById('pms-list');
+        const q = (query || '').toLowerCase().trim();
+        const shown = q
+            ? pmsFiltered.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                p.item_code.toLowerCase().includes(q) ||
+                (p.pack_name && p.pack_name.toLowerCase().includes(q))
+              )
+            : pmsFiltered;
+
+        if (shown.length === 0) {
+            list.innerHTML = '<div class="pms-empty">No products found</div>';
+            pmsHighlight = -1;
+            return;
+        }
+        list.innerHTML = '';
+        shown.forEach((p, idx) => {
+            const isSel = pmsSelected.has(p.id);
+            const div = document.createElement('div');
+            div.className = 'pms-item' + (isSel ? ' selected' : '') + (idx === pmsHighlight ? ' highlighted' : '');
+            div.dataset.id = p.id;
+            div.dataset.idx = idx;
+            div.innerHTML = `<span class="pms-check"></span><span class="pms-name">${esc(p.name)}</span><span class="pms-code">[${esc(p.item_code)}]</span>${p.pack_name ? '<span class="pms-pack">' + esc(p.pack_name) + '</span>' : ''}`;
+            div.onmousedown = (e) => { e.preventDefault(); pmsToggle(p); };
+            list.appendChild(div);
+        });
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function pmsToggle(p) {
+        // Set flag so clickOutside doesn't fire after DOM re-render detaches target
+        pmsJustToggled = true;
+        setTimeout(() => { pmsJustToggled = false; }, 100);
+
+        if (pmsSelected.has(p.id)) {
+            pmsSelected.delete(p.id);
+        } else {
+            pmsSelected.set(p.id, p);
+        }
+        pmsRenderTags();
+        pmsRenderList(document.getElementById('pms-search').value);
+        // Keep input focused so dropdown stays open
+        document.getElementById('pms-search').focus();
+    }
+
+    function pmsRemove(id) {
+        pmsSelected.delete(id);
+        pmsRenderTags();
+        pmsRenderList(document.getElementById('pms-search').value);
+    }
+
+    function pmsOpen() {
+        if (pmsOpen_flag) return;
+        pmsOpen_flag = true;
+        const dd = document.getElementById('pms-dropdown');
+        const wrap = document.getElementById('pms-wrapper');
+        const rect = wrap.getBoundingClientRect();
+        dd.style.top  = (rect.bottom + 4) + 'px';
+        dd.style.left = rect.left + 'px';
+        dd.style.width = Math.max(rect.width, 340) + 'px';
+        dd.style.display = 'block';
+        pmsRenderList(document.getElementById('pms-search').value);
+        document.addEventListener('mousedown', pmsClickOutside);
+        window.addEventListener('scroll', pmsReposition, true);
+    }
+
+    function pmsClose() {
+        pmsOpen_flag = false;
+        document.getElementById('pms-dropdown').style.display = 'none';
+        document.removeEventListener('mousedown', pmsClickOutside);
+        window.removeEventListener('scroll', pmsReposition, true);
+    }
+
+    function pmsReposition() {
+        const wrap = document.getElementById('pms-wrapper');
+        const dd   = document.getElementById('pms-dropdown');
+        const rect = wrap.getBoundingClientRect();
+        dd.style.top  = (rect.bottom + 4) + 'px';
+        dd.style.left = rect.left + 'px';
+    }
+
+    function pmsClickOutside(e) {
+        if (pmsJustToggled) return; // ignore right after a toggle
+        const dd   = document.getElementById('pms-dropdown');
+        const wrap = document.getElementById('pms-wrapper');
+        if (!dd.contains(e.target) && !wrap.contains(e.target)) pmsClose();
+    }
+
+    function pmsSearch(val) {
+        if (!pmsOpen_flag) pmsOpen();
+        pmsHighlight = -1;
+        pmsRenderList(val);
+    }
+
+    function pmsKeydown(e) {
+        const items = document.querySelectorAll('#pms-list .pms-item');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            pmsHighlight = Math.min(pmsHighlight + 1, items.length - 1);
+            items.forEach((el,i) => el.classList.toggle('highlighted', i === pmsHighlight));
+            if (items[pmsHighlight]) items[pmsHighlight].scrollIntoView({block:'nearest'});
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            pmsHighlight = Math.max(pmsHighlight - 1, 0);
+            items.forEach((el,i) => el.classList.toggle('highlighted', i === pmsHighlight));
+            if (items[pmsHighlight]) items[pmsHighlight].scrollIntoView({block:'nearest'});
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (pmsHighlight >= 0 && items[pmsHighlight]) items[pmsHighlight].dispatchEvent(new MouseEvent('mousedown'));
+        } else if (e.key === 'Escape') {
+            pmsClose();
+        }
+    }
+
+    function pmsLoadType(typeId, restoreIds) {
+        pmsFiltered = pmsGetFiltered(typeId);
+        // On type change, keep only selected items that still match new type
+        const filteredSet = new Set(pmsFiltered.map(p => p.id));
+        if (restoreIds) {
+            pmsSelected.clear();
+            restoreIds.forEach(id => {
+                const found = pmsFiltered.find(p => p.id === id);
+                if (found) pmsSelected.set(id, found);
+            });
+        } else {
+            // type changed manually — clear selection
+            pmsSelected.clear();
+        }
+        pmsRenderTags();
+        if (pmsOpen_flag) pmsRenderList(document.getElementById('pms-search').value);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const typeSelect = document.getElementById('typeIdFilter');
+        const initType   = typeSelect ? typeSelect.value : '';
+
+        // Initial load with pre-selected ids from URL
+        pmsLoadType(initType, PMS_INIT);
+
+        if (typeSelect) {
+            typeSelect.addEventListener('change', function () {
+                pmsLoadType(this.value, null);
+            });
+        }
+    });
+</script>
 @endsection

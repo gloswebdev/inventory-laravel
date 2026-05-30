@@ -86,6 +86,11 @@ class ReportController extends Controller
             $query->where('rm_type', $request->rm_type);
         }
 
+        // Selective Products Filter
+        if ($request->filled('product_ids')) {
+            $query->whereIn('id', $request->input('product_ids'));
+        }
+
         if ($perPage === 'all') {
             $products = $query->get();
         } else {
@@ -130,7 +135,12 @@ class ReportController extends Controller
             ];
         }
 
-        return view('reports.live_stock', compact('reportData', 'products', 'branches', 'types', 'rmTypes', 'displayUnit'));
+        // All products for the multi-select picker (unfiltered, just access-controlled)
+        $allProductsQuery = Product::orderBy('name')->select('id', 'name', 'item_code', 'pack_name', 'product_type_id');
+        $this->applyTypeFilters($allProductsQuery);
+        $allProducts = $allProductsQuery->get();
+
+        return view('reports.live_stock', compact('reportData', 'products', 'branches', 'types', 'rmTypes', 'displayUnit', 'allProducts'));
     }
 
     public function exportLiveStockExcel(Request $request)
@@ -159,6 +169,9 @@ class ReportController extends Controller
         }
         if ($request->filled('rm_type')) {
             $query->where('rm_type', $request->rm_type);
+        }
+        if ($request->filled('product_ids')) {
+            $query->whereIn('id', $request->input('product_ids'));
         }
 
         $products = $query->get();
@@ -205,6 +218,9 @@ class ReportController extends Controller
         }
         if ($request->filled('rm_type')) {
             $query->where('rm_type', $request->rm_type);
+        }
+        if ($request->filled('product_ids')) {
+            $query->whereIn('id', $request->input('product_ids'));
         }
 
         $products = $query->get();
