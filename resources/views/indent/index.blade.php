@@ -75,12 +75,10 @@
                     </div>
                     <div>
                         <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Item Type</label>
-                        <select id="item_type_filter" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-bold text-slate-700 shadow-sm" onchange="filterProductsByType()">
-                            <option value="">All Types</option>
-                            @foreach($productTypes as $type)
-                                <option value="{{ $type->id }}" {{ $type->id == $defaultTypeId ? 'selected' : '' }}>{{ $type->type_name }}</option>
-                            @endforeach
-                        </select>
+                        <div class="w-full bg-emerald-50 border border-emerald-200 rounded-xl py-2.5 px-3 text-xs font-black text-emerald-700 shadow-sm flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                            Finished Good
+                        </div>
                     </div>
                 </div>
 
@@ -120,7 +118,7 @@
                                     <td class="px-2 sm:px-5 py-3 text-right">
                                         <input type="number" 
                                                class="product-qty w-full max-w-[100px] ml-auto bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 sm:px-3 text-xs sm:text-sm font-mono font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-right transition-all" 
-                                               placeholder="0" step="0.01">
+                                               placeholder="0" step="1" min="0">
                                         <div class="selected-unit-label text-[8px] sm:text-[9px] font-bold text-indigo-500 mt-1.5 uppercase tracking-widest">BOXES</div>
                                     </td>
                                 </tr>
@@ -565,7 +563,7 @@
 
         for (let row of rows) {
             const qtyInput = row.querySelector('.product-qty');
-            const qtyValue = parseFloat(qtyInput.value || 0);
+            const qtyValue = parseInt(qtyInput.value || 0, 10);
             
             if (qtyValue > 0) {
                 hasData = true;

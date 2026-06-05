@@ -19,7 +19,11 @@ class IndentController extends Controller
      */
     public function index(Request $request)
     {
-        $productsQuery = Product::orderBy('name');
+        // Load only Finished Good products for the indent entry list
+        $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
+        $defaultTypeId = $defaultType ? $defaultType->id : 6;
+
+        $productsQuery = Product::orderBy('name')->where('product_type_id', $defaultTypeId);
         $this->applyTypeFilters($productsQuery);
         $finishedGoods = $productsQuery->get();
         
@@ -46,8 +50,6 @@ class IndentController extends Controller
         $history = $query->orderByDesc('created_at')->limit(50)->get();
         $users = \App\Models\User::orderBy('name')->get();
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
-        $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
-        $defaultTypeId = $defaultType ? $defaultType->id : 6;
 
         return view('indent.index', compact('finishedGoods', 'branches', 'history', 'users', 'productTypes', 'defaultTypeId'));
     }
@@ -146,7 +148,11 @@ class IndentController extends Controller
     {
         $branchCode = $request->get('branch_code');
         
-        $productsQuery = Product::orderBy('name');
+        // Only fetch stock for Finished Good products
+        $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
+        $defaultTypeId = $defaultType ? $defaultType->id : 6;
+
+        $productsQuery = Product::orderBy('name')->where('product_type_id', $defaultTypeId);
         $this->applyTypeFilters($productsQuery);
         $products = $productsQuery->get();
         $externalStock = $this->getExternalStock();
