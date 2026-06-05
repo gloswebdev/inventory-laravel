@@ -209,24 +209,24 @@
         }
     </script>
 
-    <div class="overflow-x-auto">
-        <table class="min-w-full bg-white border border-gray-300">
-            <thead>
+    <div class="overflow-x-auto rounded-lg border border-gray-300 shadow-sm" id="stockTableWrapper">
+        <table class="min-w-full bg-white" style="border-collapse: separate; border-spacing: 0;" id="stockTable">
+            <thead id="stockThead">
                 <tr class="bg-gray-800 text-white uppercase text-[10px] leading-normal font-black">
-                    <th class="py-3 px-4 text-left border-r border-gray-700 sticky left-0 bg-gray-800 z-10 w-64">Product Information</th>
+                    <th class="py-3 px-4 text-left border-r border-gray-700 sticky left-0 bg-gray-800 z-40 w-64" style="box-shadow: 2px 0 4px rgba(0,0,0,0.15);">Product Information</th>
                     @foreach($branches as $branch)
-                        <th class="py-3 px-4 text-center border-r border-gray-700" colspan="2">{{ $branch->name }}</th>
+                        <th class="py-3 px-4 text-center border-r border-b border-gray-700" colspan="2">{{ $branch->name }}</th>
                     @endforeach
-                    <th class="py-3 px-4 text-center bg-indigo-900" colspan="2">Consolidated Total</th>
+                    <th class="py-3 px-4 text-center bg-indigo-900 border-b border-indigo-800" colspan="2">Consolidated Total</th>
                 </tr>
-                <tr class="bg-gray-100 text-gray-600 uppercase text-[9px] leading-normal font-black border-b border-gray-300">
-                    <th class="py-2 px-4 text-left border-r border-gray-300 sticky left-0 bg-gray-100 z-10">Name / Code</th>
+                <tr class="bg-gray-100 text-gray-600 uppercase text-[9px] leading-normal font-black">
+                    <th class="py-2 px-4 text-left border-r border-b border-gray-300 sticky left-0 bg-gray-100 z-40" style="box-shadow: 2px 0 4px rgba(0,0,0,0.08);">Name / Code</th>
                     @foreach($branches as $branch)
-                        <th class="py-2 px-2 text-center border-r border-gray-200">Qty ({{ $displayUnit === 'kg' ? 'kg/Ltr' : 'Unit' }})</th>
-                        <th class="py-2 px-2 text-center border-r border-gray-300">Boxes</th>
+                        <th class="py-2 px-2 text-center border-r border-b border-gray-200">Qty ({{ $displayUnit === 'kg' ? 'kg/Ltr' : 'Unit' }})</th>
+                        <th class="py-2 px-2 text-center border-r border-b border-gray-300">Boxes</th>
                     @endforeach
-                    <th class="py-2 px-2 text-center border-r border-gray-200 bg-indigo-50">Total ({{ $displayUnit === 'kg' ? 'kg/Ltr' : 'Unit' }})</th>
-                    <th class="py-2 px-2 text-center bg-indigo-50">Total Boxes</th>
+                    <th class="py-2 px-2 text-center border-r border-b border-gray-200 bg-indigo-50">Total ({{ $displayUnit === 'kg' ? 'kg/Ltr' : 'Unit' }})</th>
+                    <th class="py-2 px-2 text-center border-b border-indigo-100 bg-indigo-50">Total Boxes</th>
                 </tr>
             </thead>
             <tbody class="text-gray-700 text-xs font-medium">
@@ -290,14 +290,35 @@
 </div>
 
 <style>
-    /* Sticky Column Shadow */
-    .sticky { position: sticky; left: 0; z-index: 5; }
-    th.sticky { z-index: 15; }
-    td.sticky::after {
-        content: ''; position: absolute; top: 0; right: -5px; bottom: 0; width: 5px;
-        background: linear-gradient(to right, rgba(0,0,0,0.05), transparent);
+    /* Sticky column left shadow */
+    td.sticky, th.sticky {
+        position: sticky !important;
+        left: 0;
+    }
+    td.sticky::after, th.sticky::after {
+        content: ''; position: absolute; top: 0; right: -6px; bottom: 0; width: 6px;
+        background: linear-gradient(to right, rgba(0,0,0,0.07), transparent);
         pointer-events: none;
     }
+    /* Cloned floating header */
+    #stockTheadClone {
+        position: fixed;
+        top: 53px; /* height of topbar */
+        left: 220px; /* width of sidebar */
+        right: 0;
+        z-index: 50;
+        overflow: hidden;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        pointer-events: none;
+    }
+    #stockTheadClone table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: fixed;
+    }
+    #stockTheadClone.visible { display: block; }
     /* Custom multi-select */
     #pms-wrapper:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.25) !important; }
     .pms-tag {
@@ -527,6 +548,96 @@
                 pmsLoadType(this.value, null);
             });
         }
+    });
+</script>
+
+{{-- Sticky Table Header (JS-based, works with overflow-x wrapper) --}}
+<div id="stockTheadClone" style="position:fixed;z-index:50;overflow:hidden;display:none;box-shadow:0 4px 14px rgba(0,0,0,0.15);pointer-events:none;"></div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const mainEl  = document.querySelector('main.content-scroll');
+        const thead   = document.getElementById('stockThead');
+        const table   = document.getElementById('stockTable');
+        const wrapper = document.getElementById('stockTableWrapper');
+        const clone   = document.getElementById('stockTheadClone');
+
+        if (!mainEl || !thead || !table || !wrapper || !clone) return;
+
+        const TOPBAR_H  = 53;   // px — height of the fixed topbar
+        const SIDEBAR_W = 220;  // px — width of sidebar
+
+        function buildClone() {
+            // Get wrapper position to align clone correctly
+            const wRect = wrapper.getBoundingClientRect();
+
+            // Clone the thead HTML
+            const clonedHtml = thead.cloneNode(true);
+
+            // Copy exact cell widths from original header cells
+            const origRows = thead.querySelectorAll('tr');
+            const clonRows = clonedHtml.querySelectorAll('tr');
+
+            origRows.forEach((origRow, rIdx) => {
+                const origCells = origRow.querySelectorAll('th');
+                const clonCells = clonRows[rIdx] ? clonRows[rIdx].querySelectorAll('th') : [];
+                origCells.forEach((origCell, cIdx) => {
+                    if (clonCells[cIdx]) {
+                        const w = origCell.getBoundingClientRect().width;
+                        clonCells[cIdx].style.width  = w + 'px';
+                        clonCells[cIdx].style.minWidth = w + 'px';
+                        clonCells[cIdx].style.maxWidth = w + 'px';
+                        // Remove sticky left from cloned header — not needed in clone
+                        clonCells[cIdx].style.position = '';
+                    }
+                });
+            });
+
+            // Build table around the cloned thead
+            const cloneTable = document.createElement('table');
+            cloneTable.style.cssText = `
+                width: ${table.offsetWidth}px;
+                border-collapse: separate;
+                border-spacing: 0;
+                table-layout: fixed;
+            `;
+            cloneTable.appendChild(clonedHtml);
+
+            clone.innerHTML = '';
+            clone.appendChild(cloneTable);
+
+            // Position the clone
+            clone.style.top   = TOPBAR_H + 'px';
+            clone.style.left  = wRect.left + 'px';
+            clone.style.width = wRect.width + 'px';
+
+            // Apply current scroll offset
+            syncScroll();
+        }
+
+        function syncScroll() {
+            const t = clone.querySelector('table');
+            if (t) t.style.transform = `translateX(-${wrapper.scrollLeft}px)`;
+        }
+
+        // Sync horizontal scroll
+        wrapper.addEventListener('scroll', syncScroll);
+
+        // Show/hide on vertical scroll
+        mainEl.addEventListener('scroll', function () {
+            const theadBottom = thead.getBoundingClientRect().bottom;
+
+            if (theadBottom < TOPBAR_H) {
+                buildClone();
+                clone.style.display = 'block';
+            } else {
+                clone.style.display = 'none';
+            }
+        });
+
+        // Rebuild on resize
+        window.addEventListener('resize', function () {
+            if (clone.style.display !== 'none') buildClone();
+        });
     });
 </script>
 @endsection
