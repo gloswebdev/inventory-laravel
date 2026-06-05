@@ -300,25 +300,6 @@
         background: linear-gradient(to right, rgba(0,0,0,0.07), transparent);
         pointer-events: none;
     }
-    /* Cloned floating header */
-    #stockTheadClone {
-        position: fixed;
-        top: 53px; /* height of topbar */
-        left: 220px; /* width of sidebar */
-        right: 0;
-        z-index: 50;
-        overflow: hidden;
-        display: none;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        pointer-events: none;
-    }
-    #stockTheadClone table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        table-layout: fixed;
-    }
-    #stockTheadClone.visible { display: block; }
     /* Custom multi-select */
     #pms-wrapper:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.25) !important; }
     .pms-tag {
