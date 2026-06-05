@@ -115,9 +115,11 @@ class IndentController extends Controller
         $externalStock = $this->getExternalStock();
         $stock = 0;
         
-        if ($branchCode && isset($externalStock[$branchCode][$product->item_code])) {
-            $stock = $externalStock[$branchCode][$product->item_code];
+        if ($branchCode) {
+            // Show stock only for the selected branch (0 if not present)
+            $stock = $externalStock[(int)$branchCode][$product->item_code] ?? 0;
         } else {
+            // Consolidated: sum across all branches
             foreach ($externalStock as $items) {
                 $stock += ($items[$product->item_code] ?? 0);
             }
@@ -152,9 +154,11 @@ class IndentController extends Controller
         $results = [];
         foreach ($products as $product) {
             $stock = 0;
-            if ((int)$branchCode && isset($externalStock[(int)$branchCode][$product->item_code])) {
-                $stock = $externalStock[(int)$branchCode][$product->item_code];
+            if ($branchCode) {
+                // Show stock only for the selected branch (0 if not present)
+                $stock = $externalStock[(int)$branchCode][$product->item_code] ?? 0;
             } else {
+                // Consolidated: sum across all branches
                 foreach ($externalStock as $items) {
                     $stock += ($items[$product->item_code] ?? 0);
                 }
