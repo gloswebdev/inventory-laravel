@@ -2011,22 +2011,29 @@ class MobileController extends Controller implements HasMiddleware
         $defaults = [
             'from_date' => \App\Models\AppSetting::get('costing_api_from_date', $fyStart) ?: $fyStart,
             'to_date'   => \App\Models\AppSetting::get('costing_api_to_date',   $fyEnd)   ?: $fyEnd,
-            'account'   => \App\Models\AppSetting::get('costing_api_account', 'all'),
-            'item'      => \App\Models\AppSetting::get('costing_api_item', 'all'),
-            'branch'    => \App\Models\AppSetting::get('costing_api_branch', 'all'),
+            'account'   => 'all',
+            'item'      => 'all',
+            'branch'    => 'all',
         ];
 
-        if (!$request->anyFilled(['from_date', 'to_date', 'account', 'item', 'branch'])) {
-            return view('mobile.purchase_report', compact('defaults'));
+        $fromDate = $request->input('from_date', $defaults['from_date']);
+        $toDate   = $request->input('to_date',   $defaults['to_date']);
+        $account  = $request->input('account',   $defaults['account']);
+        $item     = $request->input('item',      $defaults['item']);
+        $branch   = $request->input('branch',    $defaults['branch']);
+
+        // Show form on first load — only call API when form submitted
+        if (!$request->hasAny(['from_date', 'to_date', 'account', 'item', 'branch'])) {
+            return view('mobile.purchase_report', compact('defaults', 'fromDate', 'toDate', 'account', 'item', 'branch'));
         }
 
         $payload = [
             'apikey'   => $apiKey,
-            'FromDate' => $request->input('from_date', $defaults['from_date']),
-            'ToDate'   => $request->input('to_date',   $defaults['to_date']),
-            'Account'  => $request->input('account',   $defaults['account']),
-            'Item'     => $request->input('item',      $defaults['item']),
-            'Branch'   => $request->input('branch',    $defaults['branch']),
+            'FromDate' => $fromDate,
+            'ToDate'   => $toDate,
+            'Account'  => $account,
+            'Item'     => $item,
+            'Branch'   => $branch,
         ];
 
         $reportData = [];
@@ -2040,6 +2047,8 @@ class MobileController extends Controller implements HasMiddleware
                 $data = $response->json();
                 if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
                     $reportData = $data['resultdata'];
+                } elseif (is_array($data) && !isset($data['response'])) {
+                    $reportData = $data;
                 } else {
                     $error = 'API: ' . ($data['message'] ?? $data['response'] ?? 'No data');
                 }
@@ -2050,6 +2059,6 @@ class MobileController extends Controller implements HasMiddleware
             $error = $e->getMessage();
         }
 
-        return view('mobile.purchase_report', compact('reportData', 'defaults', 'error'));
+        return view('mobile.purchase_report', compact('reportData', 'defaults', 'error', 'fromDate', 'toDate', 'account', 'item', 'branch'));
     }
 }
