@@ -101,6 +101,7 @@
                     'mobile_users'    => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
                     'mobile_settings' => ['bg' => 'bg-slate-800',  'text' => 'text-white', 'shadow' => 'shadow-slate-300'],
                     'mobile_costing'  => ['bg' => 'bg-yellow-500', 'text' => 'text-white', 'shadow' => 'shadow-yellow-200'],
+                    'mobile_purchase_report' => ['bg' => 'bg-orange-600', 'text' => 'text-white', 'shadow' => 'shadow-orange-200'],
                 ];
             @endphp
 

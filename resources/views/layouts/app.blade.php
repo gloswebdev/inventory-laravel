@@ -268,6 +268,11 @@
                     <a href="{{ route('reports.live-stock') }}" class="sub-nav-link {{ request()->routeIs('reports.live-stock') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Live Stock
                     </a>
+                    @if(Auth::user()->hasPermission('purchase_report', 'view') || Auth::user()->role === 'admin')
+                    <a href="{{ route('reports.purchase') }}" class="sub-nav-link {{ request()->routeIs('reports.purchase') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Purchase Report
+                    </a>
+                    @endif
                 </div>
             </div>
             @endif

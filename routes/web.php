@@ -116,6 +116,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::get('reports/live-stock', [ReportController::class, 'liveStock'])->name('reports.live-stock');
     Route::get('reports/live-stock/excel', [ReportController::class, 'exportLiveStockExcel'])->name('reports.live-stock.excel');
     Route::get('reports/live-stock/pdf', [ReportController::class, 'exportLiveStockPdf'])->name('reports.live-stock.pdf');
+    Route::get('reports/purchase', [ReportController::class, 'purchaseReport'])->name('reports.purchase');
 
     // Settings
     Route::get('settings/branches', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.branches.index');
@@ -163,6 +164,9 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/costing',            [App\Http\Controllers\MobileController::class, 'costing'])->name('mobile.costing');
     Route::post('/costing/calculate', [App\Http\Controllers\MobileController::class, 'calculateCosting'])->name('mobile.costing.calculate');
     Route::post('/costing/export',    [App\Http\Controllers\MobileController::class, 'exportCosting'])->name('mobile.costing.export');
+
+    // Purchase Report
+    Route::get('/purchase-report', [App\Http\Controllers\MobileController::class, 'purchaseReport'])->name('mobile.purchase-report');
 
     // Recipes
     Route::get('/recipes', [App\Http\Controllers\MobileController::class, 'recipes'])->name('mobile.recipes');

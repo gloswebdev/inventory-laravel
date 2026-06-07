@@ -257,6 +257,84 @@
                     </div>
                 </div>
 
+                <hr class="border-slate-100">
+
+                {{-- ---- SECTION 5: Purchase Report API ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-black">5</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">Purchase Report API</h4>
+                        <span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[8px] font-bold rounded">REPORTS MODULE</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Reports → Purchase Report</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-orange-700 text-[10px]">POST /LogicPurchaseRegisterDetail</code>
+                    </p>
+
+                    <div class="bg-orange-50/60 border border-orange-100 rounded-xl p-4 space-y-3">
+                        {{-- Endpoint row --}}
+                        <div class="flex items-start gap-3 bg-white border border-orange-100 rounded-xl p-3">
+                            <i class="fas fa-plug text-orange-400 text-sm mt-0.5"></i>
+                            <div class="text-[11px] text-slate-600 leading-relaxed font-mono break-all">
+                                <span class="text-slate-400 font-sans font-bold">Endpoint:</span>
+                                {{ $settings['erp_api_base_url']->value ?? 'https://logicapi.algebraerp.com/API/SYNWOOD' }}/LogicPurchaseRegisterDetail
+                            </div>
+                        </div>
+                        {{-- Parameters table --}}
+                        <div class="bg-white border border-orange-100 rounded-xl overflow-hidden">
+                            <table class="w-full text-left text-[11px]">
+                                <thead class="bg-orange-50 border-b border-orange-100">
+                                    <tr>
+                                        <th class="px-4 py-2 font-black text-orange-700 uppercase tracking-wider">Parameter</th>
+                                        <th class="px-4 py-2 font-black text-orange-700 uppercase tracking-wider">Current Default Value</th>
+                                        <th class="px-4 py-2 font-black text-orange-700 uppercase tracking-wider">Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-orange-50 font-mono text-slate-600">
+                                    <tr class="hover:bg-orange-50/30">
+                                        <td class="px-4 py-2.5 font-bold text-slate-700">apikey</td>
+                                        <td class="px-4 py-2.5 text-slate-400">••••••••••••••••••</td>
+                                        <td class="px-4 py-2.5 text-[10px] font-sans font-bold text-indigo-500">API Configuration → API Key</td>
+                                    </tr>
+                                    <tr class="hover:bg-orange-50/30">
+                                        <td class="px-4 py-2.5 font-bold text-slate-700">FromDate</td>
+                                        <td class="px-4 py-2.5">{{ $settings['costing_api_from_date']->value ?? '(auto FY start)' }}</td>
+                                        <td class="px-4 py-2.5 text-[10px] font-sans font-bold text-yellow-600">Costing API → From Date</td>
+                                    </tr>
+                                    <tr class="hover:bg-orange-50/30">
+                                        <td class="px-4 py-2.5 font-bold text-slate-700">ToDate</td>
+                                        <td class="px-4 py-2.5">{{ $settings['costing_api_to_date']->value ?? '(auto FY end)' }}</td>
+                                        <td class="px-4 py-2.5 text-[10px] font-sans font-bold text-yellow-600">Costing API → To Date</td>
+                                    </tr>
+                                    <tr class="hover:bg-orange-50/30">
+                                        <td class="px-4 py-2.5 font-bold text-slate-700">Account</td>
+                                        <td class="px-4 py-2.5">{{ $settings['costing_api_account']->value ?? 'all' }}</td>
+                                        <td class="px-4 py-2.5 text-[10px] font-sans font-bold text-yellow-600">Costing API → Account</td>
+                                    </tr>
+                                    <tr class="hover:bg-orange-50/30">
+                                        <td class="px-4 py-2.5 font-bold text-slate-700">Item</td>
+                                        <td class="px-4 py-2.5">{{ $settings['costing_api_item']->value ?? 'all' }}</td>
+                                        <td class="px-4 py-2.5 text-[10px] font-sans font-bold text-yellow-600">Costing API → Item</td>
+                                    </tr>
+                                    <tr class="hover:bg-orange-50/30">
+                                        <td class="px-4 py-2.5 font-bold text-slate-700">Branch</td>
+                                        <td class="px-4 py-2.5">{{ $settings['costing_api_branch']->value ?? 'all' }}</td>
+                                        <td class="px-4 py-2.5 text-[10px] font-sans font-bold text-yellow-600">Costing API → Branch</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex items-start gap-3 bg-white border border-orange-100 rounded-xl p-3">
+                            <i class="fas fa-circle-info text-orange-400 text-sm mt-0.5"></i>
+                            <div class="text-[11px] text-slate-500 leading-relaxed">
+                                The Purchase Report page allows <strong>on-the-fly overrides</strong> of all parameters via its filter form. Default values are pulled from
+                                the <strong>Costing API</strong> section above. To change defaults permanently, update Section 4 settings above and save.
+                                &nbsp;<a href="{{ route('reports.purchase') }}" class="text-orange-600 font-bold underline underline-offset-2">Open Purchase Report →</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>{{-- /p-6 --}}
         </div>{{-- /card --}}
     </form>

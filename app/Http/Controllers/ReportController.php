@@ -324,4 +324,76 @@ class ReportController extends Controller
                     ->orWhere('rm_type', '');
             });
     }
+
+    public function purchaseReport(Request $request)
+    {
+        // --- Default values from settings (same as Costing API section) ---
+        $baseUrl  = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey   = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        // FY auto-dates
+        $now      = now();
+        $fyStart  = $now->month >= 4
+            ? $now->year . '-04-01'
+            : ($now->year - 1) . '-04-01';
+        $fyEnd    = $now->month >= 4
+            ? ($now->year + 1) . '-03-31'
+            : $now->year . '-03-31';
+
+        $defaults = [
+            'from_date' => AppSetting::get('costing_api_from_date', $fyStart) ?: $fyStart,
+            'to_date'   => AppSetting::get('costing_api_to_date',   $fyEnd)   ?: $fyEnd,
+            'account'   => AppSetting::get('costing_api_account', 'all'),
+            'item'      => AppSetting::get('costing_api_item', 'all'),
+            'branch'    => AppSetting::get('costing_api_branch', 'all'),
+        ];
+
+        // If no filters submitted, just show empty page with defaults
+        if (!$request->anyFilled(['from_date', 'to_date', 'account', 'item', 'branch'])) {
+            return view('reports.purchase_report', compact('defaults'));
+        }
+
+        // --- Build request payload ---
+        $payload = [
+            'apikey'   => $apiKey,
+            'FromDate' => $request->input('from_date', $defaults['from_date']),
+            'ToDate'   => $request->input('to_date',   $defaults['to_date']),
+            'Account'  => $request->input('account',   $defaults['account']),
+            'Item'     => $request->input('item',      $defaults['item']),
+            'Branch'   => $request->input('branch',    $defaults['branch']),
+        ];
+
+        $reportData = [];
+        $error      = null;
+
+        try {
+            Log::info('Purchase Report API Call', ['url' => $baseUrl . '/LogicPurchaseRegisterDetail', 'payload' => $payload]);
+
+            $response = Http::withoutVerifying()
+                ->timeout(60)
+                ->connectTimeout(15)
+                ->post("{$baseUrl}/LogicPurchaseRegisterDetail", $payload);
+
+            Log::info('Purchase Report API Response', ['status' => $response->status()]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+                    $reportData = $data['resultdata'];
+                } else {
+                    $error = 'API returned: ' . ($data['message'] ?? $data['response'] ?? 'Unexpected response');
+                    Log::warning('Purchase Report API bad response', ['body' => $response->body()]);
+                }
+            } else {
+                $error = 'HTTP ' . $response->status() . ': ' . $response->body();
+                Log::error('Purchase Report API HTTP Error', ['status' => $response->status()]);
+            }
+        } catch (\Exception $e) {
+            $error = 'Connection error: ' . $e->getMessage();
+            Log::error('Purchase Report API Exception: ' . $e->getMessage());
+        }
+
+        return view('reports.purchase_report', compact('reportData', 'defaults', 'error'));
+    }
 }
+

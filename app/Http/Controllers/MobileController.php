@@ -83,6 +83,7 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.costing'                => 'mobile_costing',
                     'mobile.costing.calculate'      => 'mobile_costing',
                     'mobile.costing.export'         => 'mobile_costing',
+                    'mobile.purchase-report'        => 'mobile_purchase_report',
                 ];
 
                 if (isset($permissionMap[$route])) {
@@ -181,6 +182,13 @@ class MobileController extends Controller implements HasMiddleware
                 'route'      => 'mobile.costing',
                 'color'      => 'bg-yellow-500',
                 'permission' => 'mobile_costing'
+            ],
+            [
+                'name'       => 'Purchase Report',
+                'icon'       => 'fas fa-shopping-cart',
+                'route'      => 'mobile.purchase-report',
+                'color'      => 'bg-orange-500',
+                'permission' => 'mobile_purchase_report'
             ],
         ];
 
@@ -1986,5 +1994,62 @@ class MobileController extends Controller implements HasMiddleware
                   ->setPaper('a4', 'portrait');
 
         return $pdf->download('Mobile_Cost_Report_' . now()->format('Y-m-d_His') . '.pdf');
+    }
+
+    /**
+     * Mobile: Purchase Report
+     */
+    public function purchaseReport(Request $request)
+    {
+        $baseUrl = rtrim(\App\Models\AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = \App\Models\AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        $now     = now();
+        $fyStart = $now->month >= 4 ? $now->year . '-04-01' : ($now->year - 1) . '-04-01';
+        $fyEnd   = $now->month >= 4 ? ($now->year + 1) . '-03-31' : $now->year . '-03-31';
+
+        $defaults = [
+            'from_date' => \App\Models\AppSetting::get('costing_api_from_date', $fyStart) ?: $fyStart,
+            'to_date'   => \App\Models\AppSetting::get('costing_api_to_date',   $fyEnd)   ?: $fyEnd,
+            'account'   => \App\Models\AppSetting::get('costing_api_account', 'all'),
+            'item'      => \App\Models\AppSetting::get('costing_api_item', 'all'),
+            'branch'    => \App\Models\AppSetting::get('costing_api_branch', 'all'),
+        ];
+
+        if (!$request->anyFilled(['from_date', 'to_date', 'account', 'item', 'branch'])) {
+            return view('mobile.purchase_report', compact('defaults'));
+        }
+
+        $payload = [
+            'apikey'   => $apiKey,
+            'FromDate' => $request->input('from_date', $defaults['from_date']),
+            'ToDate'   => $request->input('to_date',   $defaults['to_date']),
+            'Account'  => $request->input('account',   $defaults['account']),
+            'Item'     => $request->input('item',      $defaults['item']),
+            'Branch'   => $request->input('branch',    $defaults['branch']),
+        ];
+
+        $reportData = [];
+        $error      = null;
+
+        try {
+            $response = Http::withoutVerifying()->timeout(60)->connectTimeout(15)
+                ->post("{$baseUrl}/LogicPurchaseRegisterDetail", $payload);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+                    $reportData = $data['resultdata'];
+                } else {
+                    $error = 'API: ' . ($data['message'] ?? $data['response'] ?? 'No data');
+                }
+            } else {
+                $error = 'HTTP ' . $response->status();
+            }
+        } catch (\Exception $e) {
+            $error = $e->getMessage();
+        }
+
+        return view('mobile.purchase_report', compact('reportData', 'defaults', 'error'));
     }
 }

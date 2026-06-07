@@ -22,6 +22,7 @@ class UserController extends Controller
         'planning_process' => 'Indent: Process List',
         'production' => 'Production Manager',
         'reports' => 'Reports Viewer',
+        'purchase_report' => 'Purchase Report',
         'adjustments' => 'Stock Adjustments',
         'users' => 'User Management',
         'settings' => 'System Settings',
@@ -35,6 +36,7 @@ class UserController extends Controller
         'mobile_products' => 'Mobile: Product Master',
         'mobile_users'  => 'Mobile: User Manager',
         'mobile_settings' => 'Mobile: System Settings',
+        'mobile_purchase_report' => 'Mobile: Purchase Report',
         'costing'       => 'Costing Manager',
         'mobile_costing' => 'Mobile: Costing',
     ];
@@ -115,6 +117,16 @@ class UserController extends Controller
         ],
         'mobile_settings' => [
             'management' => 'Branch Mapping Management'
+        ],
+        'purchase_report' => [
+            'date_filter'  => 'Date Range Filter',
+            'party_filter' => 'Account/Party Filter',
+            'item_filter'  => 'Item Filter',
+            'branch_filter' => 'Branch Filter',
+        ],
+        'mobile_purchase_report' => [
+            'date_filter'  => 'Date Range Filter',
+            'item_filter'  => 'Item Filter',
         ],
         'costing' => [
             'fetch_prices' => 'Sync Prices from ERP/Product Master',
