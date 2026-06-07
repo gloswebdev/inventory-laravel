@@ -3,6 +3,33 @@
 @section('header', 'Live Stock Report')
 
 @section('content')
+@php
+    if (!function_exists('getLiveStockPackBadge')) {
+        function getLiveStockPackBadge($packName) {
+            if (!$packName) return ['bg-slate-100 text-slate-400 border-slate-200', ''];
+            $name = strtoupper(trim($packName));
+            if (str_contains($name, '1 KG') || str_contains($name, '1KG') || str_contains($name, '1 LTR') || str_contains($name, '1LTR'))
+                return ['bg-indigo-100 text-indigo-700 border-indigo-200', ''];
+            if (str_contains($name, '500 GM') || str_contains($name, '500GM') || str_contains($name, '500 ML') || str_contains($name, '500ML'))
+                return ['bg-emerald-100 text-emerald-700 border-emerald-200', ''];
+            if (str_contains($name, '250 GM') || str_contains($name, '250GM') || str_contains($name, '250 ML') || str_contains($name, '250ML'))
+                return ['bg-rose-100 text-rose-700 border-rose-200', ''];
+            if (str_contains($name, '100 GM') || str_contains($name, '100GM') || str_contains($name, '100 ML') || str_contains($name, '100ML'))
+                return ['bg-amber-100 text-amber-700 border-amber-200', ''];
+            if (str_contains($name, '50 GM') || str_contains($name, '50GM') || str_contains($name, '50 ML') || str_contains($name, '50ML'))
+                return ['bg-cyan-100 text-cyan-700 border-cyan-200', ''];
+            if (str_contains($name, '200 GM') || str_contains($name, '200GM') || str_contains($name, '200 ML') || str_contains($name, '200ML'))
+                return ['bg-violet-100 text-violet-700 border-violet-200', ''];
+            if (str_contains($name, '400 ML') || str_contains($name, '400ML'))
+                return ['bg-pink-100 text-pink-700 border-pink-200', ''];
+            if (str_contains($name, '5 LTR') || str_contains($name, '5LTR') || str_contains($name, '5 KG') || str_contains($name, '5KG'))
+                return ['bg-teal-100 text-teal-700 border-teal-200', ''];
+            if (str_contains($name, '15 ML') || str_contains($name, '15ML') || str_contains($name, '15 GM') || str_contains($name, '15GM'))
+                return ['bg-lime-100 text-lime-700 border-lime-200', ''];
+            return ['bg-purple-100 text-purple-700 border-purple-200', ''];
+        }
+    }
+@endphp
 <div class="bg-white rounded shadow-md p-6">
     <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
         <h3 class="text-xl font-bold text-gray-700">Live Inventory Across Branches</h3>
@@ -240,7 +267,17 @@
                                 <span class="bg-gray-200 px-1 rounded text-[9px] text-gray-600">{{ $row['product']->rm_type }}</span>
                             @endif
                         </div>
-                        <div class="text-[9px] text-gray-400 italic">Pack: {{ $row['product']->pack_name }} ({{ $row['product']->uom }})</div>
+                        @php [$packCss] = getLiveStockPackBadge($row['product']->pack_name ?? ''); @endphp
+                        @if($row['product']->pack_name)
+                        <div class="mt-1.5 flex items-center gap-1 flex-wrap">
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded border text-[8px] font-black uppercase tracking-wide {{ $packCss }}">
+                                {{ $row['product']->pack_name }}
+                            </span>
+                            @if($row['product']->uom)
+                            <span class="text-[8px] text-gray-400 italic">{{ $row['product']->uom }}</span>
+                            @endif
+                        </div>
+                        @endif
                     </td>
                     @foreach($branches as $branch)
                         @php 

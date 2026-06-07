@@ -1,6 +1,42 @@
 @extends('layouts.mobile')
 
 @section('content')
+@php
+    if (!function_exists('getMobilePackBadgeClass')) {
+        function getMobilePackBadgeClass($packName) {
+            if (!$packName) return 'bg-slate-100 text-slate-500 border-slate-200';
+            $name = strtoupper(trim($packName));
+            if (str_contains($name, '1 KG') || str_contains($name, '1 LTR') || str_contains($name, '1KG') || str_contains($name, '1LTR'))
+                return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+            if (str_contains($name, '500 GM') || str_contains($name, '500 ML') || str_contains($name, '500GM') || str_contains($name, '500ML'))
+                return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            if (str_contains($name, '250 GM') || str_contains($name, '250 ML') || str_contains($name, '250GM') || str_contains($name, '250ML'))
+                return 'bg-rose-100 text-rose-700 border-rose-200';
+            if (str_contains($name, '100 GM') || str_contains($name, '100 ML') || str_contains($name, '100GM') || str_contains($name, '100ML'))
+                return 'bg-amber-100 text-amber-700 border-amber-200';
+            if (str_contains($name, '50 GM') || str_contains($name, '50 ML') || str_contains($name, '50GM') || str_contains($name, '50ML'))
+                return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+            if (str_contains($name, '5 LTR') || str_contains($name, '5 KG') || str_contains($name, '5LTR') || str_contains($name, '5KG'))
+                return 'bg-teal-100 text-teal-700 border-teal-200';
+            if (str_contains($name, '200 ML') || str_contains($name, '200ML') || str_contains($name, '200 GM') || str_contains($name, '200GM'))
+                return 'bg-violet-100 text-violet-700 border-violet-200';
+            if (str_contains($name, '400 ML') || str_contains($name, '400ML'))
+                return 'bg-pink-100 text-pink-700 border-pink-200';
+            return 'bg-purple-100 text-purple-700 border-purple-200';
+        }
+    }
+    // Cycle colours for branch number badges
+    $branchBadgeColors = [
+        'bg-indigo-100 text-indigo-700',
+        'bg-violet-100 text-violet-700',
+        'bg-sky-100 text-sky-700',
+        'bg-emerald-100 text-emerald-700',
+        'bg-amber-100 text-amber-700',
+        'bg-rose-100 text-rose-700',
+        'bg-teal-100 text-teal-700',
+        'bg-pink-100 text-pink-700',
+    ];
+@endphp
 <div class="space-y-8 pb-10" x-data="processApp()">
     <!-- Header Area -->
     <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden mb-2">
@@ -69,12 +105,17 @@
                 <thead>
                     <tr class="bg-indigo-50/20">
                         <th class="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 sticky left-0 bg-white/95 backdrop-blur-md z-10 w-44">Product Profile</th>
-                        <th class="px-6 py-4 text-[9px] font-black text-green-500 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">Stock at<br>Entry</th>
                         <th class="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-slate-50 whitespace-nowrap text-center">Indent<br>Box</th>
                         @foreach($branches as $branch)
-                        <th class="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center whitespace-nowrap">
-                            {{ $branch->code }}<br>
-                            <span class="text-[7px] text-indigo-300 lowercase italic">{{ $branch->name }}</span>
+                        @php $branchBadgeColor = $branchBadgeColors[($loop->index) % count($branchBadgeColors)]; @endphp
+                        <th class="px-4 py-4 text-center border-b border-slate-50 whitespace-nowrap min-w-[90px]">
+                            <div class="flex flex-col items-center gap-1.5">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[11px] font-black {{ $branchBadgeColor }} shadow-sm border border-white/60">
+                                    {{ $loop->iteration + 1 }}
+                                </span>
+                                <span class="text-[10px] font-black text-slate-700 uppercase tracking-tight leading-tight">{{ $branch->name }}</span>
+                                <span class="text-[7px] font-bold text-slate-300 uppercase tracking-widest">{{ $branch->code }}</span>
+                            </div>
                         </th>
                         @endforeach
                     </tr>
@@ -82,16 +123,17 @@
                 <tbody class="divide-y divide-slate-100">
                     @foreach($indent->items as $item)
                     <tr class="hover:bg-indigo-50/10 transition-colors">
-                        <td class="px-6 py-5 sticky left-0 bg-white/95 backdrop-blur-md z-10 shadow-[8px_0_15px_rgba(0,0,0,0.02)]">
+                        <td class="px-5 py-5 sticky left-0 bg-white/95 backdrop-blur-md z-10 shadow-[8px_0_15px_rgba(0,0,0,0.02)]">
                             <div class="text-[12px] font-900 text-slate-800 font-900 leading-tight uppercase tracking-tighter">{{ $item->product ? $item->product->name : 'Unknown' }}</div>
-                            <div class="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{{ $item->product ? $item->product->pack_name : '-' }}</div>
+                            @if($item->product && $item->product->pack_name)
+                                <span class="inline-flex items-center mt-1.5 px-2 py-0.5 rounded-full text-[8px] font-black border {{ getMobilePackBadgeClass($item->product->pack_name) }} uppercase tracking-wider shadow-sm">
+                                    {{ $item->product->pack_name }}
+                                </span>
+                            @else
+                                <div class="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">—</div>
+                            @endif
                         </td>
-                        <td class="px-6 py-5 text-center">
-                            <div class="text-[11px] font-black text-green-600 tracking-tighter whitespace-nowrap">
-                                {{ number_format($item->stock_box, 0) }}
-                                <span class="text-[8px] opacity-60 ml-0.5">BOX</span>
-                            </div>
-                        </td>
+
                         <td class="px-6 py-5 text-center">
                             <div class="text-[11px] font-900 text-indigo-600 tracking-tighter whitespace-nowrap">
                                 {{ number_format($item->final_qty_box, 0) }}
@@ -99,11 +141,24 @@
                             </div>
                         </td>
                         @foreach($branches as $branch)
-                        @php $stock = $branchStocks[$item->product_id][$branch->code] ?? 0; @endphp
-                        <td class="px-6 py-5 text-center">
-                            <span class="text-[11px] font-black {{ $stock <= 0 ? 'text-slate-200' : 'text-slate-600' }}">
-                                {{ $stock > 0 ? number_format($stock, 0) : '---' }}
-                            </span>
+                        @php 
+                            $stock = $branchStocks[$item->product_id][$branch->code] ?? 0;
+                            $isTarget = $branch->code == $indent->branch_code;
+                        @endphp
+                        <td class="px-6 py-5 text-center {{ $isTarget ? 'bg-amber-50/40' : '' }}">
+                            @if($isTarget)
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <span class="text-[18px] font-black text-amber-600 tracking-tight leading-none">
+                                        {{ $stock > 0 ? number_format($stock, 0) : '0' }}
+                                    </span>
+                                    <span class="text-[7px] font-black text-amber-400 uppercase">BOX</span>
+                                    <div class="mt-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-[7px] font-black text-white uppercase tracking-widest shadow-sm">TARGET</div>
+                                </div>
+                            @else
+                                <span class="text-[11px] font-black {{ $stock <= 0 ? 'text-slate-200' : 'text-slate-600' }}">
+                                    {{ $stock > 0 ? number_format($stock, 0) : '---' }}
+                                </span>
+                            @endif
                         </td>
                         @endforeach
                     </tr>

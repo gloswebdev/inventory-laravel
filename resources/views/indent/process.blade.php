@@ -90,7 +90,6 @@
                         <tr>
                             <th class="sticky left-0 bg-slate-50 px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest z-30 border-r border-slate-200 border-b min-w-[250px]">Product Details</th>
                             <th class="px-6 py-5 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center bg-indigo-50/50 border-b border-indigo-100 min-w-[120px]">Indent<br>Qty (Boxes)</th>
-                            <th class="px-6 py-5 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-center bg-emerald-50/50 border-b border-emerald-100 min-w-[120px]">Stock at<br>Entry (Box)</th>
                             
                             @foreach($branches as $branch)
                             <th class="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-l border-b border-slate-200 min-w-[140px]">
@@ -110,24 +109,25 @@
                             <td class="px-6 py-5 text-center bg-indigo-50/10 group-hover:bg-indigo-50/30 transition-colors border-r border-slate-50">
                                 <span class="text-xl font-black text-indigo-600 tracking-tight">{{ number_format($item->final_qty_box, 0) }}</span>
                             </td>
-                            <td class="px-6 py-5 text-center bg-emerald-50/10 group-hover:bg-emerald-50/30 transition-colors">
-                                <span class="text-sm font-black text-emerald-600">{{ number_format($item->stock_box, 2) }}</span>
-                            </td>
 
                             @foreach($branches as $branch)
                             @php 
                                 $stock = $branchStocks[$item->product_id][$branch->code] ?? 0;
                                 $isTarget = $branch->code == $indent->branch_code;
                             @endphp
-                            <td class="px-6 py-5 text-center border-l border-slate-100 {{ $isTarget ? 'bg-indigo-50/20 group-hover:bg-indigo-50/40' : '' }} transition-colors relative">
+                            <td class="px-6 py-5 text-center border-l border-slate-100 {{ $isTarget ? 'bg-amber-50/40 group-hover:bg-amber-50/70' : '' }} transition-colors relative">
                                 <div class="flex flex-col items-center">
-                                    <span class="text-sm font-black {{ $stock > 0 ? 'text-slate-800' : 'text-slate-300' }}">
-                                        {{ number_format($stock, 1) }}
-                                    </span>
-                                    <span class="text-[8px] font-black uppercase {{ $stock > 0 ? 'text-slate-400' : 'text-slate-300' }} mt-0.5">Box</span>
-                                    
                                     @if($isTarget)
-                                    <div class="mt-2 px-2 py-0.5 rounded-md bg-indigo-100 border border-indigo-200 text-[8px] font-black text-indigo-700 uppercase tracking-widest">TARGET</div>
+                                        <span class="text-2xl font-black text-amber-600 tracking-tight drop-shadow-sm">
+                                            {{ number_format($stock, 1) }}
+                                        </span>
+                                        <span class="text-[9px] font-black uppercase text-amber-400 mt-0.5">Box</span>
+                                        <div class="mt-2 px-3 py-1 rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-[8px] font-black text-white uppercase tracking-widest shadow-sm">TARGET</div>
+                                    @else
+                                        <span class="text-sm font-black {{ $stock > 0 ? 'text-slate-800' : 'text-slate-300' }}">
+                                            {{ number_format($stock, 1) }}
+                                        </span>
+                                        <span class="text-[8px] font-black uppercase {{ $stock > 0 ? 'text-slate-400' : 'text-slate-300' }} mt-0.5">Box</span>
                                     @endif
                                 </div>
                             </td>
