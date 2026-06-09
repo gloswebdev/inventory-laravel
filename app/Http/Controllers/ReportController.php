@@ -353,26 +353,33 @@ class ReportController extends Controller
         $account  = $request->input('account',   $defaults['account']);
         $item     = $request->input('item',      $defaults['item']);
         $branch   = $request->input('branch',    $defaults['branch']);
+        $rmType   = $request->input('rm_type',   '');
+        $types    = $request->input('types',     '');
 
         // Only call API when form is submitted (has at least one query param)
-        if (!$request->hasAny(['from_date', 'to_date', 'account', 'item', 'branch'])) {
-            return view('reports.purchase_report', compact('defaults', 'fromDate', 'toDate', 'account', 'item', 'branch'));
+        if (!$request->hasAny(['from_date', 'to_date', 'account', 'item', 'branch', 'rm_type', 'types'])) {
+            return view('reports.purchase_report', compact('defaults', 'fromDate', 'toDate', 'account', 'item', 'branch', 'rmType', 'types'));
         }
 
         // --- Build request payload ---
+        // NOTE: Account & Item are filtered PHP-side after fetch (API only accepts 'all' reliably)
         $payload = [
             'apikey'   => $apiKey,
             'FromDate' => $fromDate,
             'ToDate'   => $toDate,
-            'Account'  => $account,
-            'Item'     => $item,
+            'Account'  => 'all',
+            'Item'     => 'all',
             'Branch'   => $branch,
         ];
 
         Log::info('Purchase Report API Call', ['url' => $baseUrl . '/LogicPurchaseRegisterDetail', 'payload' => $payload]);
 
-        $reportData = [];
-        $error      = null;
+        $reportData     = [];
+        $error          = null;
+        $rmTypeOptions  = [];
+        $typesOptions   = [];
+        $accountOptions = [];
+        $itemOptions    = [];
 
         try {
             $response = Http::withoutVerifying()
@@ -398,6 +405,70 @@ class ReportController extends Controller
                     $error = "API returned: {$msg}";
                     Log::warning('Purchase Report API non-success', ['data' => $data]);
                 }
+
+                // Extract dropdown options from FULL data (before filters)
+                $rmTypeOptions = collect($reportData)
+                    ->pluck('GroupName4')
+                    ->map(fn($v) => trim($v))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->toArray();
+
+                $typesOptions = collect($reportData)
+                    ->pluck('GroupName5')
+                    ->map(fn($v) => trim($v))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->toArray();
+
+                $accountOptions = collect($reportData)
+                    ->pluck('SupplierName')
+                    ->map(fn($v) => trim($v))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->toArray();
+
+                $itemOptions = collect($reportData)
+                    ->map(fn($r) => ['code' => trim($r['User_Code'] ?? ''), 'name' => trim($r['Item_Hd_Name'] ?? '')])
+                    ->filter(fn($r) => $r['name'] !== '')
+                    ->unique('name')
+                    ->sortBy('name')
+                    ->values()
+                    ->toArray();
+
+                // Apply server-side GroupName4 (Rm Type) filter
+                if (!empty($rmType) && $rmType !== 'all') {
+                    $reportData = array_values(array_filter($reportData, function($row) use ($rmType) {
+                        return trim($row['GroupName4'] ?? '') === trim($rmType);
+                    }));
+                }
+
+                // Apply server-side GroupName5 (Types) filter
+                if (!empty($types) && $types !== 'all') {
+                    $reportData = array_values(array_filter($reportData, function($row) use ($types) {
+                        return trim($row['GroupName5'] ?? '') === trim($types);
+                    }));
+                }
+
+                // Apply server-side Account (SupplierName) filter
+                if (!empty($account) && $account !== 'all') {
+                    $reportData = array_values(array_filter($reportData, function($row) use ($account) {
+                        return trim($row['SupplierName'] ?? '') === trim($account);
+                    }));
+                }
+
+                // Apply server-side Item (Item_Hd_Name) filter
+                if (!empty($item) && $item !== 'all') {
+                    $reportData = array_values(array_filter($reportData, function($row) use ($item) {
+                        return trim($row['Item_Hd_Name'] ?? '') === trim($item);
+                    }));
+                }
             } else {
                 $error = 'HTTP ' . $response->status();
                 Log::error('Purchase Report API HTTP Error', ['status' => $response->status(), 'body' => $response->body()]);
@@ -407,7 +478,12 @@ class ReportController extends Controller
             Log::error('Purchase Report API Exception: ' . $e->getMessage());
         }
 
-        return view('reports.purchase_report', compact('reportData', 'defaults', 'error', 'fromDate', 'toDate', 'account', 'item', 'branch'));
+        return view('reports.purchase_report', compact(
+            'reportData', 'defaults', 'error',
+            'fromDate', 'toDate', 'account', 'item', 'branch',
+            'rmType', 'types', 'rmTypeOptions', 'typesOptions',
+            'accountOptions', 'itemOptions'
+        ));
     }
 }
 

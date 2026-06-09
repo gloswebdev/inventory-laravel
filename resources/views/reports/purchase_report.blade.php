@@ -35,7 +35,7 @@
             <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest">Filter Parameters</h3>
         </div>
         <form method="GET" action="{{ route('reports.purchase') }}" id="purchaseFilterForm" class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">From Date</label>
                     <input type="date" name="from_date"
@@ -50,17 +50,41 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Account</label>
-                    <input type="text" name="account"
-                        value="{{ $account ?? $defaults['account'] }}"
-                        placeholder="all"
-                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-400 outline-none transition">
+                    <div class="relative">
+                        <select name="account"
+                            class="w-full border border-gray-200 rounded-xl py-2.5 px-4 pr-9 text-sm focus:ring-2 focus:ring-amber-400 outline-none transition appearance-none bg-white">
+                            <option value="all" {{ ($account ?? 'all') === 'all' ? 'selected' : '' }}>— All Accounts —</option>
+                            @if(!empty($accountOptions ?? []))
+                                @foreach($accountOptions as $opt)
+                                    <option value="{{ $opt }}" {{ ($account ?? '') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                @endforeach
+                            @elseif(!empty($account) && $account !== 'all')
+                                <option value="{{ $account }}" selected>{{ $account }}</option>
+                            @endif
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-amber-500">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Item</label>
-                    <input type="text" name="item"
-                        value="{{ $item ?? $defaults['item'] }}"
-                        placeholder="all"
-                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-400 outline-none transition">
+                    <div class="relative">
+                        <select name="item"
+                            class="w-full border border-gray-200 rounded-xl py-2.5 px-4 pr-9 text-sm focus:ring-2 focus:ring-indigo-400 outline-none transition appearance-none bg-white">
+                            <option value="all" {{ ($item ?? 'all') === 'all' ? 'selected' : '' }}>— All Items —</option>
+                            @if(!empty($itemOptions ?? []))
+                                @foreach($itemOptions as $opt)
+                                    <option value="{{ $opt['name'] }}" {{ ($item ?? '') === $opt['name'] ? 'selected' : '' }}>{{ $opt['name'] }}</option>
+                                @endforeach
+                            @elseif(!empty($item) && $item !== 'all')
+                                <option value="{{ $item }}" selected>{{ $item }}</option>
+                            @endif
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-indigo-500">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Branch</label>
@@ -68,6 +92,48 @@
                         value="{{ $branch ?? $defaults['branch'] }}"
                         placeholder="all"
                         class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-400 outline-none transition">
+                </div>
+
+                {{-- Rm Type Dropdown --}}
+                <div>
+                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Rm Type</label>
+                    <div class="relative">
+                        <select name="rm_type"
+                            class="w-full border border-gray-200 rounded-xl py-2.5 px-4 pr-9 text-sm focus:ring-2 focus:ring-teal-400 outline-none transition appearance-none bg-white">
+                            <option value="">— All Rm Types —</option>
+                            @if(!empty($rmTypeOptions ?? []))
+                                @foreach($rmTypeOptions as $opt)
+                                    <option value="{{ $opt }}" {{ ($rmType ?? '') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                @endforeach
+                            @elseif(!empty($rmType))
+                                <option value="{{ $rmType }}" selected>{{ $rmType }}</option>
+                            @endif
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-teal-500">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Types Dropdown --}}
+                <div>
+                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Types</label>
+                    <div class="relative">
+                        <select name="types"
+                            class="w-full border border-gray-200 rounded-xl py-2.5 px-4 pr-9 text-sm focus:ring-2 focus:ring-violet-400 outline-none transition appearance-none bg-white">
+                            <option value="">— All Types —</option>
+                            @if(!empty($typesOptions ?? []))
+                                @foreach($typesOptions as $opt)
+                                    <option value="{{ $opt }}" {{ ($types ?? '') === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                                @endforeach
+                            @elseif(!empty($types))
+                                <option value="{{ $types }}" selected>{{ $types }}</option>
+                            @endif
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-violet-500">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="flex gap-3 mt-4">
@@ -166,21 +232,20 @@
                         <th class="py-3 px-3 border-r border-amber-100 cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(2)">Date <i class="fas fa-sort ml-1 opacity-40"></i></th>
                         <th class="py-3 px-3 border-r border-amber-100 cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(3)">Supplier <i class="fas fa-sort ml-1 opacity-40"></i></th>
                         <th class="py-3 px-3 border-r border-amber-100">Bill No</th>
-                        <th class="py-3 px-3 border-r border-amber-100">Group 1</th>
-                        <th class="py-3 px-3 border-r border-amber-100">Group 4</th>
-                        <th class="py-3 px-3 border-r border-amber-100">Group 5</th>
+                        <th class="py-3 px-3 border-r border-amber-100">Rm Type</th>
+                        <th class="py-3 px-3 border-r border-amber-100">Types</th>
                         <th class="py-3 px-3 border-r border-amber-100">Item Code</th>
-                        <th class="py-3 px-3 border-r border-amber-100 cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(9)">Item Name <i class="fas fa-sort ml-1 opacity-40"></i></th>
+                        <th class="py-3 px-3 border-r border-amber-100 cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(8)">Item Name <i class="fas fa-sort ml-1 opacity-40"></i></th>
                         <th class="py-3 px-3 border-r border-amber-100">Pack</th>
-                        <th class="py-3 px-3 border-r border-amber-100 text-right cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(11)">Qty <i class="fas fa-sort ml-1 opacity-40"></i></th>
+                        <th class="py-3 px-3 border-r border-amber-100 text-right cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(10)">Qty <i class="fas fa-sort ml-1 opacity-40"></i></th>
                         <th class="py-3 px-3 border-r border-amber-100 text-right">Cases</th>
                         <th class="py-3 px-3 border-r border-amber-100 text-right">Rate</th>
                         <th class="py-3 px-3 border-r border-amber-100 text-right">GST</th>
                         <th class="py-3 px-3 border-r border-amber-100 text-right">TCS</th>
                         <th class="py-3 px-3 border-r border-amber-100 text-right">Scheme</th>
                         <th class="py-3 px-3 border-r border-amber-100 text-right">Adjust</th>
-                        <th class="py-3 px-3 border-r border-amber-100 text-right cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(18)">Gross Amt <i class="fas fa-sort ml-1 opacity-40"></i></th>
-                        <th class="py-3 px-3 border-r border-amber-100 text-right cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(19)">Net Amt <i class="fas fa-sort ml-1 opacity-40"></i></th>
+                        <th class="py-3 px-3 border-r border-amber-100 text-right cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(17)">Gross Amt <i class="fas fa-sort ml-1 opacity-40"></i></th>
+                        <th class="py-3 px-3 border-r border-amber-100 text-right cursor-pointer hover:bg-amber-100 transition" onclick="sortTable(18)">Net Amt <i class="fas fa-sort ml-1 opacity-40"></i></th>
                         <th class="py-3 px-3 text-right">Purity%</th>
                     </tr>
                 </thead>
@@ -198,8 +263,8 @@
                         $rate     = (float)str_replace(',', '', $row['CaseRate']       ?? 0);
                         $purity   = $row['Purity'] ?? '';
                     @endphp
-                    <tr class="hover:bg-amber-50/40 transition-colors purchase-row">
-                        <td class="py-2.5 px-3 text-center text-gray-400 font-bold border-r border-gray-50">{{ $index + 1 }}</td>
+                    <tr class="hover:bg-amber-50/40 transition-colors purchase-row" data-index="{{ $index }}">
+                        <td class="py-2.5 px-3 text-center text-gray-400 font-bold border-r border-gray-50 row-num">{{ $index + 1 }}</td>
 
                         {{-- Branch --}}
                         <td class="py-2.5 px-3 border-r border-gray-50 whitespace-nowrap">
@@ -223,10 +288,7 @@
                             {{ $row['Bill_No'] ?? '—' }}
                         </td>
 
-                        {{-- Groups --}}
-                        <td class="py-2.5 px-3 border-r border-gray-50 text-[10px] text-gray-500">
-                            {{ $row['GroupName1'] ?? '—' }}
-                        </td>
+                        {{-- Rm Type (GroupName4) --}}
                         <td class="py-2.5 px-3 border-r border-gray-50">
                             @if(isset($row['GroupName4']) && $row['GroupName4'])
                             <span class="bg-teal-50 text-teal-700 border border-teal-100 px-1.5 py-0.5 rounded text-[9px] font-black">{{ $row['GroupName4'] }}</span>
@@ -234,6 +296,8 @@
                             <span class="text-gray-300">—</span>
                             @endif
                         </td>
+
+                        {{-- Types (GroupName5) --}}
                         <td class="py-2.5 px-3 border-r border-gray-50">
                             @if(isset($row['GroupName5']) && $row['GroupName5'])
                             <span class="bg-violet-50 text-violet-700 border border-violet-100 px-1.5 py-0.5 rounded text-[9px] font-black">{{ $row['GroupName5'] }}</span>
@@ -322,7 +386,7 @@
                 {{-- Footer totals --}}
                 <tfoot class="bg-amber-50 border-t-2 border-amber-200 text-xs font-black text-amber-800">
                     <tr>
-                        <td colspan="11" class="py-3 px-3 text-right uppercase tracking-widest text-[9px]">Totals →</td>
+                        <td colspan="10" class="py-3 px-3 text-right uppercase tracking-widest text-[9px]">Totals →</td>
                         <td class="py-3 px-3 text-right">{{ number_format($totalQty, 2) }}</td>
                         <td class="py-3 px-3 text-right">—</td>
                         <td class="py-3 px-3 text-right">—</td>
@@ -337,6 +401,23 @@
                 </tfoot>
             </table>
         </div>
+
+        {{-- Pagination Controls --}}
+        <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-slate-50" id="paginationBar">
+            <div class="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                <span>Show</span>
+                <select id="pageSizeSelect" onchange="changePageSize()" class="border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-amber-400 outline-none">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="9999999">All</option>
+                </select>
+                <span>rows per page</span>
+                <span class="ml-2 text-slate-400" id="pageInfo"></span>
+            </div>
+            <div class="flex items-center gap-1" id="paginationBtns"></div>
+        </div>
         @endif
     </div>
     @endif
@@ -344,27 +425,139 @@
 </div>
 
 <script>
-function filterTable() {
-    const q = document.getElementById('purchaseSearch').value.toLowerCase();
-    document.querySelectorAll('#purchaseTbody .purchase-row').forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
+// ── Pagination ──────────────────────────────────────────────────────────────
+let allRows      = [];
+let filteredRows = [];
+let currentPage  = 1;
+let pageSize     = 50;
+
+function initPagination() {
+    allRows      = Array.from(document.querySelectorAll('#purchaseTbody .purchase-row'));
+    filteredRows = [...allRows];
+    renderPage();
 }
 
+function renderPage() {
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * pageSize;
+    const end   = Math.min(start + pageSize, total);
+
+    // Show/hide rows
+    allRows.forEach(r => r.style.display = 'none');
+    filteredRows.forEach((r, i) => {
+        r.style.display = (i >= start && i < end) ? '' : 'none';
+        // Update row numbers
+        const numCell = r.querySelector('.row-num');
+        if (numCell) numCell.textContent = i + 1;
+    });
+
+    // Page info
+    const info = document.getElementById('pageInfo');
+    if (info) info.textContent = total > 0 ? `Showing ${start+1}–${end} of ${total}` : 'No results';
+
+    // Pagination buttons
+    renderPaginationBtns(totalPages);
+}
+
+function renderPaginationBtns(totalPages) {
+    const container = document.getElementById('paginationBtns');
+    if (!container) return;
+
+    const btnBase = 'px-3 py-1.5 rounded-lg text-xs font-bold transition focus:outline-none';
+    const btnActive = 'bg-amber-500 text-white shadow';
+    const btnInactive = 'bg-white border border-gray-200 text-slate-600 hover:bg-amber-50 hover:border-amber-300';
+    const btnDisabled = 'bg-white border border-gray-100 text-gray-300 cursor-not-allowed';
+
+    let html = '';
+
+    // Prev
+    if (currentPage > 1) {
+        html += `<button class="${btnBase} ${btnInactive}" onclick="goToPage(${currentPage-1})"><i class="fas fa-chevron-left"></i></button>`;
+    } else {
+        html += `<button class="${btnBase} ${btnDisabled}" disabled><i class="fas fa-chevron-left"></i></button>`;
+    }
+
+    // Page numbers (smart window)
+    const window_size = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(window_size/2));
+    let endPage   = Math.min(totalPages, startPage + window_size - 1);
+    if (endPage - startPage < window_size - 1) startPage = Math.max(1, endPage - window_size + 1);
+
+    if (startPage > 1) {
+        html += `<button class="${btnBase} ${btnInactive}" onclick="goToPage(1)">1</button>`;
+        if (startPage > 2) html += `<span class="px-2 text-gray-400 text-xs font-bold">…</span>`;
+    }
+    for (let p = startPage; p <= endPage; p++) {
+        html += `<button class="${btnBase} ${p === currentPage ? btnActive : btnInactive}" onclick="goToPage(${p})">${p}</button>`;
+    }
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) html += `<span class="px-2 text-gray-400 text-xs font-bold">…</span>`;
+        html += `<button class="${btnBase} ${btnInactive}" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+    }
+
+    // Next
+    if (currentPage < totalPages) {
+        html += `<button class="${btnBase} ${btnInactive}" onclick="goToPage(${currentPage+1})"><i class="fas fa-chevron-right"></i></button>`;
+    } else {
+        html += `<button class="${btnBase} ${btnDisabled}" disabled><i class="fas fa-chevron-right"></i></button>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function goToPage(page) {
+    currentPage = page;
+    renderPage();
+    document.getElementById('purchaseTable')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function changePageSize() {
+    pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+    currentPage = 1;
+    renderPage();
+}
+
+// ── Search Filter ────────────────────────────────────────────────────────────
+function filterTable() {
+    const q = document.getElementById('purchaseSearch').value.toLowerCase().trim();
+    filteredRows = q
+        ? allRows.filter(row => row.textContent.toLowerCase().includes(q))
+        : [...allRows];
+    currentPage = 1;
+    renderPage();
+}
+
+// ── Column Sort ──────────────────────────────────────────────────────────────
 let sortDir = {};
 function sortTable(colIndex) {
-    const tbody = document.getElementById('purchaseTbody');
-    const rows  = Array.from(tbody.querySelectorAll('tr'));
-    const dir   = (sortDir[colIndex] = !(sortDir[colIndex]));
-    rows.sort((a, b) => {
+    const dir = (sortDir[colIndex] = !(sortDir[colIndex]));
+    filteredRows.sort((a, b) => {
         const aText = a.cells[colIndex]?.textContent.trim() || '';
         const bText = b.cells[colIndex]?.textContent.trim() || '';
-        const aNum  = parseFloat(aText.replace(/[₹,%,]/g,''));
-        const bNum  = parseFloat(bText.replace(/[₹,%,]/g,''));
+        const aNum  = parseFloat(aText.replace(/[₹,%\s]/g,''));
+        const bNum  = parseFloat(bText.replace(/[₹,%\s]/g,''));
         if (!isNaN(aNum) && !isNaN(bNum)) return dir ? aNum - bNum : bNum - aNum;
         return dir ? aText.localeCompare(bText) : bText.localeCompare(aText);
     });
-    rows.forEach(r => tbody.appendChild(r));
+    // Also re-sort allRows for consistent state
+    allRows.sort((a, b) => {
+        const ai = filteredRows.indexOf(a);
+        const bi = filteredRows.indexOf(b);
+        return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    });
+    // Re-append in sorted order
+    const tbody = document.getElementById('purchaseTbody');
+    filteredRows.forEach(r => tbody.appendChild(r));
+    allRows.filter(r => !filteredRows.includes(r)).forEach(r => tbody.appendChild(r));
+    renderPage();
 }
+
+// Init on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('purchaseTbody')) initPagination();
+});
 </script>
 @endsection

@@ -2021,18 +2021,30 @@ class MobileController extends Controller implements HasMiddleware
         $account  = $request->input('account',   $defaults['account']);
         $item     = $request->input('item',      $defaults['item']);
         $branch   = $request->input('branch',    $defaults['branch']);
+        $rmType   = $request->input('rm_type',   '');
+        $types    = $request->input('types',     '');
+
+        // Initialize option arrays
+        $rmTypeOptions  = [];
+        $typesOptions   = [];
+        $accountOptions = [];
+        $itemOptions    = [];
 
         // Show form on first load — only call API when form submitted
-        if (!$request->hasAny(['from_date', 'to_date', 'account', 'item', 'branch'])) {
-            return view('mobile.purchase_report', compact('defaults', 'fromDate', 'toDate', 'account', 'item', 'branch'));
+        if (!$request->hasAny(['from_date', 'to_date', 'account', 'item', 'branch', 'rm_type', 'types'])) {
+            return view('mobile.purchase_report', compact(
+                'defaults', 'fromDate', 'toDate', 'account', 'item', 'branch',
+                'rmType', 'types', 'rmTypeOptions', 'typesOptions', 'accountOptions', 'itemOptions'
+            ));
         }
 
+        // NOTE: Account & Item filtered PHP-side; API only accepts 'all' reliably
         $payload = [
             'apikey'   => $apiKey,
             'FromDate' => $fromDate,
             'ToDate'   => $toDate,
-            'Account'  => $account,
-            'Item'     => $item,
+            'Account'  => 'all',
+            'Item'     => 'all',
             'Branch'   => $branch,
         ];
 
@@ -2052,6 +2064,29 @@ class MobileController extends Controller implements HasMiddleware
                 } else {
                     $error = 'API: ' . ($data['message'] ?? $data['response'] ?? 'No data');
                 }
+
+                // Extract dropdown options from FULL data (before filters)
+                $rmTypeOptions  = collect($reportData)->pluck('GroupName4')->map(fn($v) => trim($v))->filter()->unique()->sort()->values()->toArray();
+                $typesOptions   = collect($reportData)->pluck('GroupName5')->map(fn($v) => trim($v))->filter()->unique()->sort()->values()->toArray();
+                $accountOptions = collect($reportData)->pluck('SupplierName')->map(fn($v) => trim($v))->filter()->unique()->sort()->values()->toArray();
+                $itemOptions    = collect($reportData)
+                    ->map(fn($r) => ['code' => trim($r['User_Code'] ?? ''), 'name' => trim($r['Item_Hd_Name'] ?? '')])
+                    ->filter(fn($r) => $r['name'] !== '')
+                    ->unique('name')->sortBy('name')->values()->toArray();
+
+                // Server-side filters
+                if (!empty($rmType) && $rmType !== 'all') {
+                    $reportData = array_values(array_filter($reportData, fn($r) => trim($r['GroupName4'] ?? '') === trim($rmType)));
+                }
+                if (!empty($types) && $types !== 'all') {
+                    $reportData = array_values(array_filter($reportData, fn($r) => trim($r['GroupName5'] ?? '') === trim($types)));
+                }
+                if (!empty($account) && $account !== 'all') {
+                    $reportData = array_values(array_filter($reportData, fn($r) => trim($r['SupplierName'] ?? '') === trim($account)));
+                }
+                if (!empty($item) && $item !== 'all') {
+                    $reportData = array_values(array_filter($reportData, fn($r) => trim($r['Item_Hd_Name'] ?? '') === trim($item)));
+                }
             } else {
                 $error = 'HTTP ' . $response->status();
             }
@@ -2059,6 +2094,10 @@ class MobileController extends Controller implements HasMiddleware
             $error = $e->getMessage();
         }
 
-        return view('mobile.purchase_report', compact('reportData', 'defaults', 'error', 'fromDate', 'toDate', 'account', 'item', 'branch'));
+        return view('mobile.purchase_report', compact(
+            'reportData', 'defaults', 'error',
+            'fromDate', 'toDate', 'account', 'item', 'branch',
+            'rmType', 'types', 'rmTypeOptions', 'typesOptions', 'accountOptions', 'itemOptions'
+        ));
     }
 }
