@@ -174,6 +174,14 @@ class SystemController extends Controller
             $executed = 0;
             foreach ($statements as $stmt) {
                 if (empty(trim($stmt))) continue;
+
+                // Skip huge product_sync_logs insert statements to prevent max_allowed_packet crash
+                if (preg_match('/INSERT\s+INTO\s+`?product_sync_logs`?/i', $stmt)) {
+                    if (strlen($stmt) > 50000) { // > 50KB
+                        continue;
+                    }
+                }
+
                 DB::unprepared($stmt);
                 $executed++;
             }
