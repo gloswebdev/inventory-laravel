@@ -12,7 +12,10 @@ class Production extends Model
         'production_date',
         'branch_code',
         'branch_name',
-        'user_id'
+        'user_id',
+        'erp_push_status',
+        'erp_issue_response',
+        'erp_receipt_response',
     ];
 
     public function user(): BelongsTo

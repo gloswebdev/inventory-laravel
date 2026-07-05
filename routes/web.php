@@ -145,6 +145,9 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/stock', [App\Http\Controllers\MobileController::class, 'stock'])->name('mobile.stock');
     Route::get('/production', [App\Http\Controllers\MobileController::class, 'production'])->name('mobile.production');
     Route::post('/production-store', [App\Http\Controllers\MobileController::class, 'submitProduction'])->name('mobile.production.store');
+    Route::delete('/production/{id}', [App\Http\Controllers\MobileController::class, 'destroyProduction'])->name('mobile.production.destroy');
+    Route::post('/production/check-stock', [ProductionController::class, 'checkStock'])->name('mobile.production.check-stock');
+    Route::get('/production/{production}', [ProductionController::class, 'show'])->name('mobile.production.show');
     Route::get('/planning', [App\Http\Controllers\MobileController::class, 'planning'])->name('mobile.planning');
     Route::post('/planning/calculate', [App\Http\Controllers\MobileController::class, 'calculateMRP'])->name('mobile.planning.calculate');
     Route::get('/indents', [App\Http\Controllers\MobileController::class, 'indents'])->name('mobile.indents');

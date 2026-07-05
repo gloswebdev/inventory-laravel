@@ -10,6 +10,7 @@ use App\Models\Branch;
 use App\Models\Recipe;
 use App\Models\StockLedger;
 use App\Models\RecipeItem;
+use App\Library\ErpStockPushService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -164,7 +165,7 @@ class ProductionController extends Controller
 
         $branch = Branch::where('code', $request->branch_code)->first();
 
-        DB::transaction(function () use ($request, $branch) {
+        $production = DB::transaction(function () use ($request, $branch) {
             $production = Production::create([
                 'production_date' => $request->production_date,
                 'branch_code' => $request->branch_code,
@@ -216,8 +217,81 @@ class ProductionController extends Controller
                     }
                 }
             }
+            return $production;
         });
 
+        // ── ERP PUSH (non-blocking) ────────────────────────────────────────
+        // DB transaction already committed above. ERP failure will NOT rollback
+        // local stock — production is saved regardless.
+        if (AppSetting::get('erp_push_enabled', '0') === '1') {
+
+            // We need the production record + items freshly loaded for building payloads
+            $production->load('items.product');
+
+            // ── Build Issue payload (raw materials consumed) ──────────────
+            $issueItems   = [];
+            $receiptItems = [];
+
+            foreach ($production->items as $prodItem) {
+                $product = $prodItem->product;
+                if (!$product) continue;
+
+                // Receipt: every FG item
+                $unitPerBox  = (float) ($product->unit_box ?: 1);
+                $totalUnits  = $prodItem->quantity_box * $unitPerBox;
+                $receiptItems[] = [
+                    'item_code' => $product->item_code,
+                    'quantity'  => $totalUnits,
+                    'lot_no'    => $prodItem->batch_number,
+                    'mfg_date'  => $prodItem->mfg_date,
+                    'exp_date'  => $prodItem->exp_date,
+                    'rate'      => (float) ($product->price ?? 0),
+                ];
+
+                // Issue: raw materials from recipe
+                $recipe = Recipe::where('finished_product_id', $product->id)->with('items.rawMaterial')->first();
+                if ($recipe) {
+                    $totalBase = $totalUnits * $product->weight_multiplier;
+                    foreach ($recipe->items as $recipeItem) {
+                        $rm  = $recipeItem->rawMaterial;
+                        if (!$rm || !$rm->item_code) continue;
+                        $qty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalBase;
+                        $issueItems[] = [
+                            'item_code' => $rm->item_code,
+                            'quantity'  => $qty,
+                        ];
+                    }
+                }
+            }
+
+            $erp    = new ErpStockPushService();
+            $issueResult   = ['success' => true, 'message' => 'No raw materials', 'response' => []];
+            $receiptResult = ['success' => true, 'message' => 'No FG items',      'response' => []];
+
+            if (!empty($issueItems)) {
+                $issueResult = $erp->pushIssueStock($production, $issueItems);
+            }
+            if (!empty($receiptItems)) {
+                $receiptResult = $erp->pushReceiptStock($production, $receiptItems);
+            }
+
+            $erpSuccess = $issueResult['success'] && $receiptResult['success'];
+            $production->update([
+                'erp_push_status'      => $erpSuccess ? 'success' : 'failed',
+                'erp_issue_response'   => json_encode($issueResult['response']),
+                'erp_receipt_response' => json_encode($receiptResult['response']),
+            ]);
+
+            $erpMsg = $erpSuccess
+                ? ' ERP stock updated ✓'
+                : ' ERP push failed: Issue=' . $issueResult['message'] . ' | Receipt=' . $receiptResult['message'];
+
+            return redirect()->route('production.index')
+                ->with('success', 'Production entry saved successfully.' . $erpMsg);
+        }
+
+        // ERP push disabled
+        $production->update(['erp_push_status' => 'skipped']);
         return redirect()->route('production.index')->with('success', 'Production entry saved successfully.');
     }
 

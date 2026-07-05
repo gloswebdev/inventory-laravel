@@ -335,6 +335,163 @@
                     </div>
                 </div>
 
+
+                <hr class="border-slate-100">
+
+                {{-- ---- SECTION 6: ERP Production Push ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-black">6</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">ERP Stock Push &mdash; Production Module</h4>
+                        <span class="px-1.5 py-0.5 bg-green-100 text-green-700 text-[8px] font-bold rounded">PRODUCTION PUSH</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        When enabled, every new production entry automatically pushes to Logic ERP:
+                        &nbsp;<code class="bg-slate-100 px-1.5 py-0.5 rounded text-green-700 text-[10px]">POST /SaveIssueStock</code> (RM consumed)
+                        &nbsp;&amp;&nbsp;
+                        <code class="bg-slate-100 px-1.5 py-0.5 rounded text-green-700 text-[10px]">POST /SaveReceiptStock</code> (FG produced)
+                    </p>
+
+                    <div class="bg-green-50/50 border border-green-100 rounded-xl p-4 space-y-5">
+
+                        {{-- Master Toggle --}}
+                        <div class="flex items-center justify-between bg-white border border-green-200 rounded-xl px-5 py-4">
+                            <div>
+                                <p class="text-sm font-black text-slate-700">Enable ERP Stock Push</p>
+                                <p class="text-[11px] text-slate-400 mt-0.5">When OFF, production saves locally only. ERP push status shows <span class="font-bold text-slate-500">"skipped"</span>.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer select-none">
+                                <input type="checkbox" name="erp_push_enabled" id="erp_push_enabled" value="1"
+                                    {{ ($settings['erp_push_enabled']->value ?? '0') === '1' ? 'checked' : '' }}
+                                    class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-400 rounded-full peer
+                                            peer-checked:after:translate-x-full peer-checked:after:border-white
+                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white
+                                            after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+                                            peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+
+                        {{-- Credentials --}}
+                        <div>
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Basic Auth Credentials &amp; Endpoint</p>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="md:col-span-3">
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                        Push Base URL <span class="font-normal text-gray-400 normal-case">(e.g. http://demo.logicerp.com/api)</span>
+                                    </label>
+                                    <input type="text" name="erp_push_base_url"
+                                        value="{{ $settings['erp_push_base_url']->value ?? 'http://demo.logicerp.com/api' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 font-mono text-sm text-green-700 focus:ring-2 focus:ring-green-500 outline-none transition bg-white"
+                                        placeholder="http://demo.logicerp.com/api">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Username</label>
+                                    <input type="text" name="erp_push_username"
+                                        value="{{ $settings['erp_push_username']->value ?? '' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-green-500 outline-none transition bg-white"
+                                        placeholder="Demo">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Password</label>
+                                    <div class="relative">
+                                        <input type="password" id="erp_push_password_input" name="erp_push_password"
+                                            value="{{ $settings['erp_push_password']->value ?? '' }}"
+                                            class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-green-500 outline-none transition pr-10 bg-white"
+                                            placeholder="••••••">
+                                        <button type="button" onclick="toggleErpPwd()"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition">
+                                            <i id="erp_pwd_eye" class="fas fa-eye text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Receipt Stock Config --}}
+                        <div class="border-t border-green-100 pt-4">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px]">SaveReceiptStock</span>
+                                Finished Good Production Settings
+                            </p>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Doc Prefix</label>
+                                    <input type="text" name="erp_receipt_doc_prefix"
+                                        value="{{ $settings['erp_receipt_doc_prefix']->value ?? 'REC' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                        placeholder="REC">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Godown Name</label>
+                                    <input type="text" name="erp_receipt_godown_name"
+                                        value="{{ $settings['erp_receipt_godown_name']->value ?? 'MAIN' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                        placeholder="MAIN">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">ReceivedFrom</label>
+                                    <input type="text" name="erp_receipt_received_from"
+                                        value="{{ $settings['erp_receipt_received_from']->value ?? '' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                        placeholder="RKSS">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">IssueTo</label>
+                                    <input type="text" name="erp_receipt_issue_to"
+                                        value="{{ $settings['erp_receipt_issue_to']->value ?? '' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                        placeholder="(blank ok)">
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Issue Stock Config --}}
+                        <div class="border-t border-green-100 pt-4">
+                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px]">SaveIssueStock</span>
+                                Raw Material Consumption Settings
+                            </p>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Doc Prefix</label>
+                                    <input type="text" name="erp_issue_doc_prefix"
+                                        value="{{ $settings['erp_issue_doc_prefix']->value ?? 'IS' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-orange-500 outline-none transition bg-white"
+                                        placeholder="IS">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Godown Name</label>
+                                    <input type="text" name="erp_issue_godown_name"
+                                        value="{{ $settings['erp_issue_godown_name']->value ?? '' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-orange-500 outline-none transition bg-white"
+                                        placeholder="(blank ok)">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
+                                        IssueTo <span class="font-normal text-red-400 normal-case">* mandatory in ERP</span>
+                                    </label>
+                                    <input type="text" name="erp_issue_issue_to"
+                                        value="{{ $settings['erp_issue_issue_to']->value ?? 'DAMAGE' }}"
+                                        class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-orange-500 outline-none transition bg-white"
+                                        placeholder="DAMAGE">
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Info note --}}
+                        <div class="flex items-start gap-3 bg-white border border-green-100 rounded-xl p-3">
+                            <i class="fas fa-circle-info text-green-500 text-sm mt-0.5"></i>
+                            <div class="text-[11px] text-slate-500 leading-relaxed">
+                                <strong class="text-slate-700">Non-blocking push:</strong>
+                                If ERP API fails, production is still saved locally. Check <code class="bg-slate-100 px-1 rounded text-slate-600">storage/logs/laravel.log</code>
+                                for errors. ERP push status is shown in the Production history table as <span class="font-bold text-green-600">✓ success</span>,
+                                <span class="font-bold text-red-500">✗ failed</span>, or <span class="font-bold text-slate-400">— skipped</span>.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>{{-- /p-6 --}}
         </div>{{-- /card --}}
     </form>
@@ -433,6 +590,17 @@
 function toggleKey() {
     const input = document.getElementById('api_key_input');
     const icon  = document.getElementById('eye_icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+function toggleErpPwd() {
+    const input = document.getElementById('erp_push_password_input');
+    const icon  = document.getElementById('erp_pwd_eye');
     if (input.type === 'password') {
         input.type = 'text';
         icon.classList.replace('fa-eye', 'fa-eye-slash');

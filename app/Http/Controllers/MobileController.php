@@ -587,16 +587,16 @@ class MobileController extends Controller implements HasMiddleware
 
         $products = $productsQuery->get();
         $branches = Branch::whereIn('code', $permittedCodes)->orderBy('sort_order')->orderBy('code')->get();
+        $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
         
-        $history = \App\Models\ProductionItem::whereHas('production', function($q) use ($permittedCodes) {
-                $q->whereIn('branch_code', $permittedCodes);
-            })
-            ->with(['product', 'production'])
+        $history = \App\Models\Production::whereIn('branch_code', $permittedCodes)
+            ->with(['items.product', 'user'])
+            ->orderByDesc('production_date')
             ->orderByDesc('created_at')
-            ->limit(10)
+            ->limit(20)
             ->get();
 
-        return view('mobile.production', compact('products', 'branches', 'history'));
+        return view('mobile.production', compact('products', 'branches', 'history', 'productTypes'));
     }
 
     /**
@@ -1082,7 +1082,12 @@ class MobileController extends Controller implements HasMiddleware
         $request->validate([
             'branch_code' => 'required',
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|numeric|min:1',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.001',
+            'items.*.batch_number' => 'required|string|max:255',
+            'items.*.mfg_date' => 'required|date',
+            'items.*.exp_date' => 'required|date|after_or_equal:items.*.mfg_date',
         ]);
 
         $branch = Branch::where('code', $request->branch_code)->first();
@@ -1090,57 +1095,181 @@ class MobileController extends Controller implements HasMiddleware
         try {
             DB::transaction(function () use ($request, $branch) {
                 $production = Production::create([
-                    'production_date' => now(),
+                    'production_date' => $request->production_date,
                     'branch_code' => $request->branch_code,
                     'branch_name' => $branch ? $branch->name : $request->branch_code,
                     'user_id' => auth()->id(),
                 ]);
 
-                $product = Product::find($request->product_id);
-                
-                if (auth()->user()->role !== 'admin') {
-                    $permittedTypeIds = auth()->user()->getPermittedProductTypeIds();
-                    if (!in_array($product->product_type_id, $permittedTypeIds)) {
-                        throw new \Exception('Unauthorized product type for this user.');
+                foreach ($request->items as $itemData) {
+                    $product = Product::find($itemData['product_id']);
+                    if (auth()->user()->role !== 'admin') {
+                        $permittedTypeIds = auth()->user()->getPermittedProductTypeIds();
+                        if (!in_array($product->product_type_id, $permittedTypeIds)) {
+                            throw new \Exception('Unauthorized product type for this user.');
+                        }
+                    }
+
+                    $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
+
+                    $unitPerBox = (float)($product->unit_box ?: 1);
+                    $totalUnits = $itemData['quantity'] * $unitPerBox;
+                    $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+
+                    ProductionItem::create([
+                        'production_id' => $production->id,
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'pack_size' => $product->pack_name,
+                        'quantity_box' => $itemData['quantity'],
+                        'batch_number' => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
+                        'mfg_date' => $itemData['mfg_date'] ?? null,
+                        'exp_date' => $itemData['exp_date'] ?? null,
+                    ]);
+
+                    $product->increment('current_stock', $totalUnits);
+                    StockLedger::create([
+                        'product_id' => $product->id,
+                        'transaction_type' => 'production_add',
+                        'transaction_id' => $production->id,
+                        'change_quantity' => $totalUnits,
+                        'new_stock' => $product->current_stock,
+                    ]);
+
+                    if ($recipe) {
+                        foreach ($recipe->items as $recipeItem) {
+                            $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
+                            $rawMaterial = Product::find($recipeItem->raw_material_id);
+                            $rawMaterial->decrement('current_stock', $deductQty);
+
+                            StockLedger::create([
+                                'product_id' => $rawMaterial->id,
+                                'transaction_type' => 'production_deduct',
+                                'transaction_id' => $production->id,
+                                'change_quantity' => -$deductQty,
+                                'new_stock' => $rawMaterial->current_stock,
+                            ]);
+                        }
                     }
                 }
 
-                $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
+                // ── ERP PUSH (non-blocking) ────────────────────────────────────────
+                if (\App\Models\AppSetting::get('erp_push_enabled', '0') === '1') {
+                    $production->load('items.product');
+                    $issueItems   = [];
+                    $receiptItems = [];
 
-                ProductionItem::create([
-                    'production_id' => $production->id,
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'pack_size' => $product->pack_name,
-                    'quantity_box' => $request->quantity,
-                ]);
+                    foreach ($production->items as $prodItem) {
+                        $product = $prodItem->product;
+                        if (!$product) continue;
 
-                $product->increment('current_stock', $request->quantity);
-                StockLedger::create([
-                    'product_id' => $product->id,
-                    'transaction_type' => 'production_add',
-                    'transaction_id' => $production->id,
-                    'change_quantity' => $request->quantity,
-                    'new_stock' => $product->current_stock,
-                ]);
+                        $unitPerBox  = (float) ($product->unit_box ?: 1);
+                        $totalUnits  = $prodItem->quantity_box * $unitPerBox;
+                        $receiptItems[] = [
+                            'item_code' => $product->item_code,
+                            'quantity'  => $totalUnits,
+                            'lot_no'    => $prodItem->batch_number,
+                            'mfg_date'  => $prodItem->mfg_date,
+                            'exp_date'  => $prodItem->exp_date,
+                            'rate'      => (float) ($product->price ?? 0),
+                        ];
 
-                if ($recipe) {
-                    foreach ($recipe->items as $recipeItem) {
-                        $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $request->quantity;
-                        $rawMaterial = Product::find($recipeItem->raw_material_id);
-                        $rawMaterial->decrement('current_stock', $deductQty);
-
-                        StockLedger::create([
-                            'product_id' => $rawMaterial->id,
-                            'transaction_type' => 'production_deduct',
-                            'transaction_id' => $production->id,
-                            'change_quantity' => -$deductQty,
-                            'new_stock' => $rawMaterial->current_stock,
-                        ]);
+                        $recipe = Recipe::where('finished_product_id', $product->id)->with('items.rawMaterial')->first();
+                        if ($recipe) {
+                            $totalBase = $totalUnits * $product->weight_multiplier;
+                            foreach ($recipe->items as $recipeItem) {
+                                $rm  = $recipeItem->rawMaterial;
+                                if (!$rm || !$rm->item_code) continue;
+                                $qty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalBase;
+                                $issueItems[] = [
+                                    'item_code' => $rm->item_code,
+                                    'quantity'  => $qty,
+                                ];
+                            }
+                        }
                     }
+
+                    $erp = new \App\Library\ErpStockPushService();
+                    $issueResult   = ['success' => true, 'response' => []];
+                    $receiptResult = ['success' => true, 'response' => []];
+
+                    if (!empty($issueItems)) {
+                        $issueResult = $erp->pushIssueStock($production, $issueItems);
+                    }
+                    if (!empty($receiptItems)) {
+                        $receiptResult = $erp->pushReceiptStock($production, $receiptItems);
+                    }
+
+                    $erpSuccess = $issueResult['success'] && $receiptResult['success'];
+                    $production->update([
+                        'erp_push_status'      => $erpSuccess ? 'success' : 'failed',
+                        'erp_issue_response'   => json_encode($issueResult['response'] ?? []),
+                        'erp_receipt_response' => json_encode($receiptResult['response'] ?? []),
+                    ]);
+                } else {
+                    $production->update(['erp_push_status' => 'skipped']);
                 }
             });
+
             return response()->json(['success' => true, 'message' => 'Production recorded successfully!']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Delete Production Entry from Mobile
+     */
+    public function destroyProduction($id)
+    {
+        if (auth()->user()->role !== 'admin' && !auth()->user()->hasPermission('mobile_production', 'delete')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+        }
+
+        try {
+            $production = Production::findOrFail($id);
+
+            DB::transaction(function () use ($production) {
+                foreach ($production->items as $item) {
+                    $product = Product::find($item->product_id);
+                    if (!$product) continue;
+                    $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
+
+                    $unitPerBox = (float)($product->unit_box ?: 1);
+                    $totalUnits = $item->quantity_box * $unitPerBox;
+                    $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+
+                    $product->decrement('current_stock', $totalUnits);
+                    StockLedger::create([
+                        'product_id' => $product->id,
+                        'transaction_type' => 'production_delete_deduct',
+                        'transaction_id' => $production->id,
+                        'change_quantity' => -$totalUnits,
+                        'new_stock' => $product->current_stock,
+                    ]);
+
+                    if ($recipe) {
+                        foreach ($recipe->items as $recipeItem) {
+                            $reverseQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
+                            $rawMaterial = Product::find($recipeItem->raw_material_id);
+                            if ($rawMaterial) {
+                                $rawMaterial->increment('current_stock', $reverseQty);
+
+                                StockLedger::create([
+                                    'product_id' => $rawMaterial->id,
+                                    'transaction_type' => 'production_delete_add',
+                                    'transaction_id' => $production->id,
+                                    'change_quantity' => $reverseQty,
+                                    'new_stock' => $rawMaterial->current_stock,
+                                ]);
+                            }
+                        }
+                    }
+                }
+                $production->delete();
+            });
+
+            return response()->json(['success' => true, 'message' => 'Production entry deleted and stock reverted.']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
         }

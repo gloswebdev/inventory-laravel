@@ -42,6 +42,18 @@ class SettingController extends Controller
             'costing_api_account'       => 'nullable|string',
             'costing_api_item'          => 'nullable|string',
             'costing_api_branch'        => 'nullable|string',
+            // ERP Push (optional)
+            'erp_push_enabled'          => 'nullable|string',
+            'erp_push_base_url'         => 'nullable|string',
+            'erp_push_username'         => 'nullable|string',
+            'erp_push_password'         => 'nullable|string',
+            'erp_receipt_doc_prefix'    => 'nullable|string',
+            'erp_receipt_godown_name'   => 'nullable|string',
+            'erp_receipt_received_from' => 'nullable|string',
+            'erp_receipt_issue_to'      => 'nullable|string',
+            'erp_issue_doc_prefix'      => 'nullable|string',
+            'erp_issue_godown_name'     => 'nullable|string',
+            'erp_issue_issue_to'        => 'nullable|string',
         ]);
 
         $keys = [
@@ -52,11 +64,18 @@ class SettingController extends Controller
             // Costing API settings
             'costing_api_from_date', 'costing_api_to_date',
             'costing_api_account', 'costing_api_item', 'costing_api_branch',
+            // ERP Push settings
+            'erp_push_base_url', 'erp_push_username', 'erp_push_password',
+            'erp_receipt_doc_prefix', 'erp_receipt_godown_name', 'erp_receipt_received_from', 'erp_receipt_issue_to',
+            'erp_issue_doc_prefix', 'erp_issue_godown_name', 'erp_issue_issue_to',
         ];
 
         foreach ($keys as $key) {
-            AppSetting::set($key, $request->input($key, ''));
+            AppSetting::set($key, (string) ($request->input($key) ?? ''));
         }
+
+        // erp_push_enabled is a checkbox — only present in request when checked
+        AppSetting::set('erp_push_enabled', $request->has('erp_push_enabled') ? '1' : '0');
 
         // Bust the stock cache so new settings take effect immediately
         Cache::forget('external_stock_data_grouped');
