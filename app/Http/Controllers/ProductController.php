@@ -343,13 +343,34 @@ class ProductController extends Controller
 
             DB::commit();
 
+            // Limit logging size to prevent database max_allowed_packet size crash
+            $loggedCreatedItems = $createdItems;
+            if (count($createdItems) > 100) {
+                $loggedCreatedItems = array_slice($createdItems, 0, 100);
+                $loggedCreatedItems[] = [
+                    'item_code' => '...',
+                    'name' => '... and ' . (count($createdItems) - 100) . ' more items created',
+                    'type' => '...'
+                ];
+            }
+
+            $loggedUpdatedItems = $updatedItems;
+            if (count($updatedItems) > 100) {
+                $loggedUpdatedItems = array_slice($updatedItems, 0, 100);
+                $loggedUpdatedItems[] = [
+                    'item_code' => '...',
+                    'name' => '... and ' . (count($updatedItems) - 100) . ' more items updated',
+                    'type' => '...'
+                ];
+            }
+
             // Save sync log
             $syncLog = \App\Models\ProductSyncLog::create([
                 'total_created'  => $created,
                 'total_updated'  => $updated,
                 'total_skipped'  => $skipped,
-                'created_items'  => $createdItems,
-                'updated_items'  => $updatedItems,
+                'created_items'  => $loggedCreatedItems,
+                'updated_items'  => $loggedUpdatedItems,
                 'status'         => 'success',
                 'synced_by'      => Auth::user()->name ?? 'Unknown',
             ]);
