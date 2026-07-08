@@ -82,6 +82,14 @@
                     </div>
                 </div>
 
+                <!-- Product Search Filter -->
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-slate-400 group-focus-within:text-indigo-500 transition-colors"></i>
+                    </div>
+                    <input type="text" id="productSearchInput" oninput="filterProducts()" placeholder="Search product name or code..." class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-11 pr-4 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-xs font-bold text-slate-700 shadow-sm" />
+                </div>
+
                 <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                     <div class="max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar">
                         <table class="w-full text-left border-collapse relative table-fixed">
@@ -97,6 +105,7 @@
                                 <tr class="product-row hover:bg-slate-50/70 transition-colors group" 
                                     data-id="{{ $product->id }}" 
                                     data-name="{{ $product->name }}"
+                                    data-code="{{ $product->item_code }}"
                                     data-pack="{{ $product->pack_name }}"
                                     data-unit-box="{{ $product->unit_box ?: 1 }}"
                                     data-weight-unit="{{ $product->weight_multiplier }}"
@@ -462,6 +471,32 @@
     </div>
 </div>
 
+<!-- Refresh Confirmation Modal -->
+<div id="refreshModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col p-6 animate-in zoom-in duration-200">
+        <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                <i class="fas fa-redo-alt text-lg animate-spin" style="animation-duration: 3s;"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-black text-slate-800 tracking-tight">Sync Notification</h3>
+                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Refresh Request</p>
+            </div>
+        </div>
+        <div class="text-slate-600 text-sm mb-6 font-semibold leading-relaxed">
+            Its time to refresh. Do you want to reload the page to sync with latest changes?
+        </div>
+        <div class="flex gap-3 justify-end">
+            <button onclick="handleRefreshConfirm(false)" class="bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold transition text-xs uppercase tracking-wider shadow-sm">
+                No
+            </button>
+            <button onclick="handleRefreshConfirm(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold transition text-xs uppercase tracking-wider shadow-lg shadow-indigo-200/50">
+                Yes
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
@@ -534,8 +569,30 @@
         }
     }
 
+    function filterProducts() {
+        try {
+            const query = document.getElementById('productSearchInput').value.toLowerCase().trim();
+            const rows = document.querySelectorAll('.product-row');
+            
+            rows.forEach(row => {
+                const name = (row.dataset.name || '').toLowerCase();
+                const code = (row.dataset.code || '').toLowerCase();
+                
+                if (name.includes(query) || code.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        } catch (e) {
+            alert('Search Error: ' + e.message);
+        }
+    }
+
     function filterProductsByType() {
-        const typeId = document.getElementById('item_type_filter').value;
+        const filterEl = document.getElementById('item_type_filter');
+        if (!filterEl) return;
+        const typeId = filterEl.value;
         const rows = document.querySelectorAll('.product-row');
         rows.forEach(row => {
             if (!typeId || row.dataset.typeId === typeId) {
@@ -935,19 +992,45 @@
         }
     }
 
-    // Auto-refresh when tab is focused or every 30 seconds to sync with mobile changes
+    let isConfirmingRefresh = false;
+
+    function triggerRefreshModal() {
+        if (isConfirmingRefresh) return;
+        isConfirmingRefresh = true;
+        const modal = document.getElementById('refreshModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    window.handleRefreshConfirm = function(confirmRefresh) {
+        const modal = document.getElementById('refreshModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+        isConfirmingRefresh = false;
+        if (confirmRefresh) {
+            location.reload();
+        }
+    }
+
+    // Auto-refresh check when tab is focused or every 30 seconds to sync with mobile changes
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && !editingIndentId) {
             // Check if any quantity is entered before refreshing
             const hasData = Array.from(document.querySelectorAll('.product-qty')).some(i => i.value > 0);
-            if (!hasData) location.reload();
+            if (!hasData) {
+                triggerRefreshModal();
+            }
         }
     });
 
     setInterval(() => {
         if (document.visibilityState === 'visible' && !editingIndentId) {
             const hasData = Array.from(document.querySelectorAll('.product-qty')).some(i => i.value > 0);
-            if (!hasData) location.reload();
+            if (!hasData) {
+                triggerRefreshModal();
+            }
         }
     }, 30000);
 </script>

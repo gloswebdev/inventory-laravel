@@ -546,8 +546,31 @@
                 </div>
             </div>
         </div>
+    <!-- Mobile Refresh Confirmation Modal -->
+    <div x-show="showRefreshConfirmModal" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white rounded-[3rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in duration-300 p-8 flex flex-col items-center text-center">
+            <div class="w-16 h-16 bg-indigo-50 rounded-[1.5rem] flex items-center justify-center text-indigo-600 mb-5 border border-indigo-100 shadow-sm">
+                <i class="fas fa-redo-alt text-2xl animate-spin" style="animation-duration: 3s;"></i>
+            </div>
+            <h3 class="text-xl font-900 italic tracking-tighter uppercase text-slate-800">Sync Status</h3>
+            <p class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1.5 mb-4">Refresh Required</p>
+            
+            <p class="text-slate-600 text-sm font-semibold mb-6 leading-relaxed border-none">
+                Its time to refresh. Do you want to reload the page to sync with latest changes?
+            </p>
+            
+            <div class="grid grid-cols-2 gap-4 w-full">
+                <button @click="showRefreshConfirmModal = false" class="py-4 border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all">
+                    No
+                </button>
+                <button @click="location.reload()" class="py-4 grad-violet text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-violet-100 active:scale-95 transition-all italic">
+                    Yes
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+
 
 <script>
 function indentApp() {
@@ -558,6 +581,7 @@ function indentApp() {
         viewModal: false,
         progressModal: false,
         selectedIndent: null,
+        showRefreshConfirmModal: false,
         submitting: false,
         searchQuery: '',
         selectedProducts: [],
@@ -612,7 +636,7 @@ function indentApp() {
                 const q = this.searchQuery.toLowerCase();
                 list = list.filter(p => 
                     p.name.toLowerCase().includes(q) || 
-                    (p.item_code && p.item_code.toLowerCase().includes(q))
+                     (p.item_code && p.item_code.toLowerCase().includes(q))
                 );
             }
             return list;
@@ -625,16 +649,16 @@ function indentApp() {
             }
             this.updateGlobalStocks();
             
-            // Auto-refresh when tab is focused or every 30 seconds to sync with desktop changes
+            // Auto-refresh check when tab is focused or every 30 seconds to sync with desktop changes
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible' && !this.showEntry && !this.showPreview && !this.viewModal && !this.progressModal) {
-                    location.reload();
+                    this.showRefreshConfirmModal = true;
                 }
             });
             
             setInterval(() => {
                 if (document.visibilityState === 'visible' && !this.showEntry && !this.showPreview && !this.viewModal && !this.progressModal && !this.submitting) {
-                    location.reload();
+                    this.showRefreshConfirmModal = true;
                 }
             }, 30000);
         },

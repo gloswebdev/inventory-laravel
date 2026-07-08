@@ -20,8 +20,8 @@
 
         /* ── Sidebar ── */
         .sidebar {
-            background: #0f1623;
-            border-right: 1px solid rgba(255,255,255,0.05);
+            background: #090d16;
+            border-right: 1px solid rgba(255,255,255,0.03);
         }
         .sidebar-logo-glow {
             background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
@@ -133,7 +133,7 @@
         .flash-error   { background:linear-gradient(135deg,#fef2f2,#fee2e2); border:1px solid #fca5a5; color:#991b1b; }
     </style>
 </head>
-<body class="bg-[#f0f4f9] text-slate-900 antialiased">
+<body class="bg-[#f4f7fc] text-slate-900 antialiased">
 
 <div class="flex h-screen overflow-hidden" x-data="{ showAccessModal: false }">
 
