@@ -921,7 +921,10 @@
             // UI Updates
             document.getElementById('entryTitle').innerText = `EDIT INDENT #IND-${id}`;
             document.getElementById('editBadge').classList.remove('hidden');
-            document.getElementById('createBadge').classList.add('hidden');
+            const createBadge = document.getElementById('createBadge');
+            if (createBadge) {
+                createBadge.classList.add('hidden');
+            }
             document.getElementById('branch_code').value = indent.branch_code;
             document.getElementById('indent_date').value = indent.indent_date;
             
@@ -938,7 +941,6 @@
             });
             
             updateAllStock();
-            alert('Form populated! You can now modify and update.');
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
         } catch(e) {
