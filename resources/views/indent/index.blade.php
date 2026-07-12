@@ -389,6 +389,9 @@
                     </tbody>
                 </table>
             </div>
+            <div class="px-7 py-4 border-t border-slate-100 bg-slate-50/50">
+                {{ $history->appends(request()->query())->links() }}
+            </div>
         </div>
     </div>
 </div>

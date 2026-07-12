@@ -47,7 +47,7 @@ class IndentController extends Controller
             $query->where('status', $request->status);
         }
 
-        $history = $query->orderByDesc('created_at')->limit(50)->get();
+        $history = $query->orderByDesc('created_at')->paginate(5);
         $users = \App\Models\User::orderBy('name')->get();
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
 
