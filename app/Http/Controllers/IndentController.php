@@ -249,6 +249,18 @@ class IndentController extends Controller
             "Process_Matrix_{$indent->branch_code}_{$indent->indent_date}.xlsx"
         );
     }
+
+    public function exportProcessPdf(Indent $indent)
+    {
+        $indent->load('items.product', 'user');
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
+        $branchStocks = $this->getBranchStocksForIndent($indent, $branches);
+
+        $pdf = Pdf::loadView('indent.process_pdf', compact('indent', 'branches', 'branchStocks'))
+                  ->setPaper('a4', 'landscape');
+        return $pdf->download("Process_Matrix_{$indent->branch_code}_{$indent->indent_date}.pdf");
+    }
+
     public function updateCompletion(Request $request, Indent $indent)
     {
         $quantities = $request->input('completed_qty', []);
