@@ -394,6 +394,7 @@
                                 <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
                                     <div class="col-span-7">
                                         <select x-model="item.raw_material_id"
+                                                @change="if (isTechnical(item.raw_material_id) && !item.quantity) item.quantity = calculateSuggestedQty()"
                                                 class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
                                             <option value="">Select Raw Material</option>
                                             <template x-for="rm in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
@@ -426,6 +427,11 @@
                                         <input type="number" step="0.001" x-model="item.quantity"
                                                placeholder="Qty"
                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
+                                        <div class="text-[9px] text-indigo-600 hover:text-indigo-800 mt-1 text-center cursor-pointer font-black select-none"
+                                             @click="item.quantity = calculateSuggestedQty()"
+                                             title="Click to apply: Batch Quantity * formulation / density">
+                                            Calc: <span x-text="calculateSuggestedQty()"></span>
+                                        </div>
                                     </div>
                                     <div class="col-span-1 text-center text-[10px] font-bold text-slate-400" x-text="getItemUom(item.raw_material_id)"></div>
                                     <div class="col-span-1 flex justify-center">
@@ -644,6 +650,18 @@ function bomApp() {
             const rm = __rawMaterials.find(r => r.id == rmId);
             if (!rm) return null;
             return __purities[rm.item_code] !== undefined && __purities[rm.item_code] !== null ? parseFloat(__purities[rm.item_code]) : null;
+        },
+
+        calculateSuggestedQty() {
+            const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
+            let formulation = parseFloat(this.bomModal.form.formulation);
+            if (isNaN(formulation)) {
+                const fgForm = this.getFormulation(this.bomModal.form.finished_product_id);
+                formulation = parseFloat(fgForm) || 0;
+            }
+            const density = parseFloat(this.bomModal.form.density) > 0 ? parseFloat(this.bomModal.form.density) : 1;
+            const qty = (batchQty * (formulation / 100)) / density;
+            return parseFloat(qty.toFixed(4));
         },
 
         openBomModal() {
