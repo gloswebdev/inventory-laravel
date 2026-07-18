@@ -252,11 +252,47 @@
                 </button>
             </div>
 
-            {{-- Modal Body --}}
-            <div class="flex-1 overflow-y-auto p-6 space-y-5">
+            {{-- Visual Step Indicators --}}
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center w-full justify-between max-w-lg mx-auto">
+                    <!-- Step 1 Indicator -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                             :class="bomModal.step >= 1 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">1</div>
+                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 1 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Product Info</span>
+                    </div>
+                    <!-- Connector -->
+                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 2 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <!-- Step 2 Indicator -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                             :class="bomModal.step >= 2 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">2</div>
+                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 2 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Batch Specs</span>
+                    </div>
+                    <!-- Connector -->
+                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 3 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <!-- Step 3 Indicator -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                             :class="bomModal.step >= 3 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">3</div>
+                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 3 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Ingredients</span>
+                    </div>
+                    <!-- Connector -->
+                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 4 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <!-- Step 4 Indicator -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                             :class="bomModal.step >= 4 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">4</div>
+                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 4 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Packing</span>
+                    </div>
+                </div>
+            </div>
 
-                {{-- Finished Product and Badge --}}
-                <div class="space-y-4">
+            {{-- Modal Body --}}
+            <div class="flex-1 overflow-y-auto p-6">
+
+                {{-- Step 1: Product Info & Settings --}}
+                <div x-show="bomModal.step === 1" class="space-y-5" x-transition>
                     <div class="grid grid-cols-12 gap-4">
                         <div class="col-span-12 md:col-span-4">
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Product Type</label>
@@ -281,7 +317,7 @@
                     </div>
 
                     <div class="grid grid-cols-12 gap-4">
-                        <div class="col-span-12 md:col-span-6">
+                        <div class="col-span-12 md:col-span-4">
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">BOM Badge</label>
                             <select x-model="bomModal.form.badge"
                                     class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium">
@@ -291,10 +327,16 @@
                                 <option value="bulk">Bulk</option>
                             </select>
                         </div>
-                        <div class="col-span-12 md:col-span-6">
+                        <div class="col-span-12 md:col-span-4">
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Formulation Override %</label>
                             <input type="number" step="0.001" min="0" max="100" x-model="bomModal.form.formulation"
                                    placeholder="e.g. 5.0"
+                                   class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold text-slate-800">
+                        </div>
+                        <div class="col-span-12 md:col-span-4">
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Density (g/ml)</label>
+                            <input type="number" step="0.0001" min="0.001" max="10" x-model="bomModal.form.density"
+                                   placeholder="e.g. 1.05"
                                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold text-slate-800">
                         </div>
                     </div>
@@ -306,92 +348,143 @@
                     </template>
                 </div>
 
-                {{-- Yield --}}
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch Quantity *</label>
-                        <input type="number" step="0.001" x-model="bomModal.form.yield_quantity"
-                               class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. 1">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch UOM *</label>
-                        <input type="text" x-model="bomModal.form.yield_uom"
-                               class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. BOX">
+                {{-- Step 2: Batch Specifications --}}
+                <div x-show="bomModal.step === 2" class="space-y-5" x-transition>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch Quantity *</label>
+                            <input type="number" step="0.001" x-model="bomModal.form.yield_quantity"
+                                   class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. 1">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch UOM *</label>
+                            <input type="text" x-model="bomModal.form.yield_uom"
+                                   class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. BOX">
+                        </div>
                     </div>
                 </div>
 
-                {{-- Raw Materials / Ingredients --}}
-                <div>
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Raw Materials / Ingredients *</label>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 batch unit</p>
-                        </div>
-                        <button type="button" @click="addRMRow()"
-                                class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
-                            <i class="fas fa-plus-circle text-xs"></i> Add Row
-                        </button>
-                    </div>
-
-                    {{-- Global RM Type Filter --}}
-                    <div class="mb-3">
-                        <select x-model="bomModal.rmTypeFilter"
-                                class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold text-slate-600">
-                            <option value="">All Raw Material Types (filter all rows)</option>
-                            <template x-for="t in rmTypes" :key="t">
-                                <option :value="t" x-text="t"></option>
-                            </template>
-                        </select>
-                    </div>
-
-                    <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                        <template x-for="(item, idx) in bomModal.form.items" :key="idx">
-                            <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
-                                <div class="col-span-7">
-                                    <select x-model="item.raw_material_id"
-                                            class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
-                                        <option value="">Select Raw Material</option>
-                                        <template x-for="rm in getFilteredRMs(item.rm_type_filter)" :key="rm.id">
-                                            <option :value="rm.id" :selected="rm.id == item.raw_material_id"
-                                                    x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
-                                        </template>
-                                    </select>
-                                    <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
-                                        <div>
-                                            <!-- Show fetched purity if not null -->
-                                            <template x-if="getPurityVal(item.raw_material_id) !== null">
-                                                <div class="text-[9px] text-amber-700 font-black mt-1 ml-1 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
-                                                    <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
-                                                </div>
-                                            </template>
-                                            
-                                            <!-- Show manual purity input if fetched is null -->
-                                            <template x-if="getPurityVal(item.raw_material_id) === null">
-                                                <div class="mt-1.5 flex items-center gap-1">
-                                                    <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
-                                                    <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
-                                                           class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
-                                                           placeholder="100">
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </template>
-                                </div>
-                                <div class="col-span-3">
-                                    <input type="number" step="0.001" x-model="item.quantity"
-                                           placeholder="Qty"
-                                           class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
-                                </div>
-                                <div class="col-span-1 text-center text-[10px] font-bold text-slate-400" x-text="getItemUom(item.raw_material_id)"></div>
-                                <div class="col-span-1 flex justify-center">
-                                    <button @click="bomModal.form.items.splice(idx, 1)" class="w-6 h-6 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition">
-                                        <i class="fas fa-trash-alt text-[10px]"></i>
-                                    </button>
-                                </div>
+                {{-- Step 3: Raw Materials / Ingredients --}}
+                <div x-show="bomModal.step === 3" class="space-y-5" x-transition>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Raw Materials / Ingredients *</label>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 batch unit</p>
                             </div>
-                        </template>
-                        <div x-show="bomModal.form.items.length === 0" class="text-center py-6 text-slate-400 text-sm font-bold border-2 border-dashed border-slate-200 rounded-xl">
-                            No ingredients added yet — click "Add Row"
+                            <button type="button" @click="addRMRow(false)"
+                                    class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
+                                <i class="fas fa-plus-circle text-xs"></i> Add Row
+                            </button>
+                        </div>
+
+                        {{-- Global RM Type Filter --}}
+                        <div class="mb-3">
+                            <select x-model="bomModal.rmTypeFilter"
+                                    class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold text-slate-600">
+                                <option value="">All Raw Material Types (filter all rows)</option>
+                                <template x-for="t in rmTypes" :key="t">
+                                    <option :value="t" x-text="t"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                            <template x-for="(item, idx) in bomModal.form.items.filter(i => !i.is_packing)" :key="idx">
+                                <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
+                                    <div class="col-span-7">
+                                        <select x-model="item.raw_material_id"
+                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
+                                            <option value="">Select Raw Material</option>
+                                            <template x-for="rm in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
+                                                <option :value="rm.id" :selected="rm.id == item.raw_material_id"
+                                                        x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                            </template>
+                                        </select>
+                                        <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
+                                            <div>
+                                                <!-- Show fetched purity if not null -->
+                                                <template x-if="getPurityVal(item.raw_material_id) !== null">
+                                                    <div class="text-[9px] text-amber-700 font-black mt-1 ml-1 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
+                                                        <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
+                                                    </div>
+                                                </template>
+                                                
+                                                <!-- Show manual purity input if fetched is null -->
+                                                <template x-if="getPurityVal(item.raw_material_id) === null">
+                                                    <div class="mt-1.5 flex items-center gap-1">
+                                                        <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
+                                                        <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
+                                                               class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                               placeholder="100">
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div class="col-span-3">
+                                        <input type="number" step="0.001" x-model="item.quantity"
+                                               placeholder="Qty"
+                                               class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
+                                    </div>
+                                    <div class="col-span-1 text-center text-[10px] font-bold text-slate-400" x-text="getItemUom(item.raw_material_id)"></div>
+                                    <div class="col-span-1 flex justify-center">
+                                        <button @click="bomModal.form.items.splice(bomModal.form.items.indexOf(item), 1)" class="w-6 h-6 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition">
+                                            <i class="fas fa-trash-alt text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="bomModal.form.items.filter(i => !i.is_packing).length === 0" class="text-center py-6 text-slate-400 text-sm font-bold border-2 border-dashed border-slate-200 rounded-xl">
+                                No ingredients added yet — click "Add Row"
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Step 4: Packing Materials --}}
+                <div x-show="bomModal.step === 4" class="space-y-5" x-transition>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Packing Materials *</label>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 batch unit</p>
+                            </div>
+                            <button type="button" @click="addRMRow(true)"
+                                    class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
+                                <i class="fas fa-plus-circle text-xs"></i> Add Row
+                            </button>
+                        </div>
+
+                        <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                            <template x-for="(item, idx) in bomModal.form.items.filter(i => i.is_packing)" :key="idx">
+                                <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
+                                    <div class="col-span-7">
+                                        <select x-model="item.raw_material_id"
+                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
+                                            <option value="">Select Packing Material</option>
+                                            <template x-for="rm in getFilteredRMs('', true)" :key="rm.id">
+                                                <option :value="rm.id" :selected="rm.id == item.raw_material_id"
+                                                        x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-3">
+                                        <input type="number" step="0.001" x-model="item.quantity"
+                                               placeholder="Qty"
+                                               class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
+                                    </div>
+                                    <div class="col-span-1 text-center text-[10px] font-bold text-slate-400" x-text="getItemUom(item.raw_material_id)"></div>
+                                    <div class="col-span-1 flex justify-center">
+                                        <button @click="bomModal.form.items.splice(bomModal.form.items.indexOf(item), 1)" class="w-6 h-6 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition">
+                                            <i class="fas fa-trash-alt text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="bomModal.form.items.filter(i => i.is_packing).length === 0" class="text-center py-6 text-slate-400 text-sm font-bold border-2 border-dashed border-slate-200 rounded-xl">
+                                No packing materials added yet — click "Add Row"
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -399,12 +492,27 @@
 
             {{-- Modal Footer --}}
             <div class="p-5 border-t bg-slate-50 flex gap-3 flex-shrink-0">
-                <button @click="bomModal.show = false" class="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
-                <button @click="submitBom()" :disabled="bomModal.submitting"
-                        class="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 disabled:opacity-60 flex items-center justify-center gap-2">
-                    <i class="fas fa-save" :class="bomModal.submitting ? 'fa-spin' : ''"></i>
-                    <span x-text="bomModal.submitting ? 'Saving...' : (bomModal.editId ? 'Update BOM' : 'Save BOM')"></span>
-                </button>
+                <template x-if="bomModal.step === 1">
+                    <button @click="bomModal.show = false" class="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                </template>
+                <template x-if="bomModal.step > 1">
+                    <button @click="bomModal.step--" class="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition flex items-center justify-center gap-1">
+                        <i class="fas fa-chevron-left text-xs"></i> Back
+                    </button>
+                </template>
+
+                <template x-if="bomModal.step < 4">
+                    <button @click="nextStep()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 flex items-center justify-center gap-1">
+                        Next <i class="fas fa-chevron-right text-xs"></i>
+                    </button>
+                </template>
+                <template x-if="bomModal.step === 4">
+                    <button @click="submitBom()" :disabled="bomModal.submitting"
+                            class="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 disabled:opacity-60 flex items-center justify-center gap-2">
+                        <i class="fas fa-save" :class="bomModal.submitting ? 'fa-spin' : ''"></i>
+                        <span x-text="bomModal.submitting ? 'Saving...' : (bomModal.editId ? 'Update BOM' : 'Save BOM')"></span>
+                    </button>
+                </template>
             </div>
         </div>
     </div>
@@ -455,14 +563,15 @@ const __finishedGoods = @json($finishedGoods);
 const __rawMaterials  = @json($rawMaterials);
 const __bomIds        = @json($boms->pluck('id'));
 const __purities      = @json($purities);
+const __types         = @json(\App\Models\ProductType::all());
 
 function bomApp() {
     return {
         selectedIds: [],
         bomModal: {
             show: false, editId: null, submitting: false,
-            typeFilter: '', rmTypeFilter: '',
-            form: { finished_product_id: '', badge: '', yield_quantity: 1, yield_uom: 'BOX', items: [] }
+            typeFilter: '', rmTypeFilter: '', step: 1,
+            form: { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'BOX', items: [] }
         },
         duplicateModal: {
             show: false, bomId: null, productName: '', badge: 'small', submitting: false
@@ -490,10 +599,22 @@ function bomApp() {
         get rmTypes() {
             return [...new Set(__rawMaterials.map(r => r.rm_type).filter(Boolean))].sort();
         },
-        getFilteredRMs(filter) {
-            if (!filter && !this.bomModal.rmTypeFilter) return __rawMaterials;
-            const f = filter || this.bomModal.rmTypeFilter;
-            return __rawMaterials.filter(r => r.rm_type === f);
+        isPackingMaterial(rmId) {
+            const rm = __rawMaterials.find(r => r.id == rmId);
+            if (!rm) return false;
+            const type = __types.find(t => t.id == rm.product_type_id);
+            return type && type.type_name.toUpperCase().includes('PACKING');
+        },
+        getFilteredRMs(filter, wantPacking = false) {
+            let list = __rawMaterials;
+            if (filter || this.bomModal.rmTypeFilter) {
+                const f = filter || this.bomModal.rmTypeFilter;
+                list = list.filter(r => r.rm_type === f);
+            }
+            return list.filter(r => {
+                const isPM = this.isPackingMaterial(r.id);
+                return wantPacking ? isPM : !isPM;
+            });
         },
         getItemUom(id) {
             const rm = __rawMaterials.find(r => r.id == id);
@@ -529,7 +650,8 @@ function bomApp() {
             this.bomModal.editId = null;
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '' }] };
+            this.bomModal.step = 1;
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: false }] };
             this.bomModal.show = true;
         },
 
@@ -538,35 +660,72 @@ function bomApp() {
             this.bomModal.editId = recipe.id;
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
+            this.bomModal.step = 1;
             this.bomModal.form = {
                 finished_product_id: recipe.finished_product_id,
                 badge: recipe.badge || '',
                 formulation: recipe.formulation || '',
+                density: recipe.density || '',
                 yield_quantity: recipe.yield_quantity,
                 yield_uom: recipe.yield_uom,
                 items: (recipe.items || []).map(i => ({
                     raw_material_id: i.raw_material_id,
                     quantity: i.quantity,
                     purity: i.purity || '',
-                    rm_type_filter: ''
+                    rm_type_filter: '',
+                    is_packing: this.isPackingMaterial(i.raw_material_id)
                 }))
             };
             this.bomModal.show = true;
         },
 
-        addRMRow() {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '' });
+        nextStep() {
+            if (this.bomModal.step === 1) {
+                if (!this.bomModal.form.finished_product_id) {
+                    alert('Please select a finished product.');
+                    return;
+                }
+                this.bomModal.step = 2;
+            } else if (this.bomModal.step === 2) {
+                if (!this.bomModal.form.yield_quantity || this.bomModal.form.yield_quantity <= 0) {
+                    alert('Please enter a valid batch quantity.');
+                    return;
+                }
+                if (!this.bomModal.form.yield_uom) {
+                    alert('Please enter a batch UOM.');
+                    return;
+                }
+                this.bomModal.step = 3;
+            } else if (this.bomModal.step === 3) {
+                const rmMats = this.bomModal.form.items.filter(i => !i.is_packing);
+                if (rmMats.length === 0) {
+                    alert('Please add at least one raw material ingredient.');
+                    return;
+                }
+                if (rmMats.some(i => !i.raw_material_id || !i.quantity || i.quantity <= 0)) {
+                    alert('Please ensure all raw material rows have a selected material and valid quantity.');
+                    return;
+                }
+                this.bomModal.step = 4;
+            }
+        },
+
+        addRMRow(isPacking = false) {
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: isPacking });
         },
 
         async submitBom() {
-            if (!this.bomModal.form.finished_product_id || !this.bomModal.form.yield_quantity || this.bomModal.form.items.length === 0) {
-                alert('Please fill all required fields and add at least one raw material.');
+            const cleanItems = this.bomModal.form.items.filter(i => i.raw_material_id);
+            if (!this.bomModal.form.finished_product_id || !this.bomModal.form.yield_quantity || cleanItems.length === 0) {
+                alert('Please fill all required fields and add at least one item.');
                 return;
             }
             this.bomModal.submitting = true;
             const isEdit = !!this.bomModal.editId;
             const url    = isEdit ? `{{ url('costing-boms') }}/${this.bomModal.editId}` : '{{ route('costing.boms.store') }}';
             const method = isEdit ? 'PUT' : 'POST';
+
+            const submissionForm = { ...this.bomModal.form, items: cleanItems };
 
             try {
                 const resp = await fetch(url, {
@@ -576,7 +735,7 @@ function bomApp() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify(this.bomModal.form)
+                    body: JSON.stringify(submissionForm)
                 });
                 const data = await resp.json();
                 if (data.success) {
