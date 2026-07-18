@@ -387,51 +387,67 @@
                                     <option :value="t" x-text="t"></option>
                                 </template>
                             </select>
-                        </div>
-
-                        <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                            <template x-for="(item, idx) in bomModal.form.items.filter(i => !i.is_packing)" :key="idx">
-                                <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
+                                      <template x-for="(item, idx) in bomModal.form.items.filter(i => !i.is_packing)" :key="idx">
+                                <div x-effect="if (isTechnical(item.raw_material_id)) { item.quantity = calculateSuggestedQty(item); } else if (item.is_solvent) { item.quantity = calculateRemainingQty(item); }"
+                                     class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
                                     <div class="col-span-7">
                                         <select x-model="item.raw_material_id"
-                                                @change="if (isTechnical(item.raw_material_id) && !item.quantity) item.quantity = calculateSuggestedQty()"
                                                 class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
                                             <option value="">Select Raw Material</option>
                                             <template x-for="rm in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
                                                 <option :value="rm.id" :selected="rm.id == item.raw_material_id"
-                                                        x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                         x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                             </template>
                                         </select>
-                                        <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
-                                            <div>
-                                                <!-- Show fetched purity if not null -->
-                                                <template x-if="getPurityVal(item.raw_material_id) !== null">
-                                                    <div class="text-[9px] text-amber-700 font-black mt-1 ml-1 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
-                                                        <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
-                                                    </div>
-                                                </template>
-                                                
-                                                <!-- Show manual purity input if fetched is null -->
-                                                <template x-if="getPurityVal(item.raw_material_id) === null">
-                                                    <div class="mt-1.5 flex items-center gap-1">
-                                                        <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
-                                                        <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
-                                                               class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
-                                                               placeholder="100">
-                                                    </div>
-                                                </template>
-                                            </div>
-                                        </template>
+                                        <div class="mt-1.5 flex flex-wrap gap-2 items-center">
+                                            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
+                                                <input type="radio" :checked="item.is_solvent"
+                                                       @click.prevent="toggleSolvent(item)"
+                                                       class="w-3 h-3 text-amber-600 focus:ring-amber-500 border-slate-300">
+                                                Solvent
+                                            </label>
+
+                                            <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
+                                                <div class="flex flex-wrap gap-2 items-center">
+                                                    <!-- Show fetched purity if not null -->
+                                                    <template x-if="getPurityVal(item.raw_material_id) !== null">
+                                                        <div class="text-[9px] text-amber-700 font-black bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
+                                                            <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
+                                                        </div>
+                                                    </template>
+                                                    
+                                                    <!-- Show manual purity input if fetched is null -->
+                                                    <template x-if="getPurityVal(item.raw_material_id) === null">
+                                                        <div class="flex items-center gap-1">
+                                                            <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
+                                                            <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
+                                                                   class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                                   placeholder="100">
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
                                     <div class="col-span-3">
                                         <input type="number" step="0.001" x-model="item.quantity"
                                                placeholder="Qty"
+                                               :readonly="isTechnical(item.raw_material_id) || item.is_solvent"
+                                               :class="(isTechnical(item.raw_material_id) || item.is_solvent) ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''"
                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
-                                        <div class="text-[9px] text-indigo-600 hover:text-indigo-800 mt-1 text-center cursor-pointer font-black select-none"
-                                             @click="item.quantity = calculateSuggestedQty()"
-                                             title="Click to apply: Batch Quantity * formulation / density">
-                                            Calc: <span x-text="calculateSuggestedQty()"></span>
-                                        </div>
+                                        <template x-if="isTechnical(item.raw_material_id)">
+                                            <div class="text-[9px] text-emerald-600 mt-1 text-center font-bold">Auto-calculated</div>
+                                        </template>
+                                        <template x-if="item.is_solvent">
+                                            <div class="text-[9px] text-indigo-600 mt-1 text-center font-bold">Solvent (Balance)</div>
+                                        </template>
+                                        <template x-if="!isTechnical(item.raw_material_id) && !item.is_solvent">
+                                            <div class="text-[9px] text-indigo-600 hover:text-indigo-800 mt-1 text-center cursor-pointer font-black select-none"
+                                                 @click="item.quantity = calculateSuggestedQty(item)"
+                                                 title="Click to apply: Batch Quantity * Formulation / Purity">
+                                                Calc: <span x-text="calculateSuggestedQty(item)"></span>
+                                            </div>
+                                        </template>
                                     </div>
                                     <div class="col-span-1 text-center text-[10px] font-bold text-slate-400" x-text="getItemUom(item.raw_material_id)"></div>
                                     <div class="col-span-1 flex justify-center">
@@ -652,16 +668,47 @@ function bomApp() {
             return __purities[rm.item_code] !== undefined && __purities[rm.item_code] !== null ? parseFloat(__purities[rm.item_code]) : null;
         },
 
-        calculateSuggestedQty() {
+        calculateSuggestedQty(item) {
             const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
             let formulation = parseFloat(this.bomModal.form.formulation);
             if (isNaN(formulation)) {
                 const fgForm = this.getFormulation(this.bomModal.form.finished_product_id);
                 formulation = parseFloat(fgForm) || 0;
             }
-            const density = parseFloat(this.bomModal.form.density) > 0 ? parseFloat(this.bomModal.form.density) : 1;
-            const qty = (batchQty * (formulation / 100)) / density;
+            let purity = 100;
+            if (item && item.raw_material_id) {
+                const fetchedPurity = this.getPurityVal(item.raw_material_id);
+                if (fetchedPurity !== null) {
+                    purity = fetchedPurity;
+                } else if (item.purity) {
+                    purity = parseFloat(item.purity) || 100;
+                }
+            }
+            if (purity <= 0) purity = 100;
+            const qty = (batchQty * formulation) / purity;
             return parseFloat(qty.toFixed(4));
+        },
+
+        calculateRemainingQty(currentItem) {
+            const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
+            let sumOthers = 0;
+            this.bomModal.form.items.forEach(i => {
+                if (!i.is_packing && i !== currentItem) {
+                    sumOthers += parseFloat(i.quantity) || 0;
+                }
+            });
+            const remaining = batchQty - sumOthers;
+            return parseFloat(Math.max(0, remaining).toFixed(4));
+        },
+
+        toggleSolvent(item) {
+            const targetVal = !item.is_solvent;
+            this.bomModal.form.items.forEach(i => {
+                if (!i.is_packing) {
+                    i.is_solvent = false;
+                }
+            });
+            item.is_solvent = targetVal;
         },
 
         openBomModal() {
@@ -669,7 +716,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: false }] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: false, is_solvent: false }] };
             this.bomModal.show = true;
         },
 
@@ -691,7 +738,8 @@ function bomApp() {
                     quantity: i.quantity,
                     purity: i.purity || '',
                     rm_type_filter: '',
-                    is_packing: this.isPackingMaterial(i.raw_material_id)
+                    is_packing: this.isPackingMaterial(i.raw_material_id),
+                    is_solvent: false
                 }))
             };
             this.bomModal.show = true;
@@ -729,7 +777,7 @@ function bomApp() {
         },
 
         addRMRow(isPacking = false) {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: isPacking });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false });
         },
 
         async submitBom() {
