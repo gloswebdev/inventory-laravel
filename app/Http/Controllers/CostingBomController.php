@@ -8,6 +8,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class CostingBomController extends Controller
 {
@@ -49,6 +50,16 @@ class CostingBomController extends Controller
             });
         }
 
+        if ($request->filled('badge')) {
+            if ($request->badge === 'standard') {
+                $query->where(function($q) {
+                    $q->whereNull('badge')->orWhere('badge', '');
+                });
+            } else {
+                $query->where('badge', $request->badge);
+            }
+        }
+
         $perPage = $request->get('per_page', 20);
         if ($perPage === 'all') {
             $boms = $query->orderByDesc('created_at')->get();
@@ -71,7 +82,14 @@ class CostingBomController extends Controller
         $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
         $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
         $types         = $typesQuery->get();
-        $purities      = \App\Models\ProductPrice::allPuritiesAsMap();
+        $purities      = \App\Models\PurchaseRegister::whereNotNull('purity')
+            ->where('purity', '>', 0)
+            ->orderByDesc('vouch_date')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('item_code')
+            ->pluck('purity', 'item_code')
+            ->toArray();
 
         return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities'));
     }
@@ -83,13 +101,24 @@ class CostingBomController extends Controller
         }
 
         $validated = $request->validate([
-            'finished_product_id' => 'required|exists:products,id|unique:costing_boms,finished_product_id',
+            'finished_product_id' => [
+                'required',
+                'exists:products,id',
+                Rule::unique('costing_boms')->where(function ($query) use ($request) {
+                    return $query->where('finished_product_id', $request->finished_product_id)
+                                 ->where('badge', $request->badge);
+                }),
+            ],
+            'badge' => 'nullable|string|in:small,big,bulk',
+            'formulation' => 'nullable|numeric|min:0.001|max:100',
             'yield_quantity' => 'required|numeric|min:0.001',
             'yield_uom' => 'required|string|max:50',
             'items' => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.purity' => 'nullable|numeric|min:0.1|max:100',
+        ], [
+            'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
 
         DB::transaction(function () use ($validated) {
@@ -97,6 +126,8 @@ class CostingBomController extends Controller
                 'finished_product_id' => $validated['finished_product_id'],
                 'yield_quantity'      => $validated['yield_quantity'],
                 'yield_uom'           => $validated['yield_uom'],
+                'badge'               => $validated['badge'] ?? null,
+                'formulation'         => $validated['formulation'] ?? null,
             ]);
 
             foreach ($validated['items'] as $item) {
@@ -122,13 +153,25 @@ class CostingBomController extends Controller
         }
 
         $validated = $request->validate([
-            'finished_product_id' => 'required|exists:products,id|unique:costing_boms,finished_product_id,' . $costingBom->id,
+            'finished_product_id' => [
+                'required',
+                'exists:products,id',
+                Rule::unique('costing_boms')->where(function ($query) use ($request, $costingBom) {
+                    return $query->where('finished_product_id', $request->finished_product_id)
+                                 ->where('badge', $request->badge)
+                                 ->where('id', '!=', $costingBom->id);
+                }),
+            ],
+            'badge' => 'nullable|string|in:small,big,bulk',
+            'formulation' => 'nullable|numeric|min:0.001|max:100',
             'yield_quantity' => 'required|numeric|min:0.001',
             'yield_uom' => 'required|string|max:50',
             'items' => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.purity' => 'nullable|numeric|min:0.1|max:100',
+        ], [
+            'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
 
         DB::transaction(function () use ($costingBom, $validated) {
@@ -136,6 +179,8 @@ class CostingBomController extends Controller
                 'finished_product_id' => $validated['finished_product_id'],
                 'yield_quantity'      => $validated['yield_quantity'],
                 'yield_uom'           => $validated['yield_uom'],
+                'badge'               => $validated['badge'] ?? null,
+                'formulation'         => $validated['formulation'] ?? null,
             ]);
 
             $costingBom->items()->delete();
@@ -162,7 +207,10 @@ class CostingBomController extends Controller
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
-        $costingBom->delete();
+        DB::transaction(function () use ($costingBom) {
+            $costingBom->items()->delete();
+            $costingBom->delete();
+        });
 
         if (request()->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Costing BOM deleted successfully.']);
@@ -182,10 +230,52 @@ class CostingBomController extends Controller
         ]);
 
         DB::transaction(function () use ($request) {
+            CostingBomItem::whereIn('costing_bom_id', $request->ids)->delete();
             CostingBom::whereIn('id', $request->ids)->delete();
         });
 
         return response()->json(['success' => true, 'message' => 'Selected Costing BOMs deleted.']);
+    }
+
+    public function duplicate(Request $request, CostingBom $costingBom)
+    {
+        if (!Auth::user()->hasPermission('costing', 'create')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $request->validate([
+            'badge' => 'required|string|in:small,big,bulk',
+        ]);
+
+        // Check if a BOM with this finished_product_id and this badge already exists
+        $exists = CostingBom::where('finished_product_id', $costingBom->finished_product_id)
+            ->where('badge', $request->badge)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['success' => false, 'message' => 'A Costing BOM for this product with this badge already exists.'], 422);
+        }
+
+        DB::transaction(function () use ($costingBom, $request) {
+            $newBom = CostingBom::create([
+                'finished_product_id' => $costingBom->finished_product_id,
+                'yield_quantity'      => $costingBom->yield_quantity,
+                'yield_uom'           => $costingBom->yield_uom,
+                'badge'               => $request->badge,
+                'formulation'         => $costingBom->formulation,
+            ]);
+
+            foreach ($costingBom->items as $item) {
+                CostingBomItem::create([
+                    'costing_bom_id'  => $newBom->id,
+                    'raw_material_id' => $item->raw_material_id,
+                    'quantity'        => $item->quantity,
+                    'purity'          => $item->purity,
+                ]);
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Costing BOM duplicated successfully.']);
     }
 
     public function export(Request $request)

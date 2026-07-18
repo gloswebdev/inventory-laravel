@@ -17,6 +17,8 @@ class CostingBom extends Model
         'finished_product_id',
         'yield_quantity',
         'yield_uom',
+        'badge',
+        'formulation',
     ];
 
     public function finishedProduct(): BelongsTo

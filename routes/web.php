@@ -94,6 +94,13 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     // Costing Module
     Route::prefix('costing')->name('costing.')->group(function () {
         Route::get('/',                   [CostingController::class, 'index'])->name('index');
+        Route::get('/pro',                [CostingController::class, 'pro'])->name('pro');
+        Route::get('/purchase-register',  [CostingController::class, 'purchaseRegister'])->name('purchase-register');
+        Route::post('/sync-purchase-register', [CostingController::class, 'syncPurchaseRegister'])->name('sync-purchase-register');
+        Route::post('/save-sync-settings', [CostingController::class, 'saveSyncSettings'])->name('save-sync-settings');
+        Route::get('/pricelist',           [CostingController::class, 'pricelist'])->name('pricelist');
+        Route::post('/sync-pricelist',     [CostingController::class, 'syncPricelist'])->name('sync-pricelist');
+        Route::post('/save-pricelist-sync-settings', [CostingController::class, 'savePricelistSyncSettings'])->name('save-pricelist-sync-settings');
         Route::get('/product/{product}',  [CostingController::class, 'show'])->name('show');
         Route::post('/calculate',         [CostingController::class, 'calculate'])->name('calculate');
         Route::post('/fetch-prices',      [CostingController::class, 'fetchPrices'])->name('fetch-prices');
@@ -104,6 +111,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     // Costing BOM Master
     Route::post('costing-boms/bulk-delete', [CostingBomController::class, 'bulkDelete'])->name('costing.boms.bulk-delete');
     Route::get('costing-boms/export', [CostingBomController::class, 'export'])->name('costing.boms.export');
+    Route::post('costing-boms/{costing_bom}/duplicate', [CostingBomController::class, 'duplicate'])->name('costing.boms.duplicate');
     Route::resource('costing-boms', CostingBomController::class)->names([
         'index'   => 'costing.boms.index',
         'store'   => 'costing.boms.store',

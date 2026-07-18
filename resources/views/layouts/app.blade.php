@@ -422,9 +422,9 @@
             @endif
 
             @if(Auth::user()->hasPermission('costing', 'view'))
-            <div x-data="{ open: {{ (request()->routeIs('costing.index') || request()->routeIs('costing.show') || request()->routeIs('costing.boms.*')) ? 'true' : 'false' }} }">
+            <div x-data="{ open: {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist')) ? 'true' : 'false' }} }">
                 <button @click="open = !open"
-                    class="nav-link link-costing w-[calc(100%-20px)] justify-between {{ (request()->routeIs('costing.index') || request()->routeIs('costing.show') || request()->routeIs('costing.boms.*')) ? 'active' : '' }}">
+                    class="nav-link link-costing w-[calc(100%-20px)] justify-between {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist')) ? 'active' : '' }}">
                     <div class="flex items-center gap-[11px]">
                         <i class="fas fa-coins nav-icon"></i>
                         <span>Costing</span>
@@ -435,11 +435,17 @@
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0">
-                    <a href="{{ route('costing.index') }}" class="sub-nav-link {{ (request()->routeIs('costing.index') || request()->routeIs('costing.show')) ? 'active' : '' }}">
-                        <span class="sub-dot"></span> Cost Calculator
-                    </a>
                     <a href="{{ route('costing.boms.index') }}" class="sub-nav-link {{ request()->routeIs('costing.boms.*') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Costing BOMs
+                    </a>
+                    <a href="{{ route('costing.pro') }}" class="sub-nav-link {{ request()->routeIs('costing.pro') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Costing Pro
+                    </a>
+                    <a href="{{ route('costing.purchase-register') }}" class="sub-nav-link {{ request()->routeIs('costing.purchase-register') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Purchase Register
+                    </a>
+                    <a href="{{ route('costing.pricelist') }}" class="sub-nav-link {{ request()->routeIs('costing.pricelist') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Pricelist
                     </a>
                 </div>
             </div>

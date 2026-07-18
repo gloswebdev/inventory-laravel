@@ -49,7 +49,7 @@
             
             <div class="w-full sm:w-44">
                 <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Product Type</label>
-                <select name="type_id" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm">
+                <select name="type_id" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm font-semibold">
                     <option value="">All Types</option>
                     @foreach($types as $type)
                         <option value="{{ $type->id }}" {{ request('type_id') == $type->id ? 'selected' : '' }}>
@@ -59,11 +59,22 @@
                 </select>
             </div>
 
+            <div class="w-full sm:w-44">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">BOM Badge / Grade</label>
+                <select name="badge" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm font-semibold">
+                    <option value="">All Badges</option>
+                    <option value="standard" {{ request('badge') === 'standard' ? 'selected' : '' }}>Standard (No Badge)</option>
+                    <option value="small" {{ request('badge') === 'small' ? 'selected' : '' }}>Small</option>
+                    <option value="big" {{ request('badge') === 'big' ? 'selected' : '' }}>Big</option>
+                    <option value="bulk" {{ request('badge') === 'bulk' ? 'selected' : '' }}>Bulk</option>
+                </select>
+            </div>
+
             <div class="flex gap-2">
                 <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2">
                     <i class="fas fa-filter"></i> Filter
                 </button>
-                @if(request()->anyFilled(['search', 'type_id']))
+                @if(request()->anyFilled(['search', 'type_id', 'badge']))
                 <a href="{{ route('costing.boms.index') }}" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2">
                     <i class="fas fa-times"></i> Clear
                 </a>
@@ -97,7 +108,7 @@
                         <input type="checkbox" @change="toggleAll($event.target.checked)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                     </th>
                     <th class="py-3 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Finished Product</th>
-                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Yield</th>
+                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Batch</th>
                     <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Raw Materials (BOM)</th>
                     <th class="py-3 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
@@ -109,7 +120,14 @@
                         <input type="checkbox" :checked="selectedIds.includes({{ $bom->id }})" @change="toggleSelect({{ $bom->id }}, $event.target.checked)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                     </td>
                     <td class="py-3 px-5">
-                        <div class="font-bold text-slate-800 text-sm">{{ $bom->finishedProduct->name ?? '—' }}</div>
+                        <div class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            {{ $bom->finishedProduct->name ?? '—' }}
+                            @if($bom->badge)
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider {{ $bom->badge === 'small' ? 'bg-orange-500 text-white' : ($bom->badge === 'big' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white') }} border border-transparent shadow-sm">
+                                {{ strtoupper($bom->badge) }}
+                            </span>
+                            @endif
+                        </div>
                         <div class="flex items-center gap-2 mt-1">
                             @php 
                                 $typeName = $bom->finishedProduct->type->type_name ?? 'N/A'; 
@@ -143,8 +161,7 @@
                                 <span class="text-slate-400 text-[10px]">{{ $item->rawMaterial->uom ?? '' }}</span>
                                 @if(strtoupper(trim($item->rawMaterial->rm_type ?? '')) === 'TECHNICAL')
                                     @php
-                                        $priceModel = \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->first();
-                                        $purity = ($priceModel && $priceModel->purity !== null) ? $priceModel->purity : $item->purity;
+                                        $purity = $purities[$item->rawMaterial->item_code] ?? $item->purity;
                                     @endphp
                                     <span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 whitespace-nowrap">
                                         Purity: {{ $purity ? $purity . '%' : '—' }}
@@ -165,6 +182,14 @@
                                     @click="editBomFromData($event.currentTarget.getAttribute('data-bom'))"
                                     class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50 flex items-center justify-center transition-all shadow-sm">
                                 <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            @endif
+                            @if(Auth::user()->hasPermission('costing', 'create'))
+                            <button type="button"
+                                    @click="openDuplicateModal({{ $bom->id }}, '{{ addslashes($bom->finishedProduct->name ?? '') }}')"
+                                    class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm"
+                                    title="Duplicate BOM">
+                                <i class="fas fa-copy text-xs"></i>
                             </button>
                             @endif
                             @if(Auth::user()->hasPermission('costing', 'delete'))
@@ -230,28 +255,53 @@
             {{-- Modal Body --}}
             <div class="flex-1 overflow-y-auto p-6 space-y-5">
 
-                {{-- Finished Product --}}
-                <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Finished Product *</label>
-                    <div class="grid grid-cols-2 gap-3 mb-2">
-                        <select x-model="bomModal.typeFilter" @change="bomModal.form.finished_product_id = ''"
-                                class="px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium">
-                            <option value="">All Types</option>
-                            @foreach($types as $type)
-                            <option value="{{ $type->id }}">{{ $type->type_name }}</option>
-                            @endforeach
-                        </select>
-                        <select x-model="bomModal.form.finished_product_id"
-                                class="px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium" required>
-                            <option value="">Select Finished Good</option>
-                            <template x-for="p in filteredFGs" :key="p.id">
-                                <option :value="p.id" x-text="p.name + (p.pack_name ? ' ['+p.pack_name+']' : '') + ' ('+p.item_code+')'"></option>
-                            </template>
-                        </select>
+                {{-- Finished Product and Badge --}}
+                <div class="space-y-4">
+                    <div class="grid grid-cols-12 gap-4">
+                        <div class="col-span-12 md:col-span-4">
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Product Type</label>
+                            <select x-model="bomModal.typeFilter" @change="bomModal.form.finished_product_id = ''"
+                                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium">
+                                <option value="">All Types</option>
+                                @foreach($types as $type)
+                                <option value="{{ $type->id }}">{{ $type->type_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-span-12 md:col-span-8">
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Finished Product *</label>
+                            <select x-model="bomModal.form.finished_product_id"
+                                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium" required>
+                                <option value="">Select Finished Good</option>
+                                <template x-for="p in filteredFGs" :key="p.id">
+                                    <option :value="p.id" x-text="p.name + (p.pack_name ? ' ['+p.pack_name+']' : '') + ' ('+p.item_code+')'"></option>
+                                </template>
+                            </select>
+                        </div>
                     </div>
+
+                    <div class="grid grid-cols-12 gap-4">
+                        <div class="col-span-12 md:col-span-6">
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">BOM Badge</label>
+                            <select x-model="bomModal.form.badge"
+                                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium">
+                                <option value="">Default (Standard)</option>
+                                <option value="small">Small</option>
+                                <option value="big">Big</option>
+                                <option value="bulk">Bulk</option>
+                            </select>
+                        </div>
+                        <div class="col-span-12 md:col-span-6">
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Formulation Override %</label>
+                            <input type="number" step="0.001" min="0" max="100" x-model="bomModal.form.formulation"
+                                   placeholder="e.g. 5.0"
+                                   class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold text-slate-800">
+                        </div>
+                    </div>
+
                     <template x-if="bomModal.form.finished_product_id">
                         <div class="text-[10px] text-blue-700 font-black mt-1.5 ml-1 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl inline-block">
-                            <i class="fas fa-flask"></i> Formulation: <span x-text="getFormulation(bomModal.form.finished_product_id)"></span>
+                            <i class="fas fa-flask"></i> Formulation: <span x-text="bomModal.form.formulation ? bomModal.form.formulation + '%' : getFormulation(bomModal.form.finished_product_id)"></span>
                         </div>
                     </template>
                 </div>
@@ -259,12 +309,12 @@
                 {{-- Yield --}}
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Yield Quantity *</label>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch Quantity *</label>
                         <input type="number" step="0.001" x-model="bomModal.form.yield_quantity"
                                class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. 1">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Yield UOM *</label>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch UOM *</label>
                         <input type="text" x-model="bomModal.form.yield_uom"
                                class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. BOX">
                     </div>
@@ -275,7 +325,7 @@
                     <div class="flex items-center justify-between mb-3">
                         <div>
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Raw Materials / Ingredients *</label>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 yield unit</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 batch unit</p>
                         </div>
                         <button type="button" @click="addRMRow()"
                                 class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
@@ -359,6 +409,45 @@
         </div>
     </div>
 
+    {{-- ══ Duplicate Modal ══ --}}
+    <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" x-show="duplicateModal.show" x-cloak x-transition>
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col border border-slate-100" @click.away="duplicateModal.show = false">
+            <div class="p-5 border-b flex items-center justify-between bg-slate-50">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-copy text-indigo-500"></i>
+                    <h3 class="text-sm font-black text-slate-800 uppercase tracking-widest">Duplicate Costing BOM</h3>
+                </div>
+                <button @click="duplicateModal.show = false" class="text-slate-400 hover:text-slate-600 transition">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
+                    <div class="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-0.5">Product Name</div>
+                    <div class="text-sm font-bold text-slate-800" x-text="duplicateModal.productName"></div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">New BOM Badge</label>
+                    <select x-model="duplicateModal.badge" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm font-semibold">
+                        <option value="small">SMALL Badge</option>
+                        <option value="big">BIG Badge</option>
+                        <option value="bulk">BULK Badge</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-5 border-t bg-slate-50 flex gap-3">
+                <button @click="duplicateModal.show = false" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                <button @click="submitDuplicate()" :disabled="duplicateModal.submitting"
+                        class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl transition-all shadow-md shadow-indigo-200 disabled:opacity-60 flex items-center justify-center gap-2">
+                    <i class="fas fa-save" x-show="!duplicateModal.submitting"></i>
+                    <i class="fas fa-circle-notch fa-spin" x-show="duplicateModal.submitting"></i>
+                    <span x-text="duplicateModal.submitting ? 'Duplicating...' : 'Duplicate BOM'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -373,7 +462,10 @@ function bomApp() {
         bomModal: {
             show: false, editId: null, submitting: false,
             typeFilter: '', rmTypeFilter: '',
-            form: { finished_product_id: '', yield_quantity: 1, yield_uom: 'BOX', items: [] }
+            form: { finished_product_id: '', badge: '', yield_quantity: 1, yield_uom: 'BOX', items: [] }
+        },
+        duplicateModal: {
+            show: false, bomId: null, productName: '', badge: 'small', submitting: false
         },
 
         init() {},
@@ -437,7 +529,7 @@ function bomApp() {
             this.bomModal.editId = null;
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
-            this.bomModal.form = { finished_product_id: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '' }] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '' }] };
             this.bomModal.show = true;
         },
 
@@ -448,6 +540,8 @@ function bomApp() {
             this.bomModal.rmTypeFilter = '';
             this.bomModal.form = {
                 finished_product_id: recipe.finished_product_id,
+                badge: recipe.badge || '',
+                formulation: recipe.formulation || '',
                 yield_quantity: recipe.yield_quantity,
                 yield_uom: recipe.yield_uom,
                 items: (recipe.items || []).map(i => ({
@@ -471,7 +565,7 @@ function bomApp() {
             }
             this.bomModal.submitting = true;
             const isEdit = !!this.bomModal.editId;
-            const url    = isEdit ? `/costing-boms/${this.bomModal.editId}` : '{{ route('costing.boms.store') }}';
+            const url    = isEdit ? `{{ url('costing-boms') }}/${this.bomModal.editId}` : '{{ route('costing.boms.store') }}';
             const method = isEdit ? 'PUT' : 'POST';
 
             try {
@@ -499,7 +593,7 @@ function bomApp() {
         async deleteBom(id) {
             if (!confirm('Delete this costing BOM?')) return;
             try {
-                const resp = await fetch(`/costing-boms/${id}`, {
+                const resp = await fetch(`{{ url('costing-boms') }}/${id}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
@@ -532,6 +626,43 @@ function bomApp() {
                     window.location.reload();
                 } else alert(data.message || 'Bulk delete failed.');
             } catch(e) { alert('Network error.'); }
+        },
+
+        openDuplicateModal(id, name) {
+            this.duplicateModal.bomId = id;
+            this.duplicateModal.productName = name;
+            this.duplicateModal.badge = 'small';
+            this.duplicateModal.show = true;
+        },
+
+        async submitDuplicate() {
+            if (!this.duplicateModal.badge) {
+                alert('Please select a badge.');
+                return;
+            }
+            this.duplicateModal.submitting = true;
+            try {
+                const resp = await fetch(`{{ url('costing-boms') }}/${this.duplicateModal.bomId}/duplicate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ badge: this.duplicateModal.badge })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    this.duplicateModal.show = false;
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Duplicate failed.');
+                }
+            } catch(e) {
+                alert('Network error.');
+            } finally {
+                this.duplicateModal.submitting = false;
+            }
         }
     };
 }

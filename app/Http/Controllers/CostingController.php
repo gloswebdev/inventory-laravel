@@ -8,11 +8,13 @@ use App\Models\ProductPrice;
 use App\Models\ProductType;
 use App\Models\CostingBom;
 use App\Models\CostingBomItem;
+use App\Models\PurchaseRegister;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class CostingController extends Controller
@@ -26,49 +28,7 @@ class CostingController extends Controller
             abort(403, 'Access denied to Costing module.');
         }
 
-        $user = Auth::user();
-
-        $query = Product::with(['type', 'costingBoms.items.rawMaterial'])
-                        ->whereHas('costingBoms')
-                        ->orderBy('name');
-
-        // Permission-based product type filter
-        if ($user->role !== 'admin') {
-            $query->whereIn('product_type_id', $user->getPermittedProductTypeIds());
-        }
-
-        // Search
-        if ($request->filled('search')) {
-            $s = $request->search;
-            $query->where(function ($q) use ($s) {
-                $q->where('name', 'like', "%$s%")
-                  ->orWhere('item_code', 'like', "%$s%");
-            });
-        }
-
-        // Type filter
-        if ($request->filled('type_id')) {
-            $query->where('product_type_id', $request->type_id);
-        }
-
-        $products     = $query->get();
-        $priceMap     = ProductPrice::allAsMap();
-        $productTypes = ProductType::orderBy('type_name')->get();
-        $lastSync     = ProductPrice::where('price_source', 'erp')
-                        ->orderByDesc('fetched_at')->first()?->fetched_at
-                        ?? ProductPrice::orderByDesc('updated_at')->first()?->updated_at;
-
-        // Pre-compute per-unit cost for each product using costing BOMs
-        $costData = [];
-        foreach ($products as $product) {
-            $costData[$product->id] = $this->computeCost($product, $priceMap, 1, 1);
-        }
-
-        $activeTab = 'calculator';
-
-        return view('costing.index', compact(
-            'products', 'priceMap', 'productTypes', 'lastSync', 'costData', 'activeTab'
-        ));
+        return redirect()->route('costing.pro');
     }
 
     /**
@@ -365,6 +325,538 @@ class CostingController extends Controller
         return $pdf->download('Cost_Report_' . now()->format('Y-m-d_His') . '.pdf');
     }
 
+    /**
+     * Desktop: Costing Pro
+     */
+    public function pro(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            abort(403, 'Access denied to Costing Pro.');
+        }
+
+        $boms = CostingBom::with(['finishedProduct.type', 'items.rawMaterial'])->get();
+
+        $latestPurityMap = [];
+        $apiSuccess = false;
+        try {
+            $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+            $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+            $now     = now();
+            $fyStart = $now->month >= 4 ? $now->year . '-04-01' : ($now->year - 1) . '-04-01';
+            $fyEnd   = $now->month >= 4 ? ($now->year + 1) . '-03-31' : $now->year . '-03-31';
+
+            $fromDate = AppSetting::get('costing_api_from_date') ?: $fyStart;
+            $toDate   = AppSetting::get('costing_api_to_date')   ?: $fyEnd;
+
+            $response = Http::withoutVerifying()
+                ->timeout(10)
+                ->post("{$baseUrl}/LogicPurchaseRegisterDetail", [
+                    'apikey'   => $apiKey,
+                    'FromDate' => $fromDate,
+                    'ToDate'   => $toDate,
+                    'Account'  => 'all',
+                    'Item'     => 'all',
+                    'Branch'   => 'all',
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (($data['response'] ?? '') === 'success' && !empty($data['resultdata'])) {
+                    $latestByCode = [];
+                    foreach ($data['resultdata'] as $row) {
+                        $itemCode  = trim($row['User_Code'] ?? '');
+                        $purity    = isset($row['Purity']) ? (float)$row['Purity'] : null;
+                        $vouchDateStr = $row['Vouch_Date'] ?? '01/01/2000';
+                        $dateObj = \Carbon\Carbon::createFromFormat('d/m/Y', $vouchDateStr);
+                        $timestamp = $dateObj ? $dateObj->timestamp : 0;
+
+                        if (empty($itemCode) || $purity === null) continue;
+
+                        if (!isset($latestByCode[$itemCode]) || $timestamp > $latestByCode[$itemCode]['timestamp']) {
+                            $latestByCode[$itemCode] = [
+                                'purity'     => $purity,
+                                'timestamp'  => $timestamp,
+                                'vouch_date' => $vouchDateStr,
+                            ];
+                        }
+                    }
+                    $latestPurityMap = $latestByCode;
+                    $apiSuccess = true;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Costing Pro ERP API error: ' . $e->getMessage());
+        }
+
+        $localPurities = ProductPrice::allPuritiesAsMap();
+
+        // Process BOMs with their purities
+        $processedBoms = $boms->map(function ($bom) use ($latestPurityMap, $localPurities) {
+            $product = $bom->finishedProduct;
+            $purity = '—';
+            $vouchDate = '—';
+            $source = 'No Data';
+            $rmName = '—';
+
+            // Find the TECHNICAL raw material in this BOM
+            $techRm = null;
+            foreach ($bom->items as $item) {
+                if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
+                    $techRm = $item->rawMaterial;
+                    break;
+                }
+            }
+            // If no TECHNICAL rm found, fallback to the first raw material
+            if (!$techRm && $bom->items->isNotEmpty()) {
+                $techRm = $bom->items->first()->rawMaterial;
+            }
+
+            if ($techRm && $techRm->item_code) {
+                $code = trim($techRm->item_code);
+                $rmName = $techRm->name;
+                if (isset($latestPurityMap[$code])) {
+                    $purity = $latestPurityMap[$code]['purity'] . '%';
+                    $vouchDate = $latestPurityMap[$code]['vouch_date'];
+                    $source = 'Purchase API';
+                } elseif (isset($localPurities[$code]) && $localPurities[$code] > 0) {
+                    $purity = $localPurities[$code] . '%';
+                    $source = 'Local Cache';
+                }
+            }
+
+            return [
+                'id'            => $bom->id,
+                'product_name'  => $product->name ?? '—',
+                'badge'         => $bom->badge,
+                'item_code'     => $product->item_code ?? '—',
+                'pack_name'     => $product->pack_name ?? '—',
+                'yield_qty'     => $bom->yield_quantity,
+                'yield_uom'     => $bom->yield_uom,
+                'purity'        => $purity,
+                'purchase_date' => $vouchDate,
+                'source'        => $source,
+                'rm_name'       => $rmName,
+            ];
+        });
+
+        return view('costing.pro', compact('processedBoms', 'apiSuccess'));
+    }
+
+    public function purchaseRegister(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            abort(403, 'Access denied to Purchase Register module.');
+        }
+
+        $query = PurchaseRegister::orderByDesc('vouch_date')->orderByDesc('id');
+
+        if ($request->filled('supplier_name')) {
+            $query->where('supplier_name', $request->supplier_name);
+        }
+
+        if ($request->filled('item_name')) {
+            $query->where('item_name', $request->item_name);
+        }
+
+        if ($request->filled('rm_type')) {
+            $query->where('group_name4', $request->rm_type);
+        }
+
+        if ($request->filled('group_name')) {
+            $query->where('group_name5', $request->group_name);
+        }
+
+        if ($request->filled('vouch_no')) {
+            $query->where('vouch_no', 'like', "%" . $request->vouch_no . "%");
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('vouch_date', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('vouch_date', '<=', $request->to_date);
+        }
+
+        $purchases = $query->paginate(30)->withQueryString();
+
+        // Base query for dependent dropdowns (shares general filters)
+        $baseDropdownQuery = PurchaseRegister::query();
+        if ($request->filled('vouch_no')) {
+            $baseDropdownQuery->where('vouch_no', 'like', "%" . $request->vouch_no . "%");
+        }
+        if ($request->filled('from_date')) {
+            $baseDropdownQuery->whereDate('vouch_date', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $baseDropdownQuery->whereDate('vouch_date', '<=', $request->to_date);
+        }
+
+        // 1. Supplier List (filtered by item, rm_type, and group)
+        $supQuery = clone $baseDropdownQuery;
+        if ($request->filled('item_name')) {
+            $supQuery->where('item_name', $request->item_name);
+        }
+        if ($request->filled('rm_type')) {
+            $supQuery->where('group_name4', $request->rm_type);
+        }
+        if ($request->filled('group_name')) {
+            $supQuery->where('group_name5', $request->group_name);
+        }
+        $supplierList = $supQuery->whereNotNull('supplier_name')->where('supplier_name', '!=', '')->distinct()->pluck('supplier_name')->sort()->values();
+
+        // 2. Product List (filtered by supplier, rm_type, and group)
+        $prodQuery = clone $baseDropdownQuery;
+        if ($request->filled('supplier_name')) {
+            $prodQuery->where('supplier_name', $request->supplier_name);
+        }
+        if ($request->filled('rm_type')) {
+            $prodQuery->where('group_name4', $request->rm_type);
+        }
+        if ($request->filled('group_name')) {
+            $prodQuery->where('group_name5', $request->group_name);
+        }
+        $productList = $prodQuery->whereNotNull('item_name')->where('item_name', '!=', '')->distinct()->pluck('item_name')->sort()->values();
+        
+        // 3. RM Type List (filtered by supplier, item, and group)
+        $rmTypeQuery = clone $baseDropdownQuery;
+        if ($request->filled('supplier_name')) {
+            $rmTypeQuery->where('supplier_name', $request->supplier_name);
+        }
+        if ($request->filled('item_name')) {
+            $rmTypeQuery->where('item_name', $request->item_name);
+        }
+        if ($request->filled('group_name')) {
+            $rmTypeQuery->where('group_name5', $request->group_name);
+        }
+        $rmTypeList = $rmTypeQuery->whereNotNull('group_name4')->where('group_name4', '!=', '')->distinct()->pluck('group_name4')->sort()->values();
+
+        // 4. Group List (filtered by supplier, item, and rm_type)
+        $grpQuery = clone $baseDropdownQuery;
+        if ($request->filled('supplier_name')) {
+            $grpQuery->where('supplier_name', $request->supplier_name);
+        }
+        if ($request->filled('item_name')) {
+            $grpQuery->where('item_name', $request->item_name);
+        }
+        if ($request->filled('rm_type')) {
+            $grpQuery->where('group_name4', $request->rm_type);
+        }
+        $groupList = $grpQuery->whereNotNull('group_name5')->where('group_name5', '!=', '')->distinct()->pluck('group_name5')->sort()->values();
+
+        $settings = [
+            'purchase_sync_auto'      => AppSetting::get('purchase_sync_auto', 'disabled'),
+            'purchase_sync_frequency' => AppSetting::get('purchase_sync_frequency', 'daily'),
+            'purchase_sync_time'      => AppSetting::get('purchase_sync_time', '02:00'),
+            'purchase_sync_day'       => AppSetting::get('purchase_sync_day', 'Sunday'),
+        ];
+
+        return view('costing.purchase_register', compact('purchases', 'supplierList', 'productList', 'rmTypeList', 'groupList', 'settings'));
+    }
+
+    /**
+     * POST: Sync purchase register from ERP for current year and save to DB
+     */
+    public function syncPurchaseRegister(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        try {
+            $count = $this->syncPurchaseRegisterRaw();
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully synced {$count} purchases from ERP API into database.",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Purchase Register Sync Error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Common core method to sync purchase registers from ERP API
+     */
+    public function syncPurchaseRegisterRaw()
+    {
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        // FY auto-dates (current year)
+        $now     = now();
+        $fyStart = $now->month >= 4 ? $now->year . '-04-01' : ($now->year - 1) . '-04-01';
+        $fyEnd   = $now->month >= 4 ? ($now->year + 1) . '-03-31' : $now->year . '-03-31';
+
+        $fromDate = AppSetting::get('costing_api_from_date') ?: $fyStart;
+        $toDate   = AppSetting::get('costing_api_to_date')   ?: $fyEnd;
+
+        $response = Http::withoutVerifying()
+            ->timeout(90)
+            ->post("{$baseUrl}/LogicPurchaseRegisterDetail", [
+                'apikey'   => $apiKey,
+                'FromDate' => $fromDate,
+                'ToDate'   => $toDate,
+                'Account'  => 'all',
+                'Item'     => 'all',
+                'Branch'   => 'all',
+            ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('ERP API request failed.');
+        }
+
+        $data = $response->json();
+        if (($data['response'] ?? '') !== 'success' || empty($data['resultdata'])) {
+            throw new \Exception('No data returned from ERP API.');
+        }
+
+        $count = 0;
+        DB::transaction(function () use ($data, &$count) {
+            foreach ($data['resultdata'] as $row) {
+                $itemCode  = trim($row['User_Code'] ?? '');
+                if (empty($itemCode)) continue;
+
+                $vouchDateStr = $row['Vouch_Date'] ?? null;
+                $formattedDate = null;
+                if ($vouchDateStr) {
+                    try {
+                        $formattedDate = \Carbon\Carbon::createFromFormat('d/m/Y', $vouchDateStr)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        $formattedDate = null;
+                    }
+                }
+
+                $vouchNo = trim($row['Bill_No'] ?? $row['Vouch_No'] ?? '');
+
+                PurchaseRegister::updateOrCreate(
+                    [
+                        'item_code'     => $itemCode,
+                        'vouch_no'      => $vouchNo,
+                        'vouch_date'    => $formattedDate,
+                        'supplier_name' => trim($row['SupplierName'] ?? ''),
+                    ],
+                    [
+                        'item_name'   => trim($row['Item_Hd_Name'] ?? $row['ItemName'] ?? ''),
+                        'qty'         => (float)($row['Qty'] ?? 0),
+                        'case_rate'   => (float)($row['CaseRate'] ?? 0),
+                        'purity'      => isset($row['Purity']) ? (float)$row['Purity'] : null,
+                        'group_name4' => trim($row['GroupName4'] ?? ''),
+                        'group_name5' => trim($row['GroupName5'] ?? ''),
+                    ]
+                );
+                $count++;
+            }
+        });
+
+        return $count;
+    }
+
+    /**
+     * POST: Save sync scheduler settings to database
+     */
+    public function saveSyncSettings(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $request->validate([
+            'purchase_sync_auto'      => 'required|in:enabled,disabled',
+            'purchase_sync_frequency' => 'required|in:daily,weekly',
+            'purchase_sync_time'      => 'required',
+            'purchase_sync_day'       => 'required|in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+        ]);
+
+        AppSetting::set('purchase_sync_auto', $request->purchase_sync_auto);
+        AppSetting::set('purchase_sync_frequency', $request->purchase_sync_frequency);
+        AppSetting::set('purchase_sync_time', $request->purchase_sync_time);
+        AppSetting::set('purchase_sync_day', $request->purchase_sync_day);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sync settings updated successfully.',
+        ]);
+    }
+
+    /**
+     * Desktop: Pricelist view - synced from Product Master ERP API
+     */
+    public function pricelist(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            abort(403, 'Access denied to Pricelist module.');
+        }
+
+        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('item_hd_name', 'like', "%{$search}%")
+                  ->orWhere('user_code', 'like', "%{$search}%")
+                  ->orWhere('group3', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('group1')) {
+            $query->where('group1', $request->group1);
+        }
+
+        $sortOrder = $request->input('sort', 'asc') === 'desc' ? 'desc' : 'asc';
+        $query->orderBy('item_hd_name', $sortOrder);
+
+        $pricelists = $query->paginate(30)->withQueryString();
+
+        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+
+        $settings = [
+            'pricelist_sync_auto'      => AppSetting::get('pricelist_sync_auto', 'disabled'),
+            'pricelist_sync_frequency' => AppSetting::get('pricelist_sync_frequency', 'daily'),
+            'pricelist_sync_time'      => AppSetting::get('pricelist_sync_time', '02:00'),
+            'pricelist_sync_day'       => AppSetting::get('pricelist_sync_day', 'Sunday'),
+        ];
+
+        return view('costing.pricelist', compact('pricelists', 'group1List', 'settings'));
+    }
+
+    /**
+     * POST: Sync pricelist manually from Product Master API
+     */
+    public function syncPricelist(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        try {
+            $count = $this->syncPricelistRaw();
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully synced {$count} items from Product Master ERP API into database.",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Pricelist Sync Error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Core logic to sync from Product Master API
+     */
+    public function syncPricelistRaw()
+    {
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        $response = Http::withoutVerifying()
+            ->timeout(90)
+            ->post("{$baseUrl}/ProductMaster", [
+                'apikey'       => $apiKey,
+                'Itemdetcode'  => AppSetting::get('product_master_itemdetcode', '0'),
+                'Usercode'     => AppSetting::get('product_master_usercode', '0'),
+                'Branchcode'   => AppSetting::get('product_master_branchcode', '0'),
+                'PageNumber'   => AppSetting::get('product_master_page_number', '1'),
+                'RowsOfPage'   => AppSetting::get('product_master_rows', '10000'),
+                'modifieddate' => '',
+                'TxnType'      => AppSetting::get('product_master_txn_type', 'Old'),
+            ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('ERP ProductMaster API request failed.');
+        }
+
+        $data = $response->json();
+        if (($data['response'] ?? '') !== 'success' || empty($data['resultdata'])) {
+            throw new \Exception('No data returned from ERP API.');
+        }
+
+        $count = 0;
+        $items = $data['resultdata'];
+        DB::transaction(function () use ($items, &$count) {
+            foreach ($items as $item) {
+                $userCode = trim($item['User_Code'] ?? '');
+                if (empty($userCode)) continue;
+
+                $updateData = [
+                    'item_det_code'   => trim($item['Item_det_code'] ?? ''),
+                    'item_hd_name'    => trim($item['Item_hd_name'] ?? ''),
+                    'item_short_name' => trim($item['Item_Short_Name'] ?? ''),
+                    'size'            => trim($item['Size'] ?? ''),
+                    'size_desc'       => trim($item['Size_Desc'] ?? ''),
+                    'group1'          => trim($item['Group1'] ?? ''),
+                    'group2'          => trim($item['Group2'] ?? ''),
+                    'group3'          => trim($item['Group3'] ?? ''),
+                    'group4'          => trim($item['Group4'] ?? ''),
+                    'group5'          => trim($item['Group5'] ?? ''),
+                    'group6'          => trim($item['Group6'] ?? ''),
+                    'mrp'             => isset($item['MRP']) ? (float)$item['MRP'] : null,
+                    'sp_rate1'        => isset($item['Sp_Rate1']) ? (float)$item['Sp_Rate1'] : null,
+                    'sp_rate2'        => isset($item['Sp_Rate2']) ? (float)$item['Sp_Rate2'] : null,
+                    'sp_rate3'        => isset($item['Sp_Rate3']) ? (float)$item['Sp_Rate3'] : null,
+                    'sp_rate4'        => isset($item['Sp_Rate4']) ? (float)$item['Sp_Rate4'] : null,
+                    'sp_rate5'        => isset($item['Sp_Rate5']) ? (float)$item['Sp_Rate5'] : null,
+                    'sale_rate'       => isset($item['Sale_rate']) ? (float)$item['Sale_rate'] : null,
+                    'barcode'         => trim($item['Barcode'] ?? ''),
+                    'item_nature'     => trim($item['Item_Nature'] ?? ''),
+                    'cf_1'            => isset($item['cf_1']) ? (float)$item['cf_1'] : null,
+                    'cf_2'            => isset($item['cf_2']) ? (float)$item['cf_2'] : null,
+                    'cf_3'            => isset($item['cf_3']) ? (float)$item['cf_3'] : null,
+                    'modify_date'     => trim($item['Modify_Date'] ?? ''),
+                    'gst_tax'         => trim($item['GSTTax'] ?? ''),
+                ];
+
+                $existing = \App\Models\Pricelist::where('user_code', $userCode)->first();
+                if ($existing) {
+                    for ($i = 1; $i <= 5; $i++) {
+                        $rateCol = "sp_rate{$i}";
+                        $prevCol = "prev_sp_rate{$i}";
+                        $newVal = $updateData[$rateCol];
+                        $oldVal = $existing->$rateCol !== null ? (float)$existing->$rateCol : null;
+
+                        if ($newVal !== null && $oldVal !== null && abs($newVal - $oldVal) > 0.001) {
+                            $updateData[$prevCol] = $oldVal;
+                        }
+                    }
+                    $existing->update($updateData);
+                } else {
+                    \App\Models\Pricelist::create(array_merge(['user_code' => $userCode], $updateData));
+                }
+                $count++;
+            }
+        });
+
+        return $count;
+    }
+
+    /**
+     * POST: Save Pricelist sync scheduler settings
+     */
+    public function savePricelistSyncSettings(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $request->validate([
+            'pricelist_sync_auto'      => 'required|in:enabled,disabled',
+            'pricelist_sync_frequency' => 'required|in:daily,weekly',
+            'pricelist_sync_time'      => 'required',
+            'pricelist_sync_day'       => 'required|in:Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+        ]);
+
+        AppSetting::set('pricelist_sync_auto', $request->pricelist_sync_auto);
+        AppSetting::set('pricelist_sync_frequency', $request->pricelist_sync_frequency);
+        AppSetting::set('pricelist_sync_time', $request->pricelist_sync_time);
+        AppSetting::set('pricelist_sync_day', $request->pricelist_sync_day);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pricelist sync settings updated successfully.',
+        ]);
+    }
+
     // ─────────────────────────────────────────────
     //  Private Helpers
     // ─────────────────────────────────────────────
@@ -386,7 +878,7 @@ class CostingController extends Controller
         }
 
         preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
-        $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+        $formulation = ($recipe->formulation !== null) ? (float)$recipe->formulation : (isset($matches[1]) ? (float)$matches[1] : 100.0);
 
         $breakdown    = $this->buildBreakdown($recipe, $priceMap, $quantity, $product, $formulation, $density);
         $totalCost    = collect($breakdown)->sum('sub_cost');
