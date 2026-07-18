@@ -359,7 +359,7 @@
                         <div>
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch UOM *</label>
                             <input type="text" x-model="bomModal.form.yield_uom"
-                                   class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. BOX">
+                                   class="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-bold" placeholder="e.g. KG">
                         </div>
                     </div>
                 </div>
@@ -571,7 +571,7 @@ function bomApp() {
         bomModal: {
             show: false, editId: null, submitting: false,
             typeFilter: '', rmTypeFilter: '', step: 1,
-            form: { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'BOX', items: [] }
+            form: { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [] }
         },
         duplicateModal: {
             show: false, bomId: null, productName: '', badge: 'small', submitting: false
@@ -651,7 +651,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'BOX', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: false }] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: false }] };
             this.bomModal.show = true;
         },
 
