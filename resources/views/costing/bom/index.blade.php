@@ -401,7 +401,7 @@
                                         </select>
                                         <div class="mt-1.5 flex flex-wrap gap-2 items-center">
                                             <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
-                                                <input type="radio" :checked="item.is_solvent"
+                                                <input type="radio" name="solvent_radio" :checked="item.is_solvent"
                                                        @click.prevent="toggleSolvent(item)"
                                                        class="w-3 h-3 text-amber-600 focus:ring-amber-500 border-slate-300">
                                                 Solvent
@@ -460,6 +460,23 @@
                             <div x-show="bomModal.form.items.filter(i => !i.is_packing).length === 0" class="text-center py-6 text-slate-400 text-sm font-bold border-2 border-dashed border-slate-200 rounded-xl">
                                 No ingredients added yet — click "Add Row"
                             </div>
+
+                            <!-- Ingredients Quantity Summary -->
+                            <template x-if="bomModal.form.items.filter(i => !i.is_packing).length > 0">
+                                <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs font-bold text-slate-600 shadow-sm">
+                                    <div>
+                                        Total Batch Size: <span class="text-slate-800" x-text="bomModal.form.yield_quantity + ' ' + bomModal.form.yield_uom"></span>
+                                    </div>
+                                    <div class="flex gap-4">
+                                        <div>
+                                            Used: <span :class="getUsedIngredientsQty() > parseFloat(bomModal.form.yield_quantity) ? 'text-red-600' : 'text-slate-800'" x-text="getUsedIngredientsQty() + ' ' + bomModal.form.yield_uom"></span>
+                                        </div>
+                                        <div>
+                                            Remaining: <span :class="getRemainingIngredientsQty() < 0 ? 'text-red-600' : 'text-emerald-600'" x-text="getRemainingIngredientsQty() + ' ' + bomModal.form.yield_uom"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -711,6 +728,22 @@ function bomApp() {
             item.is_solvent = targetVal;
         },
 
+        getUsedIngredientsQty() {
+            let sum = 0;
+            this.bomModal.form.items.forEach(i => {
+                if (!i.is_packing) {
+                    sum += parseFloat(i.quantity) || 0;
+                }
+            });
+            return parseFloat(sum.toFixed(4));
+        },
+
+        getRemainingIngredientsQty() {
+            const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
+            const used = this.getUsedIngredientsQty();
+            return parseFloat((batchQty - used).toFixed(4));
+        },
+
         openBomModal() {
             this.bomModal.editId = null;
             this.bomModal.typeFilter = '';
@@ -772,6 +805,15 @@ function bomApp() {
                     alert('Please ensure all raw material rows have a selected material and valid quantity.');
                     return;
                 }
+                
+                // Validate total ingredients quantity against batch size
+                const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
+                const sumIngredients = this.getUsedIngredientsQty();
+                if (sumIngredients > batchQty + 0.001) {
+                    alert(`Total ingredients quantity (${sumIngredients.toFixed(4)}) cannot exceed the Batch Quantity (${batchQty}).`);
+                    return;
+                }
+                
                 this.bomModal.step = 4;
             }
         },
@@ -786,6 +828,15 @@ function bomApp() {
                 alert('Please fill all required fields and add at least one item.');
                 return;
             }
+            
+            // Validate total ingredients quantity against batch size
+            const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
+            const sumIngredients = this.getUsedIngredientsQty();
+            if (sumIngredients > batchQty + 0.001) {
+                alert(`Total ingredients quantity (${sumIngredients.toFixed(4)}) cannot exceed the Batch Quantity (${batchQty}).`);
+                return;
+            }
+            
             this.bomModal.submitting = true;
             const isEdit = !!this.bomModal.editId;
             const url    = isEdit ? `{{ url('costing-boms') }}/${this.bomModal.editId}` : '{{ route('costing.boms.store') }}';
