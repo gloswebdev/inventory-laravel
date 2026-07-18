@@ -372,8 +372,11 @@
                                 <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Raw Materials / Ingredients *</label>
                                 <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 batch unit</p>
                             </div>
-                            <button type="button" @click="addRMRow(false)"
-                                    class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
+                            <button type="button" 
+                                    @click="if (!hasActiveSolvent() && getRemainingIngredientsQty() > 0) addRMRow(false)"
+                                    :disabled="hasActiveSolvent() || getRemainingIngredientsQty() <= 0"
+                                    :class="(hasActiveSolvent() || getRemainingIngredientsQty() <= 0) ? 'opacity-50 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400' : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 hover:shadow-sm'"
+                                    class="flex items-center gap-1.5 px-3 py-1.5 border font-black text-xs rounded-lg transition-all">
                                 <i class="fas fa-plus-circle text-xs"></i> Add Row
                             </button>
                         </div>
@@ -389,7 +392,8 @@
                             </select>
                                       <template x-for="(item, idx) in bomModal.form.items.filter(i => !i.is_packing)" :key="idx">
                                 <div x-effect="if (isTechnical(item.raw_material_id)) { item.quantity = calculateSuggestedQty(item); } else if (item.is_solvent) { item.quantity = calculateRemainingQty(item); }"
-                                     class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
+                                     :class="item.is_solvent ? 'bg-indigo-50/40 border-indigo-300 ring-2 ring-indigo-100/50' : 'bg-amber-50/50 border-amber-100'"
+                                     class="grid grid-cols-12 gap-2 p-3 border rounded-xl items-center transition-all duration-200">
                                     <div class="col-span-7">
                                         <select x-model="item.raw_material_id"
                                                 class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
@@ -400,10 +404,12 @@
                                             </template>
                                         </select>
                                         <div class="mt-1.5 flex flex-wrap gap-2 items-center">
-                                            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-200 transition-colors">
+                                            <label :class="item.is_solvent ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200'"
+                                                   class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
                                                 <input type="radio" name="solvent_radio" :checked="item.is_solvent"
                                                        @click.prevent="toggleSolvent(item)"
-                                                       class="w-3 h-3 text-amber-600 focus:ring-amber-500 border-slate-300">
+                                                       :class="item.is_solvent ? 'text-indigo-600 focus:ring-indigo-500' : 'text-amber-600 focus:ring-amber-500'"
+                                                       class="w-3 h-3 border-slate-300">
                                                 Solvent
                                             </label>
 
@@ -742,6 +748,10 @@ function bomApp() {
             const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
             const used = this.getUsedIngredientsQty();
             return parseFloat((batchQty - used).toFixed(4));
+        },
+
+        hasActiveSolvent() {
+            return this.bomModal.form.items.some(i => !i.is_packing && i.is_solvent);
         },
 
         openBomModal() {
