@@ -67,8 +67,14 @@ class CostingBomController extends Controller
             $boms = $query->orderByDesc('created_at')->paginate($perPage)->withQueryString();
         }
 
-        $fgQuery = Product::orderBy('name');
-        $rmQuery = Product::orderBy('name');
+        $fgQuery = Product::whereHas('type', function($q) {
+            $q->whereIn('type_name', ['Semi Finished Good', 'Semi Finished Goods', 'SEMI FINISHED GOOD', 'SEMI FINISHED GOODS']);
+        })->orderBy('name');
+
+        $rmQuery = Product::whereHas('type', function($q) {
+            $q->whereIn('type_name', ['RAW MATERIAL', 'PACKING MATERIAL', 'Raw Material', 'Packing Material']);
+        })->orderBy('name');
+
         $typesQuery = \App\Models\ProductType::orderBy('type_name');
 
         if ($user->role !== 'admin') {
@@ -82,7 +88,22 @@ class CostingBomController extends Controller
         $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
         $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
         $types         = $typesQuery->get();
-        $purities      = \App\Models\PurchaseRegister::whereNotNull('purity')
+        $bomPurities = \App\Models\CostingBomItem::whereNotNull('purity')
+            ->where('purity', '>', 0)
+            ->with('rawMaterial')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn($item) => $item->rawMaterial !== null)
+            ->unique('rawMaterial.item_code')
+            ->pluck('purity', 'rawMaterial.item_code')
+            ->toArray();
+
+        $pricePurities = \App\Models\ProductPrice::whereNotNull('purity')
+            ->where('purity', '>', 0)
+            ->pluck('purity', 'item_code')
+            ->toArray();
+
+        $prPurities = \App\Models\PurchaseRegister::whereNotNull('purity')
             ->where('purity', '>', 0)
             ->orderByDesc('vouch_date')
             ->orderByDesc('id')
@@ -90,6 +111,8 @@ class CostingBomController extends Controller
             ->unique('item_code')
             ->pluck('purity', 'item_code')
             ->toArray();
+
+        $purities = array_merge($bomPurities, $pricePurities, $prPurities);
 
         return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities'));
     }
@@ -111,6 +134,7 @@ class CostingBomController extends Controller
             ],
             'badge' => 'nullable|string|in:small,big,bulk',
             'formulation' => 'nullable|numeric|min:0.001|max:100',
+            'density' => 'nullable|numeric|min:0.001|max:10',
             'yield_quantity' => 'required|numeric|min:0.001',
             'yield_uom' => 'required|string|max:50',
             'items' => 'required|array|min:1',
@@ -121,6 +145,22 @@ class CostingBomController extends Controller
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
 
+        $rawMaterialIds = array_column($validated['items'], 'raw_material_id');
+        if (count($rawMaterialIds) !== count(array_unique($rawMaterialIds))) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Duplicate raw materials are not allowed.'], 422);
+            }
+            return back()->withErrors(['items' => 'Duplicate raw materials are not allowed.'])->withInput();
+        }
+
+        $totalRmQty = array_sum(array_column($validated['items'], 'quantity'));
+        if ($totalRmQty > $validated['yield_quantity']) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => "Validation Error: Total raw material quantity ({$totalRmQty}) cannot exceed the Batch Quantity ({$validated['yield_quantity']})."], 422);
+            }
+            return back()->withErrors(['items' => "Total raw material quantity ({$totalRmQty}) cannot exceed the Batch Quantity ({$validated['yield_quantity']})."])->withInput();
+        }
+
         DB::transaction(function () use ($validated) {
             $bom = CostingBom::create([
                 'finished_product_id' => $validated['finished_product_id'],
@@ -128,6 +168,7 @@ class CostingBomController extends Controller
                 'yield_uom'           => $validated['yield_uom'],
                 'badge'               => $validated['badge'] ?? null,
                 'formulation'         => $validated['formulation'] ?? null,
+                'density'             => $validated['density'] ?? null,
             ]);
 
             foreach ($validated['items'] as $item) {
@@ -164,6 +205,7 @@ class CostingBomController extends Controller
             ],
             'badge' => 'nullable|string|in:small,big,bulk',
             'formulation' => 'nullable|numeric|min:0.001|max:100',
+            'density' => 'nullable|numeric|min:0.001|max:10',
             'yield_quantity' => 'required|numeric|min:0.001',
             'yield_uom' => 'required|string|max:50',
             'items' => 'required|array|min:1',
@@ -174,6 +216,22 @@ class CostingBomController extends Controller
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
 
+        $rawMaterialIds = array_column($validated['items'], 'raw_material_id');
+        if (count($rawMaterialIds) !== count(array_unique($rawMaterialIds))) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Duplicate raw materials are not allowed.'], 422);
+            }
+            return back()->withErrors(['items' => 'Duplicate raw materials are not allowed.'])->withInput();
+        }
+
+        $totalRmQty = array_sum(array_column($validated['items'], 'quantity'));
+        if ($totalRmQty > $validated['yield_quantity']) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => "Validation Error: Total raw material quantity ({$totalRmQty}) cannot exceed the Batch Quantity ({$validated['yield_quantity']})."], 422);
+            }
+            return back()->withErrors(['items' => "Total raw material quantity ({$totalRmQty}) cannot exceed the Batch Quantity ({$validated['yield_quantity']})."])->withInput();
+        }
+
         DB::transaction(function () use ($costingBom, $validated) {
             $costingBom->update([
                 'finished_product_id' => $validated['finished_product_id'],
@@ -181,6 +239,7 @@ class CostingBomController extends Controller
                 'yield_uom'           => $validated['yield_uom'],
                 'badge'               => $validated['badge'] ?? null,
                 'formulation'         => $validated['formulation'] ?? null,
+                'density'             => $validated['density'] ?? null,
             ]);
 
             $costingBom->items()->delete();
@@ -263,6 +322,7 @@ class CostingBomController extends Controller
                 'yield_uom'           => $costingBom->yield_uom,
                 'badge'               => $request->badge,
                 'formulation'         => $costingBom->formulation,
+                'density'             => $costingBom->density,
             ]);
 
             foreach ($costingBom->items as $item) {

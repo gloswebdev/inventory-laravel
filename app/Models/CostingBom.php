@@ -19,6 +19,13 @@ class CostingBom extends Model
         'yield_uom',
         'badge',
         'formulation',
+        'density',
+    ];
+
+    protected $casts = [
+        'yield_quantity' => 'float',
+        'formulation' => 'float',
+        'density' => 'float',
     ];
 
     public function finishedProduct(): BelongsTo
