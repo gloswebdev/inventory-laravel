@@ -139,11 +139,15 @@ class CostingBomController extends Controller
             'formulation' => 'nullable|numeric|min:0.001|max:100',
             'density' => 'nullable|numeric|min:0.001|max:10',
             'yield_quantity' => 'required|numeric|min:0.001',
-            'yield_uom' => 'required|string|max:50',
-            'items' => 'required|array|min:1',
+            'yield_uom'           => 'required|string|max:50',
+            'items'               => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|numeric|min:0.001',
-            'items.*.purity' => 'nullable|numeric|min:0.1|max:100',
+            'items.*.quantity'    => 'required|numeric|min:0.001',
+            'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
+            'packing_materials'   => 'nullable|array',
+            'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
+            'packing_materials.*.raw_material_id' => 'required|exists:products,id',
+            'packing_materials.*.quantity'        => 'required|numeric|min:0.001',
         ], [
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
@@ -193,6 +197,17 @@ class CostingBomController extends Controller
                     }
                 }
             }
+
+            if (!empty($validated['packing_materials'])) {
+                foreach ($validated['packing_materials'] as $pm) {
+                    \App\Models\CostingBomPackingMaterial::create([
+                        'costing_bom_id'  => $bom->id,
+                        'pricelist_id'    => $pm['pricelist_id'],
+                        'raw_material_id' => $pm['raw_material_id'],
+                        'quantity'        => $pm['quantity'],
+                    ]);
+                }
+            }
         });
 
         if (request()->expectsJson()) {
@@ -221,11 +236,15 @@ class CostingBomController extends Controller
             'formulation' => 'nullable|numeric|min:0.001|max:100',
             'density' => 'nullable|numeric|min:0.001|max:10',
             'yield_quantity' => 'required|numeric|min:0.001',
-            'yield_uom' => 'required|string|max:50',
-            'items' => 'required|array|min:1',
+            'yield_uom'           => 'required|string|max:50',
+            'items'               => 'required|array|min:1',
             'items.*.raw_material_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|numeric|min:0.001',
-            'items.*.purity' => 'nullable|numeric|min:0.1|max:100',
+            'items.*.quantity'    => 'required|numeric|min:0.001',
+            'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
+            'packing_materials'   => 'nullable|array',
+            'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
+            'packing_materials.*.raw_material_id' => 'required|exists:products,id',
+            'packing_materials.*.quantity'        => 'required|numeric|min:0.001',
         ], [
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
@@ -275,6 +294,18 @@ class CostingBomController extends Controller
                             ['purity' => $item['purity']]
                         );
                     }
+                }
+            }
+
+            $costingBom->packingMaterials()->delete();
+            if (!empty($validated['packing_materials'])) {
+                foreach ($validated['packing_materials'] as $pm) {
+                    \App\Models\CostingBomPackingMaterial::create([
+                        'costing_bom_id'  => $costingBom->id,
+                        'pricelist_id'    => $pm['pricelist_id'],
+                        'raw_material_id' => $pm['raw_material_id'],
+                        'quantity'        => $pm['quantity'],
+                    ]);
                 }
             }
         });
@@ -356,6 +387,15 @@ class CostingBomController extends Controller
                     'raw_material_id' => $item->raw_material_id,
                     'quantity'        => $item->quantity,
                     'purity'          => $item->purity,
+                ]);
+            }
+
+            foreach ($costingBom->packingMaterials as $pm) {
+                \App\Models\CostingBomPackingMaterial::create([
+                    'costing_bom_id'  => $newBom->id,
+                    'pricelist_id'    => $pm->pricelist_id,
+                    'raw_material_id' => $pm->raw_material_id,
+                    'quantity'        => $pm->quantity,
                 ]);
             }
         });

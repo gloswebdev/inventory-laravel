@@ -519,74 +519,70 @@
                     </div>
 
                 {{-- Step 4: Packing Materials --}}
-                <div x-show="bomModal.step === 4" class="space-y-5" x-transition>
-                    <!-- Linked Finished Goods Reference Card -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
-                        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-                            <i class="fas fa-box-open text-amber-500 text-xs animate-none"></i> Linked Finished Goods (FG) by Pack Size
-                        </div>
-                        <div class="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                            <template x-for="fg in getLinkedPricelistItems(bomModal.form.finished_product_id)" :key="fg.id">
-                                <div class="flex items-center justify-between bg-white border border-slate-200 p-2.5 rounded-lg text-xs shadow-xs hover:border-amber-200 transition-all">
-                                    <div class="font-extrabold text-slate-700 uppercase" x-text="fg.item_hd_name"></div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-mono text-[9px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded" x-text="fg.user_code"></span>
-                                        <span class="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded" x-text="'Size: ' + fg.size"></span>
-                                        <span class="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded" x-text="'CF1: ' + (parseFloat(fg.cf_1) || 0)"></span>
-                                    </div>
-                                </div>
-                            </template>
-                            <template x-if="getLinkedPricelistItems(bomModal.form.finished_product_id).length === 0">
-                                <div class="text-[11px] text-slate-400 font-bold text-center py-4 bg-white border border-dashed rounded-lg">
-                                    No linked Finished Goods found in Pricelist Master.
-                                </div>
-                            </template>
-                        </div>
+                <div x-show="bomModal.step === 4" class="space-y-4 max-h-[50vh] overflow-y-auto pr-1" x-transition>
+                    <div class="bg-amber-50/40 border border-amber-100/70 p-3.5 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">Size-Wise Packing Config</h4>
+                        <p class="text-[10px] text-slate-400 font-semibold leading-relaxed">Har packing size (1Ltr, 500ml, etc.) ke side me raw packing material custom add karein.</p>
                     </div>
 
-                    <div>
-                        <div class="flex items-center justify-between mb-3">
-                            <div>
-                                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Packing Materials *</label>
-                                <p class="text-[10px] text-slate-400 mt-0.5">Quantities are per 1 batch unit</p>
-                            </div>
-                            <button type="button" @click="addRMRow(true)"
-                                    class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
-                                <i class="fas fa-plus-circle text-xs"></i> Add Row
-                            </button>
-                        </div>
-
-                        <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                            <template x-for="(item, idx) in bomModal.form.items.filter(i => i.is_packing)" :key="idx">
-                                <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
-                                    <div class="col-span-7">
-                                        <select x-model="item.raw_material_id"
-                                                class="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer">
-                                            <option value="">Select Packing Material</option>
-                                            <template x-for="(rm, index) in getFilteredRMs('', true)" :key="rm.id">
-                                                <option :value="rm.id" :selected="rm.id == item.raw_material_id"
-                                                        x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
-                                            </template>
-                                        </select>
-                                    </div>
-                                    <div class="col-span-3">
-                                        <input type="number" step="0.001" x-model="item.quantity"
-                                               placeholder="Qty"
-                                               class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
-                                    </div>
-                                    <div class="col-span-1 text-center text-[10px] font-bold text-slate-400" x-text="getItemUom(item.raw_material_id)"></div>
-                                    <div class="col-span-1 flex justify-center">
-                                        <button @click="bomModal.form.items.splice(bomModal.form.items.indexOf(item), 1)" class="w-6 h-6 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition">
-                                            <i class="fas fa-trash-alt text-[10px]"></i>
-                                        </button>
-                                    </div>
+                    <template x-for="fg in getLinkedPricelistItems(bomModal.form.finished_product_id)" :key="fg.id">
+                        <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:border-amber-200 hover:shadow-md transition-all duration-300">
+                            <!-- FG Header Row -->
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-3">
+                                <div>
+                                    <div class="font-extrabold text-slate-800 text-xs uppercase tracking-tight" x-text="fg.item_hd_name"></div>
+                                    <div class="text-[10px] text-slate-400 font-bold mt-0.5">Code: <span class="text-slate-600 font-mono" x-text="fg.user_code"></span></div>
                                 </div>
-                            </template>
-                            <div x-show="bomModal.form.items.filter(i => i.is_packing).length === 0" class="text-center py-6 text-slate-400 text-sm font-bold border-2 border-dashed border-slate-200 rounded-xl">
-                                No packing materials added yet — click "Add Row"
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100/60 px-2 py-0.5 rounded-lg" x-text="'Size: ' + fg.size"></span>
+                                    <span class="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100/60 px-2 py-0.5 rounded-lg" x-text="'CF1: ' + (parseFloat(fg.cf_1) || 0)"></span>
+                                    <button type="button" @click="addPackingRow(fg.id)"
+                                            class="flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] rounded-lg transition-all shadow-sm animate-none">
+                                        <i class="fas fa-plus-circle text-[8px]"></i> Add Material
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Grouped Packing Materials items -->
+                            <div class="space-y-2">
+                                <template x-for="(pm, idx) in bomModal.form.packing_materials.filter(p => p.pricelist_id == fg.id)" :key="idx">
+                                    <div class="grid grid-cols-12 gap-2 p-2 bg-slate-50/50 border border-slate-100 rounded-xl items-center">
+                                        <div class="col-span-8">
+                                            <select x-model="pm.raw_material_id"
+                                                    class="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white">
+                                                <option value="">Select Packing Material</option>
+                                                <template x-for="(rm, index) in getFilteredRMs('', true)" :key="rm.id">
+                                                    <option :value="rm.id" x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div class="col-span-3">
+                                            <input type="number" step="0.001" x-model="pm.quantity"
+                                                   placeholder="Qty"
+                                                   class="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
+                                        </div>
+                                        <div class="col-span-1 flex justify-center">
+                                            <button type="button" @click="bomModal.form.packing_materials.splice(bomModal.form.packing_materials.indexOf(pm), 1)"
+                                                    class="w-6 h-6 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition">
+                                                <i class="fas fa-trash-alt text-[10px]"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="bomModal.form.packing_materials.filter(p => p.pricelist_id == fg.id).length === 0">
+                                    <div class="text-[10px] text-slate-400 font-bold text-center py-3 bg-slate-50/30 rounded-xl border border-dashed border-slate-200">
+                                        No packing materials added for this size. Click "Add Material" above.
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                    </div>
+                    </template>
+
+                    <template x-if="getLinkedPricelistItems(bomModal.form.finished_product_id).length === 0">
+                        <div class="text-center py-8 text-slate-400 text-sm font-bold border-2 border-dashed border-slate-200 rounded-xl bg-white">
+                            Pricelist Master me is composition se linked koi Finished Good (FG) nahi mila.
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -847,7 +843,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [] };
             this.bomModal.show = true;
         },
 
@@ -864,10 +860,10 @@ function bomApp() {
                 density: recipe.density || '',
                 yield_quantity: recipe.yield_quantity,
                 yield_uom: recipe.yield_uom,
-                items: (recipe.items || []).map(i => {
-                    const isPacking = this.isPackingMaterial(i.raw_material_id);
+                items: (recipe.items || []).filter(i => !this.isPackingMaterial(i.raw_material_id)).map(i => {
+                    const isPacking = false;
                     const purityVal = i.purity || this.getPurityVal(i.raw_material_id) || 100;
-                    const rawFormulation = isPacking ? '' : ((parseFloat(i.quantity) * parseFloat(purityVal)) / parseFloat(recipe.yield_quantity));
+                    const rawFormulation = ((parseFloat(i.quantity) * parseFloat(purityVal)) / parseFloat(recipe.yield_quantity));
                     return {
                         raw_material_id: i.raw_material_id,
                         quantity: i.quantity,
@@ -876,11 +872,27 @@ function bomApp() {
                         rm_type_filter: '',
                         is_packing: isPacking,
                         is_solvent: false,
-                        is_technical: !isPacking && this.isTechnical(i.raw_material_id)
+                        is_technical: this.isTechnical(i.raw_material_id)
                     };
-                })
+                }),
+                packing_materials: (recipe.packing_materials || []).map(p => ({
+                    pricelist_id: p.pricelist_id,
+                    raw_material_id: p.raw_material_id,
+                    quantity: p.quantity
+                }))
             };
             this.bomModal.show = true;
+        },
+
+        addPackingRow(pricelistId) {
+            if (!this.bomModal.form.packing_materials) {
+                this.bomModal.form.packing_materials = [];
+            }
+            this.bomModal.form.packing_materials.push({
+                pricelist_id: pricelistId,
+                raw_material_id: '',
+                quantity: ''
+            });
         },
 
         nextStep() {
@@ -928,7 +940,8 @@ function bomApp() {
         },
 
         async submitBom() {
-            const cleanItems = this.bomModal.form.items.filter(i => i.raw_material_id);
+            const cleanItems = this.bomModal.form.items.filter(i => i.raw_material_id && !i.is_packing);
+            const cleanPMs = (this.bomModal.form.packing_materials || []).filter(p => p.raw_material_id && p.quantity);
             if (!this.bomModal.form.finished_product_id || !this.bomModal.form.yield_quantity || cleanItems.length === 0) {
                 alert('Please fill all required fields and add at least one item.');
                 return;
@@ -937,8 +950,8 @@ function bomApp() {
             // Validate total ingredients quantity against batch size
             const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
             const sumIngredients = this.getUsedIngredientsQty();
-            if (sumIngredients > batchQty + 0.001) {
-                alert(`Total ingredients quantity (${sumIngredients.toFixed(4)}) cannot exceed the Batch Quantity (${batchQty}).`);
+            if (sumIngredients > batchQty + 0.01) {
+                alert(`Total ingredients quantity (${sumIngredients.toFixed(2)}) cannot exceed the Batch Quantity (${batchQty}).`);
                 return;
             }
             
@@ -946,8 +959,8 @@ function bomApp() {
             const isEdit = !!this.bomModal.editId;
             const url    = isEdit ? `{{ url('costing-boms') }}/${this.bomModal.editId}` : '{{ route('costing.boms.store') }}';
             const method = isEdit ? 'PUT' : 'POST';
-
-            const submissionForm = { ...this.bomModal.form, items: cleanItems };
+ 
+            const submissionForm = { ...this.bomModal.form, items: cleanItems, packing_materials: cleanPMs };
 
             try {
                 const resp = await fetch(url, {

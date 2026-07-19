@@ -37,4 +37,9 @@ class CostingBom extends Model
     {
         return $this->hasMany(CostingBomItem::class, 'costing_bom_id');
     }
+
+    public function packingMaterials(): HasMany
+    {
+        return $this->hasMany(CostingBomPackingMaterial::class, 'costing_bom_id');
+    }
 }
