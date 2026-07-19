@@ -517,7 +517,6 @@
                             </template>
                         </div>
                     </div>
-                </div>
 
                 {{-- Step 4: Packing Materials --}}
                 <div x-show="bomModal.step === 4" class="space-y-5" x-transition>
