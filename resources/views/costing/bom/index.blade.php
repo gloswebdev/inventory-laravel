@@ -307,10 +307,10 @@
                         <div class="col-span-12 md:col-span-8">
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Finished Product *</label>
                             <select x-model="bomModal.form.finished_product_id"
-                                    class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none font-medium" required>
+                                    class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer" required>
                                 <option value="">Select Finished Good</option>
-                                <template x-for="p in filteredFGs" :key="p.id">
-                                    <option :value="p.id" x-text="p.name + (p.pack_name ? ' ['+p.pack_name+']' : '') + ' ('+p.item_code+')'"></option>
+                                <template x-for="(p, index) in filteredFGs" :key="p.id">
+                                    <option :value="p.id" x-text="(index + 1) + '. ' + p.name + (p.pack_name ? ' ['+p.pack_name+']' : '') + ' ('+p.item_code+')'"></option>
                                 </template>
                             </select>
                         </div>
@@ -396,11 +396,11 @@
                                      class="grid grid-cols-12 gap-2 p-3 border rounded-xl items-center transition-all duration-200">
                                     <div class="col-span-7">
                                         <select x-model="item.raw_material_id"
-                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
+                                                class="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer">
                                             <option value="">Select Raw Material</option>
-                                            <template x-for="rm in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
+                                            <template x-for="(rm, index) in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
                                                 <option :value="rm.id" :selected="rm.id == item.raw_material_id"
-                                                         x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                         x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                             </template>
                                         </select>
                                         <div class="mt-1.5 flex flex-wrap gap-2 items-center">
@@ -498,19 +498,17 @@
                             <button type="button" @click="addRMRow(true)"
                                     class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
                                 <i class="fas fa-plus-circle text-xs"></i> Add Row
-                            </button>
-                        </div>
 
                         <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                             <template x-for="(item, idx) in bomModal.form.items.filter(i => i.is_packing)" :key="idx">
                                 <div class="grid grid-cols-12 gap-2 p-3 bg-amber-50/50 border border-amber-100 rounded-xl items-center">
                                     <div class="col-span-7">
                                         <select x-model="item.raw_material_id"
-                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold">
+                                                class="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer">
                                             <option value="">Select Packing Material</option>
-                                            <template x-for="rm in getFilteredRMs('', true)" :key="rm.id">
+                                            <template x-for="(rm, index) in getFilteredRMs('', true)" :key="rm.id">
                                                 <option :value="rm.id" :selected="rm.id == item.raw_material_id"
-                                                        x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                        x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                             </template>
                                         </select>
                                     </div>
