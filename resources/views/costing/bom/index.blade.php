@@ -178,7 +178,7 @@
                         <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             @if(Auth::user()->hasPermission('costing', 'edit'))
                             <button type="button"
-                                    data-bom='@json($bom->load("items"))'
+                                    data-bom='@json($bom->load(["items", "packingMaterials"]))'
                                     @click="editBomFromData($event.currentTarget.getAttribute('data-bom'))"
                                     class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50 flex items-center justify-center transition-all shadow-sm">
                                 <i class="fas fa-edit text-xs"></i>
