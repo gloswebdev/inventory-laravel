@@ -577,7 +577,10 @@
                 </template>
 
                 <template x-if="bomModal.step < 4">
-                    <button @click="nextStep()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 flex items-center justify-center gap-1">
+                    <button @click="nextStep()"
+                            :disabled="bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.0001"
+                            :class="(bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.0001) ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-amber-500 hover:bg-amber-600'"
+                            class="flex-1 py-3 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 flex items-center justify-center gap-1">
                         Next <i class="fas fa-chevron-right text-xs"></i>
                     </button>
                 </template>

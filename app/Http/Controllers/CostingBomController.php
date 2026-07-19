@@ -178,6 +178,17 @@ class CostingBomController extends Controller
                     'quantity'        => $item['quantity'],
                     'purity'          => $item['purity'] ?? null,
                 ]);
+
+                // Save manually entered purity to product_prices if provided
+                if (!empty($item['purity'])) {
+                    $product = Product::find($item['raw_material_id']);
+                    if ($product && !empty($product->item_code)) {
+                        \App\Models\ProductPrice::updateOrCreate(
+                            ['item_code' => $product->item_code],
+                            ['purity' => $item['purity']]
+                        );
+                    }
+                }
             }
         });
 
@@ -251,6 +262,17 @@ class CostingBomController extends Controller
                     'quantity'        => $item['quantity'],
                     'purity'          => $item['purity'] ?? null,
                 ]);
+
+                // Save manually entered purity to product_prices if provided
+                if (!empty($item['purity'])) {
+                    $product = Product::find($item['raw_material_id']);
+                    if ($product && !empty($product->item_code)) {
+                        \App\Models\ProductPrice::updateOrCreate(
+                            ['item_code' => $product->item_code],
+                            ['purity' => $item['purity']]
+                        );
+                    }
+                }
             }
         });
 
