@@ -244,7 +244,8 @@
                     </div>
                     <div>
                         <div class="font-black text-lg tracking-tight" x-text="bomModal.editId ? 'Edit Costing BOM' : 'New Costing BOM'"></div>
-                        <div class="text-[10px] font-bold uppercase tracking-widest text-white/70">Independent Costing Formula</div>
+                        <div class="text-[10px] font-bold uppercase tracking-widest text-white/70" x-show="!bomModal.form.finished_product_id">Independent Costing Formula</div>
+                        <div class="text-[11px] font-extrabold text-amber-50 truncate max-w-[350px] uppercase tracking-wider" x-show="bomModal.form.finished_product_id" x-text="getFinishedProductName(bomModal.form.finished_product_id)"></div>
                     </div>
                 </div>
                 <button @click="bomModal.show = false" class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition">
@@ -305,7 +306,7 @@
                             </select>
                         </div>
                         <div class="col-span-12 md:col-span-8">
-                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Finished Product *</label>
+                            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Bom Container *</label>
                             <select x-model="bomModal.form.finished_product_id"
                                     class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer" required>
                                 <option value="">Select Finished Good</option>
@@ -693,6 +694,11 @@ function bomApp() {
                 return matches.map(m => m[1] + '%').join(' + ');
             }
             return '100%';
+        },
+
+        getFinishedProductName(id) {
+            const fg = __finishedGoods.find(f => f.id == id);
+            return fg ? fg.name + (fg.pack_name ? ' ['+fg.pack_name+']' : '') : '';
         },
 
         getFormulationList(fgId) {
