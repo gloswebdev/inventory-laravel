@@ -391,12 +391,14 @@
                                     <option :value="t" x-text="t"></option>
                                 </template>
                             </select>
-                                      <template x-for="(item, idx) in bomModal.form.items.filter(i => !i.is_packing)" :key="idx">
-                                <div x-effect="if (isTechnical(item.raw_material_id)) { item.quantity = calculateSuggestedQty(item); } else if (item.is_solvent) { item.quantity = calculateRemainingQty(item); }"
+                        </div>
+                        <template x-for="(item, idx) in bomModal.form.items.filter(i => !i.is_packing)" :key="idx">
+                                <div x-effect="if (item.raw_material_id) { const isTech = isTechnical(item.raw_material_id); if (isTech && item.is_technical === '') { item.is_technical = true; } } if (item.is_technical) { item.quantity = calculateSuggestedQty(item); } else if (item.is_solvent) { item.quantity = calculateRemainingQty(item); }"
                                      :class="item.is_solvent ? 'bg-indigo-50/40 border-indigo-300 ring-2 ring-indigo-100/50' : 'bg-amber-50/50 border-amber-100'"
                                      class="grid grid-cols-12 gap-2 p-3 border rounded-xl items-center transition-all duration-200">
                                     <div class="col-span-7">
                                         <select x-model="item.raw_material_id"
+                                                @change="if (isTechnical(item.raw_material_id)) { item.is_technical = true; } else { item.is_technical = false; }"
                                                 class="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer">
                                             <option value="">Select Raw Material</option>
                                             <template x-for="(rm, index) in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
@@ -408,14 +410,22 @@
                                             <label :class="item.is_solvent ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200'"
                                                    class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
                                                 <input type="radio" name="solvent_radio" :checked="item.is_solvent"
-                                                       @click.prevent="toggleSolvent(item)"
+                                                       @click.prevent="toggleSolvent(item); if (item.is_solvent) { item.is_technical = false; }"
                                                        :class="item.is_solvent ? 'text-indigo-600 focus:ring-indigo-500' : 'text-amber-600 focus:ring-amber-500'"
                                                        class="w-3 h-3 border-slate-300">
                                                 Solvent
                                             </label>
 
-                                            <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
-                                                <div class="flex flex-col gap-2 mt-1.5">
+                                            <label :class="item.is_technical ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200'"
+                                                   class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
+                                                <input type="checkbox" :checked="item.is_technical"
+                                                       @click="item.is_technical = !item.is_technical; if (item.is_technical) { item.is_solvent = false; item.quantity = calculateSuggestedQty(item); }"
+                                                       class="w-3 h-3 border-slate-300 rounded text-amber-600 focus:ring-amber-500">
+                                                Technical
+                                            </label>
+
+                                            <template x-if="item.raw_material_id && item.is_technical">
+                                                <div class="flex flex-col gap-2 mt-1.5 w-full">
                                                     <div class="flex flex-wrap gap-2 items-center">
                                                         <!-- Show fetched purity if not null -->
                                                         <template x-if="getPurityVal(item.raw_material_id) !== null">
@@ -460,16 +470,16 @@
                                     <div class="col-span-3">
                                         <input type="number" step="0.001" x-model="item.quantity"
                                                placeholder="Qty"
-                                               :readonly="isTechnical(item.raw_material_id) || item.is_solvent"
-                                               :class="(isTechnical(item.raw_material_id) || item.is_solvent) ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''"
+                                               :readonly="item.is_technical || item.is_solvent"
+                                               :class="(item.is_technical || item.is_solvent) ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''"
                                                class="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
-                                        <template x-if="isTechnical(item.raw_material_id)">
+                                        <template x-if="item.is_technical">
                                             <div class="text-[9px] text-emerald-600 mt-1 text-center font-bold">Auto-calculated</div>
                                         </template>
                                         <template x-if="item.is_solvent">
                                             <div class="text-[9px] text-indigo-600 mt-1 text-center font-bold">Solvent (Balance)</div>
                                         </template>
-                                        <template x-if="!isTechnical(item.raw_material_id) && !item.is_solvent">
+                                        <template x-if="!item.is_technical && !item.is_solvent">
                                             <div class="text-[9px] text-indigo-600 hover:text-indigo-800 mt-1 text-center cursor-pointer font-black select-none"
                                                  @click="item.quantity = calculateSuggestedQty(item)"
                                                  title="Click to apply: Batch Quantity * Formulation / Purity">
@@ -797,7 +807,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false }] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }] };
             this.bomModal.show = true;
         },
 
@@ -825,7 +835,8 @@ function bomApp() {
                         formulation: rawFormulation ? parseFloat(rawFormulation.toFixed(3)) : '',
                         rm_type_filter: '',
                         is_packing: isPacking,
-                        is_solvent: false
+                        is_solvent: false,
+                        is_technical: !isPacking && this.isTechnical(i.raw_material_id)
                     };
                 })
             };
@@ -873,7 +884,7 @@ function bomApp() {
         },
 
         addRMRow(isPacking = false) {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '' });
         },
 
         async submitBom() {
