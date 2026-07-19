@@ -33,7 +33,14 @@ class ProductPrice extends Model
      */
     public static function allAsMap(): array
     {
-        return static::pluck('price_per_unit', 'item_code')->toArray();
+        $localPrices = static::pluck('price_per_unit', 'item_code')->toArray();
+        $prPrices = \App\Models\PurchaseRegister::orderByDesc('vouch_date')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('item_code')
+            ->pluck('case_rate', 'item_code')
+            ->toArray();
+        return array_merge($prPrices, $localPrices);
     }
 
     /**
