@@ -547,23 +547,34 @@
                             <div class="space-y-2">
                                 <template x-for="(pm, idx) in bomModal.form.packing_materials.filter(p => p.pricelist_id == fg.id)" :key="idx">
                                     <div class="grid grid-cols-12 gap-2 p-2 bg-slate-50/50 border border-slate-100 rounded-xl items-center">
-                                        <div class="col-span-8">
+                                        <div class="col-span-5 space-y-1">
+                                            <input type="text" x-model="pm.search" placeholder="Search material..."
+                                                   class="w-full px-2 py-1 text-[10px] border border-slate-200 rounded-lg outline-none font-semibold text-slate-600 bg-white placeholder-slate-400">
                                             <select x-model="pm.raw_material_id"
-                                                    class="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white">
-                                                <option value="">Select Packing Material</option>
-                                                <template x-for="(rm, index) in getFilteredRMs('', true)" :key="rm.id">
-                                                    <option :value="rm.id" x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                    class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white">
+                                                <option value="">Select Material</option>
+                                                <template x-for="(rm, index) in getSearchedPackingMaterials(pm.search)" :key="rm.id">
+                                                    <option :value="rm.id" x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                                 </template>
                                             </select>
+                                        </div>
+                                        <div class="col-span-2 flex flex-col items-center gap-1">
+                                            <div class="flex items-center gap-1">
+                                                <input type="checkbox" x-model="pm.is_container" class="rounded text-amber-500 focus:ring-amber-500/20 w-3 h-3 cursor-pointer">
+                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest cursor-pointer select-none" @click="pm.is_container = !pm.is_container">Container</span>
+                                            </div>
+                                            <div class="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded" x-show="pm.raw_material_id">
+                                                Rate: <span class="text-indigo-600 font-extrabold" x-text="'₹' + getPmRate(pm.raw_material_id, pm.is_container, fg.cf_1)"></span>
+                                            </div>
                                         </div>
                                         <div class="col-span-3">
                                             <input type="number" step="0.001" x-model="pm.quantity"
                                                    placeholder="Qty"
                                                    class="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-1 focus:ring-amber-400 outline-none font-bold text-center">
                                         </div>
-                                        <div class="col-span-1 flex justify-center">
+                                        <div class="col-span-2 flex justify-center">
                                             <button type="button" @click="bomModal.form.packing_materials.splice(bomModal.form.packing_materials.indexOf(pm), 1)"
-                                                    class="w-6 h-6 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition">
+                                                    class="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition border border-slate-100">
                                                 <i class="fas fa-trash-alt text-[10px]"></i>
                                             </button>
                                         </div>
@@ -901,7 +912,9 @@ function bomApp() {
                 packing_materials: (recipe.packing_materials || []).map(p => ({
                     pricelist_id: p.pricelist_id,
                     raw_material_id: p.raw_material_id,
-                    quantity: p.quantity
+                    quantity: p.quantity,
+                    is_container: p.is_container || false,
+                    search: ''
                 }))
             };
             this.bomModal.show = true;
@@ -914,7 +927,9 @@ function bomApp() {
             this.bomModal.form.packing_materials.push({
                 pricelist_id: pricelistId,
                 raw_material_id: '',
-                quantity: ''
+                quantity: '',
+                is_container: false,
+                search: ''
             });
         },
 
