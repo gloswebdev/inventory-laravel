@@ -114,7 +114,10 @@ class CostingBomController extends Controller
 
         $purities = array_merge($bomPurities, $pricePurities, $prPurities);
 
-        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities'));
+        $pricelists = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
+            ->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
+
+        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists'));
     }
 
     public function store(Request $request)

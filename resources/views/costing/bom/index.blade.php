@@ -521,6 +521,30 @@
 
                 {{-- Step 4: Packing Materials --}}
                 <div x-show="bomModal.step === 4" class="space-y-5" x-transition>
+                    <!-- Linked Finished Goods Reference Card -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
+                        <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+                            <i class="fas fa-box-open text-amber-500 text-xs animate-none"></i> Linked Finished Goods (FG) by Pack Size
+                        </div>
+                        <div class="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                            <template x-for="fg in getLinkedPricelistItems(bomModal.form.finished_product_id)" :key="fg.id">
+                                <div class="flex items-center justify-between bg-white border border-slate-200 p-2.5 rounded-lg text-xs shadow-xs hover:border-amber-200 transition-all">
+                                    <div class="font-extrabold text-slate-700 uppercase" x-text="fg.item_hd_name"></div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-[9px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded" x-text="fg.user_code"></span>
+                                        <span class="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded" x-text="'Size: ' + fg.size"></span>
+                                        <span class="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded" x-text="'CF1: ' + (parseFloat(fg.cf_1) || 0)"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="getLinkedPricelistItems(bomModal.form.finished_product_id).length === 0">
+                                <div class="text-[11px] text-slate-400 font-bold text-center py-4 bg-white border border-dashed rounded-lg">
+                                    No linked Finished Goods found in Pricelist Master.
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <div>
@@ -530,6 +554,8 @@
                             <button type="button" @click="addRMRow(true)"
                                     class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 font-black text-xs rounded-lg hover:bg-amber-100 transition-all">
                                 <i class="fas fa-plus-circle text-xs"></i> Add Row
+                            </button>
+                        </div>
 
                         <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                             <template x-for="(item, idx) in bomModal.form.items.filter(i => i.is_packing)" :key="idx">
@@ -642,6 +668,7 @@ const __rawMaterials  = @json($rawMaterials);
 const __bomIds        = @json($boms->pluck('id'));
 const __purities      = @json($purities);
 const __types         = @json(\App\Models\ProductType::all());
+const __pricelists    = @json($pricelists ?? []);
 
 function bomApp() {
     return {
@@ -712,6 +739,17 @@ function bomApp() {
         getFinishedProductName(id) {
             const fg = __finishedGoods.find(f => f.id == id);
             return fg ? fg.name + (fg.pack_name ? ' ['+fg.pack_name+']' : '') : '';
+        },
+
+        getLinkedPricelistItems(fgId) {
+            const fg = __finishedGoods.find(f => f.id == fgId);
+            if (!fg) return [];
+            const baseComposition = fg.name.replace(/\[[^\]]+\]/g, '').trim().toLowerCase();
+            return (__pricelists || []).filter(p => {
+                const hdName = (p.item_hd_name || '').toLowerCase();
+                const grp3 = (p.group3 || '').toLowerCase();
+                return hdName.includes(baseComposition) || grp3.includes(baseComposition);
+            });
         },
 
         getFormulationList(fgId) {
