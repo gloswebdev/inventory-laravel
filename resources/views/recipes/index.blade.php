@@ -207,10 +207,10 @@
                     </div>
                     <div>
                         <label class="block text-gray-700 text-[10px] font-black uppercase tracking-widest mb-1">Finished Product</label>
-                        <select name="finished_product_id" id="finished_product_id" class="w-full border border-gray-200 rounded-lg py-1.5 px-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition" required>
+                        <select name="finished_product_id" id="finished_product_id" class="w-full border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all cursor-pointer" required>
                             <option value="">Select Finished Good</option>
-                            @foreach($finishedGoods as $product)
-                                <option value="{{ $product->id }}" data-type="{{ $product->product_type_id }}">{{ $product->name }} ({{ $product->pack_name }}) ({{ $product->uom }})</option>
+                            @foreach($finishedGoods as $index => $product)
+                                <option value="{{ $product->id }}" data-type="{{ $product->product_type_id }}">{{ $index + 1 }}. {{ $product->name }} ({{ $product->pack_name }}) ({{ $product->uom }})</option>
                             @endforeach
                         </select>
                     </div>
@@ -293,7 +293,7 @@
     // Store all options as arrays for filtering
     const allFinishedProducts = Array.from(document.querySelectorAll('#finished_product_id option')).map(opt => ({
         id: opt.value,
-        text: opt.text,
+        text: opt.text.replace(/^\d+\.\s*/, ''),
         type: opt.dataset.type
     }));
 
@@ -308,15 +308,17 @@
         const currentValue = select.value;
         select.innerHTML = '<option value="">Select Finished Good</option>';
         
+        let counter = 1;
         allFinishedProducts.forEach(prod => {
             if (prod.id === "") return;
             if (!typeId || prod.type == typeId) {
                 const opt = document.createElement('option');
                 opt.value = prod.id;
-                opt.text = prod.text;
+                opt.text = `${counter}. ${prod.text}`;
                 opt.dataset.type = prod.type;
                 if (prod.id == currentValue) opt.selected = true;
                 select.appendChild(opt);
+                counter++;
             }
         });
     }
@@ -332,13 +334,15 @@
 
     function populateRMSelect(select, typeId, currentValue = '') {
         select.innerHTML = '<option value="">Select Raw Material</option>';
+        let counter = 1;
         allRawMaterials.forEach(rm => {
             if (!typeId || rm.type == typeId) {
                 const opt = document.createElement('option');
                 opt.value = rm.id;
-                opt.text = `${rm.name} (${rm.pack}) (${rm.uom})`;
+                opt.text = `${counter}. ${rm.name} (${rm.pack}) (${rm.uom})`;
                 if (rm.id == currentValue) opt.selected = true;
                 select.appendChild(opt);
+                counter++;
             }
         });
     }
@@ -350,7 +354,7 @@
         div.className = 'grid grid-cols-12 gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm items-center transition hover:border-blue-200';
         div.innerHTML = `
             <div class="col-span-8">
-                <select name="items[${itemIndex}][raw_material_id]" class="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none transition" required>
+                <select name="items[${itemIndex}][raw_material_id]" class="w-full border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all cursor-pointer" required>
                 </select>
             </div>
             <div class="col-span-3">
