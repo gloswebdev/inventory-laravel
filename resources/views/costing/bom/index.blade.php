@@ -553,8 +553,8 @@
                                             <select x-model="pm.raw_material_id"
                                                     class="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white">
                                                 <option value="">Select Material</option>
-                                                <template x-for="(rm, index) in getSearchedPackingMaterials(pm.search)" :key="rm.id">
-                                                    <option :value="rm.id" x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                <template x-for="(rm, index) in getSearchedPackingMaterials(pm.search, pm.raw_material_id)" :key="rm.id">
+                                                    <option :value="rm.id" :selected="rm.id == pm.raw_material_id" x-text="rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
                                                 </template>
                                             </select>
                                         </div>
@@ -759,11 +759,12 @@ function bomApp() {
             });
         },
 
-        getSearchedPackingMaterials(query = '') {
+        getSearchedPackingMaterials(query = '', selectedId = null) {
             const list = __rawMaterials.filter(r => this.isPackingMaterial(r.id));
             if (!query) return list;
             const q = query.toLowerCase();
             return list.filter(r => {
+                if (selectedId && r.id == selectedId) return true;
                 const name = (r.name || '').toLowerCase();
                 const code = (r.item_code || '').toLowerCase();
                 return name.includes(q) || code.includes(q);
