@@ -24,7 +24,7 @@ class CostingController extends Controller
      */
     public function index(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pro', 'view')) {
             abort(403, 'Access denied to Costing module.');
         }
 
@@ -36,7 +36,7 @@ class CostingController extends Controller
      */
     public function show(Product $product)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pro', 'view')) {
             abort(403);
         }
 
@@ -60,7 +60,7 @@ class CostingController extends Controller
      */
     public function calculate(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pro', 'view')) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -266,7 +266,7 @@ class CostingController extends Controller
      */
     public function export(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pro', 'view')) {
             abort(403);
         }
 
@@ -329,7 +329,7 @@ class CostingController extends Controller
      */
     public function pro(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pro', 'view')) {
             abort(403, 'Access denied to Costing Pro.');
         }
 
@@ -444,7 +444,7 @@ class CostingController extends Controller
 
     public function purchaseRegister(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_purchase', 'view')) {
             abort(403, 'Access denied to Purchase Register module.');
         }
 
@@ -559,7 +559,7 @@ class CostingController extends Controller
      */
     public function syncPurchaseRegister(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_purchase', 'view')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -657,7 +657,7 @@ class CostingController extends Controller
      */
     public function saveSyncSettings(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_purchase', 'view')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -684,7 +684,7 @@ class CostingController extends Controller
      */
     public function pricelist(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pricelist', 'view')) {
             abort(403, 'Access denied to Pricelist module.');
         }
 
@@ -725,7 +725,7 @@ class CostingController extends Controller
      */
     public function syncPricelist(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pricelist', 'view')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -834,7 +834,7 @@ class CostingController extends Controller
      */
     public function savePricelistSyncSettings(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_pricelist', 'view')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 

@@ -38,6 +38,10 @@ class UserController extends Controller
         'mobile_settings' => 'Mobile: System Settings',
         'mobile_purchase_report' => 'Mobile: Purchase Report',
         'costing'       => 'Costing Manager',
+        'costing_bom'   => 'Costing BOMs',
+        'costing_pro'   => 'Costing Pro',
+        'costing_purchase' => 'Purchase Register',
+        'costing_pricelist' => 'Pricelist',
         'mobile_costing' => 'Mobile: Costing',
     ];
 
@@ -130,7 +134,12 @@ class UserController extends Controller
         ],
         'costing' => [
             'fetch_prices' => 'Sync Prices from ERP/Product Master',
-            'export'       => 'Export Cost Report (PDF)',
+        ],
+        'costing_bom' => [
+            'duplicate' => 'Duplicate BOM',
+        ],
+        'costing_pro' => [
+            'export' => 'Export Cost Report (PDF)',
         ],
         'mobile_costing' => [
             'calculate' => 'Calculate Batch Cost',

@@ -22,7 +22,7 @@
             </div>
         </div>
         <div class="flex gap-2 flex-wrap items-center">
-            @if(Auth::user()->hasPermission('costing', 'create'))
+            @if(Auth::user()->hasPermission('costing_bom', 'create'))
             <button @click="openBomModal()" class="bom-btn-gradient text-white text-sm font-bold py-2.5 px-5 rounded-xl transition-all flex items-center gap-2">
                 <i class="fas fa-plus"></i> Add Costing BOM
             </button>
@@ -84,7 +84,7 @@
     </div>
 
     {{-- Bulk Actions --}}
-    @if(Auth::user()->hasPermission('costing', 'delete'))
+    @if(Auth::user()->hasPermission('costing_bom', 'delete'))
     <div id="bulkActions" class="bg-white px-6 py-3 border border-slate-100 rounded-2xl mb-4 flex items-center gap-3 shadow-sm" x-show="selectedIds.length > 0" x-cloak>
         <span class="text-xs font-bold text-slate-500">Selected <span class="text-amber-600 font-black" x-text="selectedIds.length"></span> items</span>
         <button @click="bulkDelete()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold py-1.5 px-4 rounded-lg transition-colors flex items-center gap-2">
@@ -176,7 +176,7 @@
                     </td>
                     <td class="py-3 px-5 text-right whitespace-nowrap">
                         <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            @if(Auth::user()->hasPermission('costing', 'edit'))
+                            @if(Auth::user()->hasPermission('costing_bom', 'edit'))
                             <button type="button"
                                     data-bom='@json($bom->load(["items", "packingMaterials"]))'
                                     @click="editBomFromData($event.currentTarget.getAttribute('data-bom'))"
@@ -184,7 +184,7 @@
                                 <i class="fas fa-edit text-xs"></i>
                             </button>
                             @endif
-                            @if(Auth::user()->hasPermission('costing', 'create'))
+                            @if(Auth::user()->hasPermission('costing_bom', 'create'))
                             <button type="button"
                                     @click="openDuplicateModal({{ $bom->id }}, '{{ addslashes($bom->finishedProduct->name ?? '') }}')"
                                     class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm"
@@ -192,7 +192,7 @@
                                 <i class="fas fa-copy text-xs"></i>
                             </button>
                             @endif
-                            @if(Auth::user()->hasPermission('costing', 'delete'))
+                            @if(Auth::user()->hasPermission('costing_bom', 'delete'))
                             <button type="button"
                                     @click="deleteBom({{ $bom->id }})"
                                     class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 flex items-center justify-center transition-all shadow-sm">
@@ -209,7 +209,7 @@
                             <i class="fas fa-flask text-2xl text-amber-300"></i>
                         </div>
                         <p class="text-slate-500 font-bold mb-2">No costing BOMs found.</p>
-                        @if(Auth::user()->hasPermission('costing', 'create'))
+                        @if(Auth::user()->hasPermission('costing_bom', 'create'))
                         <button @click="openBomModal()" class="px-5 py-2 bg-amber-500 text-white font-black rounded-xl text-sm shadow">
                             <i class="fas fa-plus mr-2"></i> Create First Costing BOM
                         </button>

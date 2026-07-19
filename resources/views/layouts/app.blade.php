@@ -421,7 +421,7 @@
             </div>
             @endif
 
-            @if(Auth::user()->hasPermission('costing', 'view'))
+            @if(Auth::user()->hasPermission('costing', 'view') || Auth::user()->hasPermission('costing_bom', 'view') || Auth::user()->hasPermission('costing_pro', 'view') || Auth::user()->hasPermission('costing_purchase', 'view') || Auth::user()->hasPermission('costing_pricelist', 'view'))
             <div x-data="{ open: {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist')) ? 'true' : 'false' }} }">
                 <button @click="open = !open"
                     class="nav-link link-costing w-[calc(100%-20px)] justify-between {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist')) ? 'active' : '' }}">
@@ -435,18 +435,26 @@
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 -translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0">
+                    @if(Auth::user()->hasPermission('costing_bom', 'view'))
                     <a href="{{ route('costing.boms.index') }}" class="sub-nav-link {{ request()->routeIs('costing.boms.*') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Costing BOMs
                     </a>
+                    @endif
+                    @if(Auth::user()->hasPermission('costing_pro', 'view'))
                     <a href="{{ route('costing.pro') }}" class="sub-nav-link {{ request()->routeIs('costing.pro') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Costing Pro
                     </a>
+                    @endif
+                    @if(Auth::user()->hasPermission('costing_purchase', 'view'))
                     <a href="{{ route('costing.purchase-register') }}" class="sub-nav-link {{ request()->routeIs('costing.purchase-register') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Purchase Register
                     </a>
+                    @endif
+                    @if(Auth::user()->hasPermission('costing_pricelist', 'view'))
                     <a href="{{ route('costing.pricelist') }}" class="sub-nav-link {{ request()->routeIs('costing.pricelist') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Pricelist
                     </a>
+                    @endif
                 </div>
             </div>
             @endif

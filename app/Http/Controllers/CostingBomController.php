@@ -14,7 +14,7 @@ class CostingBomController extends Controller
 {
     public function index(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'view')) {
             abort(403, 'Access denied to Costing BOM module.');
         }
 
@@ -131,7 +131,7 @@ class CostingBomController extends Controller
 
     public function store(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'create')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'create')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -229,7 +229,7 @@ class CostingBomController extends Controller
 
     public function update(Request $request, CostingBom $costingBom)
     {
-        if (!Auth::user()->hasPermission('costing', 'edit')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'edit')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -331,7 +331,7 @@ class CostingBomController extends Controller
 
     public function destroy(CostingBom $costingBom)
     {
-        if (!Auth::user()->hasPermission('costing', 'delete')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'delete')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -348,7 +348,7 @@ class CostingBomController extends Controller
 
     public function bulkDelete(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'delete')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'delete')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -367,7 +367,7 @@ class CostingBomController extends Controller
 
     public function duplicate(Request $request, CostingBom $costingBom)
     {
-        if (!Auth::user()->hasPermission('costing', 'create')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'create')) {
             return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -419,7 +419,7 @@ class CostingBomController extends Controller
 
     public function export(Request $request)
     {
-        if (!Auth::user()->hasPermission('costing', 'view')) {
+        if (!Auth::user()->hasPermission('costing_bom', 'view')) {
             abort(403);
         }
 
