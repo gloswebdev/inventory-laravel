@@ -408,7 +408,7 @@
                                         </select>
                                         <div class="mt-1.5 flex flex-wrap gap-2 items-center">
                                             <label :class="item.is_solvent ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200'"
-                                                   class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
+                                                    class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
                                                 <input type="radio" name="solvent_radio" :checked="item.is_solvent"
                                                        @click.prevent="toggleSolvent(item); if (item.is_solvent) { item.is_technical = false; }"
                                                        :class="item.is_solvent ? 'text-indigo-600 focus:ring-indigo-500' : 'text-amber-600 focus:ring-amber-500'"
@@ -417,12 +417,23 @@
                                             </label>
 
                                             <label :class="item.is_technical ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200'"
-                                                   class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
+                                                    class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
                                                 <input type="checkbox" :checked="item.is_technical"
                                                        @click="item.is_technical = !item.is_technical; if (item.is_technical) { item.is_solvent = false; item.quantity = calculateSuggestedQty(item); }"
                                                        class="w-3 h-3 border-slate-300 rounded text-amber-600 focus:ring-amber-500">
                                                 Technical
                                             </label>
+
+                                            <template x-if="item.raw_material_id && getMaterialRate(item.raw_material_id) !== null">
+                                                <div class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg text-[9px] font-black shadow-sm">
+                                                    <i class="fas fa-tag"></i> Rate: <span x-text="'₹' + getMaterialRate(item.raw_material_id)"></span>
+                                                </div>
+                                            </template>
+                                            <template x-if="item.raw_material_id && getMaterialRate(item.raw_material_id) === null">
+                                                <div class="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg text-[9px] font-black">
+                                                    <i class="fas fa-tag"></i> Rate: Not Available
+                                                </div>
+                                            </template>
 
                                             <template x-if="item.raw_material_id && item.is_technical">
                                                 <div class="flex flex-col gap-2 mt-1.5 w-full">
@@ -780,6 +791,13 @@ function bomApp() {
                 rate = rate / divisor;
             }
             return parseFloat(rate.toFixed(2));
+        },
+
+        getMaterialRate(rmId) {
+            const rm = __rawMaterials.find(r => r.id == rmId);
+            if (!rm || !rm.item_code) return null;
+            let rate = parseFloat(__pmRates[rm.item_code]) || 0;
+            return rate > 0 ? parseFloat(rate.toFixed(2)) : null;
         },
 
         getFormulationList(fgId) {
