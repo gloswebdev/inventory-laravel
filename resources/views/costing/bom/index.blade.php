@@ -414,23 +414,44 @@
                                             </label>
 
                                             <template x-if="item.raw_material_id && isTechnical(item.raw_material_id)">
-                                                <div class="flex flex-wrap gap-2 items-center">
-                                                    <!-- Show fetched purity if not null -->
-                                                    <template x-if="getPurityVal(item.raw_material_id) !== null">
-                                                        <div class="text-[9px] text-amber-700 font-black bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
-                                                            <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
-                                                        </div>
-                                                    </template>
+                                                <div class="flex flex-col gap-2 mt-1.5">
+                                                    <div class="flex flex-wrap gap-2 items-center">
+                                                        <!-- Show fetched purity if not null -->
+                                                        <template x-if="getPurityVal(item.raw_material_id) !== null">
+                                                            <div class="text-[9px] text-amber-700 font-black bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg inline-block">
+                                                                <i class="fas fa-percent"></i> Purity (fetched): <span x-text="getPurity(item.raw_material_id)"></span>
+                                                            </div>
+                                                        </template>
+                                                        
+                                                        <!-- Show manual purity input if fetched is null -->
+                                                        <template x-if="getPurityVal(item.raw_material_id) === null">
+                                                            <div class="flex items-center gap-1">
+                                                                <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
+                                                                <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
+                                                                       @input="item.quantity = calculateSuggestedQty(item)"
+                                                                       class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                                       placeholder="100">
+                                                            </div>
+                                                        </template>
+                                                    </div>
                                                     
-                                                    <!-- Show manual purity input if fetched is null -->
-                                                    <template x-if="getPurityVal(item.raw_material_id) === null">
+                                                    <!-- Formulation selection / input -->
+                                                    <div class="flex flex-wrap items-center gap-2">
                                                         <div class="flex items-center gap-1">
-                                                            <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Purity (%):</label>
-                                                            <input type="number" step="0.1" min="0.1" max="100" x-model="item.purity"
-                                                                   class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
-                                                                   placeholder="100">
+                                                            <label class="text-[9px] font-black text-indigo-700 uppercase tracking-wider block bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">Formulation (%):</label>
+                                                            <input type="number" step="0.001" min="0.001" max="100" x-model="item.formulation"
+                                                                   @input="item.quantity = calculateSuggestedQty(item)"
+                                                                   class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-indigo-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400 text-center text-indigo-800 bg-indigo-50/20"
+                                                                   placeholder="0.0">
                                                         </div>
-                                                    </template>
+                                                        <div class="flex flex-wrap gap-1">
+                                                            <template x-for="pct in getFormulationList(bomModal.form.finished_product_id)" :key="pct">
+                                                                <button type="button" @click="item.formulation = pct; item.quantity = calculateSuggestedQty(item)"
+                                                                        class="text-[9px] font-extrabold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 px-1.5 py-0.5 rounded border border-slate-200 hover:border-amber-300 transition-all shadow-sm animate-none"
+                                                                        x-text="pct + '%'"></button>
+                                                            </template>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </template>
                                         </div>
@@ -669,10 +690,16 @@ function bomApp() {
             if (!fg) return '';
             const matches = [...fg.name.matchAll(/(\d+(?:\.\d+)?)\s*%/g)];
             if (matches.length > 0) {
-                const total = matches.reduce((sum, m) => sum + parseFloat(m[1]), 0);
-                return total + '%';
+                return matches.map(m => m[1] + '%').join(' + ');
             }
             return '100%';
+        },
+
+        getFormulationList(fgId) {
+            const fg = __finishedGoods.find(f => f.id == fgId);
+            if (!fg) return [];
+            const matches = [...fg.name.matchAll(/(\d+(?:\.\d+)?)\s*%/g)];
+            return matches.map(m => parseFloat(m[1]));
         },
 
         getPurity(rmId) {
@@ -695,10 +722,13 @@ function bomApp() {
 
         calculateSuggestedQty(item) {
             const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
-            let formulation = parseFloat(this.bomModal.form.formulation);
-            if (isNaN(formulation)) {
-                const fgForm = this.getFormulation(this.bomModal.form.finished_product_id);
-                formulation = parseFloat(fgForm) || 0;
+            let formulation = parseFloat(item.formulation);
+            if (isNaN(formulation) || formulation <= 0) {
+                formulation = parseFloat(this.bomModal.form.formulation);
+            }
+            if (isNaN(formulation) || formulation <= 0) {
+                const fgFormList = this.getFormulationList(this.bomModal.form.finished_product_id);
+                formulation = fgFormList.length > 0 ? fgFormList[0] : 100;
             }
             let purity = 100;
             if (item && item.raw_material_id) {
@@ -761,7 +791,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: false, is_solvent: false }] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false }] };
             this.bomModal.show = true;
         },
 
@@ -778,14 +808,20 @@ function bomApp() {
                 density: recipe.density || '',
                 yield_quantity: recipe.yield_quantity,
                 yield_uom: recipe.yield_uom,
-                items: (recipe.items || []).map(i => ({
-                    raw_material_id: i.raw_material_id,
-                    quantity: i.quantity,
-                    purity: i.purity || '',
-                    rm_type_filter: '',
-                    is_packing: this.isPackingMaterial(i.raw_material_id),
-                    is_solvent: false
-                }))
+                items: (recipe.items || []).map(i => {
+                    const isPacking = this.isPackingMaterial(i.raw_material_id);
+                    const purityVal = i.purity || this.getPurityVal(i.raw_material_id) || 100;
+                    const rawFormulation = isPacking ? '' : ((parseFloat(i.quantity) * parseFloat(purityVal)) / parseFloat(recipe.yield_quantity));
+                    return {
+                        raw_material_id: i.raw_material_id,
+                        quantity: i.quantity,
+                        purity: i.purity || '',
+                        formulation: rawFormulation ? parseFloat(rawFormulation.toFixed(3)) : '',
+                        rm_type_filter: '',
+                        is_packing: isPacking,
+                        is_solvent: false
+                    };
+                })
             };
             this.bomModal.show = true;
         },
@@ -831,7 +867,7 @@ function bomApp() {
         },
 
         addRMRow(isPacking = false) {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false });
         },
 
         async submitBom() {
