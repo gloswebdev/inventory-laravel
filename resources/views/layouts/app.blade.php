@@ -278,7 +278,9 @@
 </head>
 <body class="bg-[#f4f7fc] text-slate-900 antialiased">
 
-<div class="flex h-screen overflow-hidden" x-data="{ showAccessModal: false, isFullscreen: false }" @fullscreenchange.window="isFullscreen = !!document.fullscreenElement">
+<div class="flex h-screen overflow-hidden" x-data="{ showAccessModal: false, isFullscreen: false, showFullscreenToast: false }" 
+     x-init="showFullscreenToast = (localStorage.getItem('wasFullscreen') === 'true' && !document.fullscreenElement)"
+     @fullscreenchange.window="isFullscreen = !!document.fullscreenElement; localStorage.setItem('wasFullscreen', isFullscreen ? 'true' : 'false')">
 
     {{-- ══════════════════════════════
          SIDEBAR
@@ -683,6 +685,30 @@
                     Close
                 </button>
             </div>
+        </div>
+    </div>
+
+    {{-- Resume Full Screen Toast --}}
+    <div x-show="showFullscreenToast && !isFullscreen" x-cloak
+         class="fixed bottom-6 right-6 z-[100] max-w-sm bg-white/95 border border-slate-200 p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white">
+                <i class="fas fa-expand text-white text-[10px]"></i>
+            </div>
+            <div>
+                <div class="text-xs font-black text-slate-800 uppercase tracking-tight">Full Screen Mode</div>
+                <div class="text-[10px] text-slate-500 font-bold">Resume full screen after update?</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button @click="document.documentElement.requestFullscreen(); showFullscreenToast = false;"
+                    class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm">
+                Resume
+            </button>
+            <button @click="showFullscreenToast = false; localStorage.setItem('wasFullscreen', 'false')" 
+                    class="text-slate-400 hover:text-slate-600 p-1">
+                <i class="fas fa-times text-xs"></i>
+            </button>
         </div>
     </div>
 
