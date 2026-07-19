@@ -131,8 +131,8 @@
                         <div class="flex items-center gap-2 mt-1">
                             @php 
                                 $typeName = $bom->finishedProduct->type->type_name ?? 'N/A'; 
-                                preg_match('/(\d+(?:\.\d+)?)\s*%/', $bom->finishedProduct->name ?? '', $matches);
-                                $formulation = isset($matches[1]) ? $matches[1] . '%' : '100%';
+                                preg_match_all('/(\d+(?:\.\d+)?)\s*%/', $bom->finishedProduct->name ?? '', $matches);
+                                $formulation = !empty($matches[1]) ? array_sum(array_map('floatval', $matches[1])) . '%' : '100%';
                             @endphp
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
                                 {{ $typeName }}
@@ -667,8 +667,12 @@ function bomApp() {
         getFormulation(fgId) {
             const fg = __finishedGoods.find(f => f.id == fgId);
             if (!fg) return '';
-            const match = fg.name.match(/(\d+(?:\.\d+)?)\s*%/);
-            return match ? match[1] + '%' : '100%';
+            const matches = [...fg.name.matchAll(/(\d+(?:\.\d+)?)\s*%/g)];
+            if (matches.length > 0) {
+                const total = matches.reduce((sum, m) => sum + parseFloat(m[1]), 0);
+                return total + '%';
+            }
+            return '100%';
         },
 
         getPurity(rmId) {

@@ -101,8 +101,7 @@ class CostingController extends Controller
                 }
             }
 
-            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
-            $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+            $formulation = $this->parseFormulation($product->name);
 
             $results[] = [
                 'product_id'    => $product->id,
@@ -307,8 +306,7 @@ class CostingController extends Controller
                 }
             }
 
-            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
-            $formulation = isset($matches[1]) ? (float)$matches[1] : 100.0;
+            $formulation = $this->parseFormulation($product->name);
 
             $results[] = array_merge($costData, [
                 'product'     => $product,
@@ -877,8 +875,7 @@ class CostingController extends Controller
             ];
         }
 
-        preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name, $matches);
-        $formulation = ($recipe->formulation !== null) ? (float)$recipe->formulation : (isset($matches[1]) ? (float)$matches[1] : 100.0);
+        $formulation = ($recipe->formulation !== null) ? (float)$recipe->formulation : $this->parseFormulation($product->name);
 
         $breakdown    = $this->buildBreakdown($recipe, $priceMap, $quantity, $product, $formulation, $density);
         $totalCost    = collect($breakdown)->sum('sub_cost');
@@ -940,5 +937,17 @@ class CostingController extends Controller
         }
 
         return $breakdown;
+    }
+
+    /**
+     * Parse and sum all formulation percentages in the product name.
+     */
+    private function parseFormulation(string $name): float
+    {
+        preg_match_all('/(\d+(?:\.\d+)?)\s*%/', $name, $matches);
+        if (!empty($matches[1])) {
+            return (float) array_sum(array_map('floatval', $matches[1]));
+        }
+        return 100.0;
     }
 }

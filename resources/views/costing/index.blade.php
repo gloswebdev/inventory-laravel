@@ -324,8 +324,8 @@ function costingApp() {
         toggleProduct(id, name, pack_name) {
             if (this.isSelected(id)) { this.selected = this.selected.filter(s => s.id !== id); }
             else {
-                const match = name.match(/(\d+(?:\.\d+)?)\s*%/);
-                const defaultFormulation = match ? parseFloat(match[1]) : 100;
+                const matches = [...name.matchAll(/(\d+(?:\.\d+)?)\s*%/g)];
+                const defaultFormulation = matches.length > 0 ? matches.reduce((sum, m) => sum + parseFloat(m[1]), 0) : 100;
                 this.selected.push({ id, name, pack_name, quantity: 1, purity: 100, formulation: defaultFormulation, density: 1.0 });
             }
         },
