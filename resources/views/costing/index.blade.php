@@ -260,9 +260,41 @@
                                             <td colspan="3" class="px-4 py-2.5 font-black text-amber-800 text-xs uppercase tracking-wider">Total</td>
                                             <td class="px-4 py-2.5 text-right font-black text-amber-700" x-text="'₹ ' + (r.total_cost||0).toLocaleString('en-IN',{minimumFractionDigits:2})"></td>
                                         </tr>
-                                    </tbody>
+                                    </tfoot>
                                 </table>
                             </div>
+
+                            <!-- Size-wise Finished Goods Costing Card Breakdown -->
+                            <template x-if="r.packing_costs && r.packing_costs.length > 0">
+                                <div class="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3">
+                                    <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <i class="fas fa-box-open text-orange-500"></i> Size-Wise Finished Goods Costing (Packed Cost)
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <template x-for="pc in r.packing_costs" :key="pc.pricelist_id">
+                                            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-xs hover:border-orange-200 transition-all">
+                                                <div class="flex items-center justify-between border-b pb-2 mb-2">
+                                                    <div>
+                                                        <span class="font-extrabold text-slate-700 text-xs uppercase" x-text="pc.size"></span>
+                                                        <span class="text-[9px] font-semibold text-slate-400 block" x-text="pc.fg_name"></span>
+                                                    </div>
+                                                    <span class="font-mono text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg" x-text="'Packed: ₹' + (pc.total_cost || 0).toFixed(2)"></span>
+                                                </div>
+                                                <div class="space-y-1 text-[11px] font-semibold text-slate-600">
+                                                    <div class="flex justify-between">
+                                                        <span>Bulk Liquid (CF1: <span x-text="pc.cf1"></span>):</span>
+                                                        <span class="font-bold text-slate-800" x-text="'₹' + (pc.bulk_cost || 0).toFixed(2)"></span>
+                                                    </div>
+                                                    <div class="flex justify-between">
+                                                        <span>Packing Materials Cost:</span>
+                                                        <span class="font-bold text-slate-800" x-text="'₹' + (pc.pm_cost || 0).toFixed(2)"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </template>
