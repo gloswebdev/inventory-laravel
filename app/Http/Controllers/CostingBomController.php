@@ -117,7 +117,16 @@ class CostingBomController extends Controller
         $pricelists = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
             ->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
 
-        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists'));
+        $localPrices = \App\Models\ProductPrice::pluck('price_per_unit', 'item_code')->toArray();
+        $prPrices = \App\Models\PurchaseRegister::orderByDesc('vouch_date')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('item_code')
+            ->pluck('case_rate', 'item_code')
+            ->toArray();
+        $pmRates = array_merge($prPrices, $localPrices);
+
+        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists', 'pmRates'));
     }
 
     public function store(Request $request)

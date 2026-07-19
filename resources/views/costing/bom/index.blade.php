@@ -664,6 +664,7 @@ const __bomIds        = @json($boms->pluck('id'));
 const __purities      = @json($purities);
 const __types         = @json(\App\Models\ProductType::all());
 const __pricelists    = @json($pricelists ?? []);
+const __pmRates       = @json($pmRates ?? []);
 
 function bomApp() {
     return {
@@ -745,6 +746,28 @@ function bomApp() {
                 const grp3 = (p.group3 || '').toLowerCase();
                 return hdName.includes(baseComposition) || grp3.includes(baseComposition);
             });
+        },
+
+        getSearchedPackingMaterials(query = '') {
+            const list = __rawMaterials.filter(r => this.isPackingMaterial(r.id));
+            if (!query) return list;
+            const q = query.toLowerCase();
+            return list.filter(r => {
+                const name = (r.name || '').toLowerCase();
+                const code = (r.item_code || '').toLowerCase();
+                return name.includes(q) || code.includes(q);
+            });
+        },
+
+        getPmRate(rmId, isContainer = false, cf1 = 1) {
+            const rm = __rawMaterials.find(r => r.id == rmId);
+            if (!rm || !rm.item_code) return 0;
+            let rate = parseFloat(__pmRates[rm.item_code]) || 0;
+            if (isContainer) {
+                const divisor = parseFloat(cf1) || 1;
+                rate = rate / divisor;
+            }
+            return parseFloat(rate.toFixed(2));
         },
 
         getFormulationList(fgId) {
