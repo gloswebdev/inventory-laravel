@@ -762,10 +762,13 @@ function bomApp() {
         getLinkedPricelistItems(fgId) {
             const fg = __finishedGoods.find(f => f.id == fgId);
             if (!fg) return [];
-            const baseComposition = fg.name.replace(/\[[^\]]+\]/g, '').trim().toLowerCase();
+            const normalize = (str) => {
+                return (str || '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').replace(/\s*%\s*/g, '%').trim().toLowerCase();
+            };
+            const baseComposition = normalize(fg.name);
             return (__pricelists || []).filter(p => {
-                const hdName = (p.item_hd_name || '').toLowerCase();
-                const grp3 = (p.group3 || '').toLowerCase();
+                const hdName = normalize(p.item_hd_name);
+                const grp3 = normalize(p.group3);
                 return hdName.includes(baseComposition) || grp3.includes(baseComposition);
             });
         },
