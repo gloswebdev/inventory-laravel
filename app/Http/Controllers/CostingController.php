@@ -114,6 +114,7 @@ class CostingController extends Controller
                 'cost_per_unit' => $costData['cost_per_unit'],
                 'total_cost'    => $costData['total_cost'],
                 'breakdown'     => $costData['breakdown'],
+                'packing_costs' => $costData['packing_costs'] ?? [],
                 'has_recipe'    => $costData['has_recipe'],
             ];
         }
@@ -872,6 +873,7 @@ class CostingController extends Controller
                 'cost_per_unit' => 0,
                 'total_cost'    => 0,
                 'breakdown'     => [],
+                'packing_costs' => [],
             ];
         }
 
@@ -881,11 +883,58 @@ class CostingController extends Controller
         $totalCost    = collect($breakdown)->sum('sub_cost');
         $costPerUnit  = $quantity > 0 ? $totalCost / $quantity : 0;
 
+        // Size-wise packing materials cost computation
+        $packingCosts = [];
+        $pms = \App\Models\CostingBomPackingMaterial::with(['rawMaterial', 'pricelist'])
+            ->where('costing_bom_id', $recipe->id)
+            ->get();
+        
+        $grouped = $pms->groupBy('pricelist_id');
+        foreach ($grouped as $pricelistId => $items) {
+            $pricelist = $items->first()->pricelist;
+            if (!$pricelist) continue;
+            
+            $cf1 = (float)($pricelist->cf_1 ?? 1);
+            if ($cf1 <= 0) $cf1 = 1;
+            
+            $singlePackPmCost = 0;
+            $pmBreakdown = [];
+            foreach ($items as $item) {
+                $rm = $item->rawMaterial;
+                if (!$rm) continue;
+                $pmPrice = (float)($priceMap[$rm->item_code] ?? 0);
+                $itemCost = $item->quantity * $pmPrice;
+                $singlePackPmCost += $itemCost;
+                
+                $pmBreakdown[] = [
+                    'name' => $rm->name,
+                    'qty' => (float)$item->quantity,
+                    'price' => $pmPrice,
+                    'cost' => round($itemCost, 2),
+                ];
+            }
+            
+            $bulkCostForPack = $costPerUnit * $cf1;
+            $totalPackCost = $bulkCostForPack + $singlePackPmCost;
+            
+            $packingCosts[] = [
+                'pricelist_id' => $pricelistId,
+                'size' => $pricelist->size ?? 'Unknown',
+                'fg_name' => $pricelist->item_hd_name,
+                'cf1' => $cf1,
+                'bulk_cost' => round($bulkCostForPack, 2),
+                'pm_cost' => round($singlePackPmCost, 2),
+                'total_cost' => round($totalPackCost, 2),
+                'pm_breakdown' => $pmBreakdown,
+            ];
+        }
+
         return [
             'has_recipe'    => true,
             'cost_per_unit' => round($costPerUnit, 4),
             'total_cost'    => round($totalCost, 4),
             'breakdown'     => $breakdown,
+            'packing_costs' => $packingCosts,
         ];
     }
 
