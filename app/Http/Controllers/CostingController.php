@@ -903,13 +903,18 @@ class CostingController extends Controller
                 $rm = $item->rawMaterial;
                 if (!$rm) continue;
                 $pmPrice = (float)($priceMap[$rm->item_code] ?? 0);
+                
+                if ($item->is_container) {
+                    $pmPrice = $cf1 > 0 ? ($pmPrice / $cf1) : $pmPrice;
+                }
+                
                 $itemCost = $item->quantity * $pmPrice;
                 $singlePackPmCost += $itemCost;
                 
                 $pmBreakdown[] = [
                     'name' => $rm->name,
                     'qty' => (float)$item->quantity,
-                    'price' => $pmPrice,
+                    'price' => round($pmPrice, 2),
                     'cost' => round($itemCost, 2),
                 ];
             }
