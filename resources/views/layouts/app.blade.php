@@ -278,7 +278,7 @@
 </head>
 <body class="bg-[#f4f7fc] text-slate-900 antialiased">
 
-<div class="flex h-screen overflow-hidden" x-data="{ showAccessModal: false }">
+<div class="flex h-screen overflow-hidden" x-data="{ showAccessModal: false, isFullscreen: false }" @fullscreenchange.window="isFullscreen = !!document.fullscreenElement">
 
     {{-- ══════════════════════════════
          SIDEBAR
@@ -533,6 +533,15 @@
             </div>
 
             <div class="flex items-center gap-3">
+                {{-- Full Screen Toggle button --}}
+                <button @click="if (!document.fullscreenElement) { document.documentElement.requestFullscreen() } else { document.exitFullscreen() }"
+                    class="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all duration-200">
+                    <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                        <i :class="isFullscreen ? 'fas fa-compress text-white text-[10px]' : 'fas fa-expand text-white text-[10px]'"></i>
+                    </div>
+                    <span class="text-[11px] font-black text-slate-600 group-hover:text-indigo-700 uppercase tracking-wider transition-colors" x-text="isFullscreen ? 'Exit Full' : 'Full Screen'"></span>
+                </button>
+
                 {{-- My Access button --}}
                 <button @click="showAccessModal = true"
                     class="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all duration-200">
