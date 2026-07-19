@@ -578,8 +578,8 @@
 
                 <template x-if="bomModal.step < 4">
                     <button @click="nextStep()"
-                            :disabled="bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.0001"
-                            :class="(bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.0001) ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-amber-500 hover:bg-amber-600'"
+                            :disabled="bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.01"
+                            :class="(bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.01) ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-amber-500 hover:bg-amber-600'"
                             class="flex-1 py-3 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 flex items-center justify-center gap-1">
                         Next <i class="fas fa-chevron-right text-xs"></i>
                     </button>
@@ -760,7 +760,7 @@ function bomApp() {
             }
             if (purity <= 0) purity = 100;
             const qty = (batchQty * formulation) / purity;
-            return parseFloat(qty.toFixed(4));
+            return parseFloat(qty.toFixed(2));
         },
 
         calculateRemainingQty(currentItem) {
@@ -772,7 +772,7 @@ function bomApp() {
                 }
             });
             const remaining = batchQty - sumOthers;
-            return parseFloat(Math.max(0, remaining).toFixed(4));
+            return parseFloat(Math.max(0, remaining).toFixed(2));
         },
 
         toggleSolvent(item) {
@@ -792,13 +792,13 @@ function bomApp() {
                     sum += parseFloat(i.quantity) || 0;
                 }
             });
-            return parseFloat(sum.toFixed(4));
+            return parseFloat(sum.toFixed(2));
         },
 
         getRemainingIngredientsQty() {
             const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
             const used = this.getUsedIngredientsQty();
-            return parseFloat((batchQty - used).toFixed(4));
+            return parseFloat((batchQty - used).toFixed(2));
         },
 
         hasActiveSolvent() {
@@ -877,8 +877,8 @@ function bomApp() {
                 // Validate total ingredients quantity against batch size
                 const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
                 const sumIngredients = this.getUsedIngredientsQty();
-                if (sumIngredients > batchQty + 0.001) {
-                    alert(`Total ingredients quantity (${sumIngredients.toFixed(4)}) cannot exceed the Batch Quantity (${batchQty}).`);
+                if (sumIngredients > batchQty + 0.01) {
+                    alert(`Total ingredients quantity (${sumIngredients.toFixed(2)}) cannot exceed the Batch Quantity (${batchQty}).`);
                     return;
                 }
                 
