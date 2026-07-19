@@ -17,6 +17,11 @@ class CostingBomPackingMaterial extends Model
         'pricelist_id',
         'raw_material_id',
         'quantity',
+        'is_container',
+    ];
+
+    protected $casts = [
+        'is_container' => 'boolean',
     ];
 
     public function costingBom(): BelongsTo

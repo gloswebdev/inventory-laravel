@@ -148,6 +148,7 @@ class CostingBomController extends Controller
             'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
             'packing_materials.*.quantity'        => 'required|numeric|min:0.001',
+            'packing_materials.*.is_container'    => 'nullable|boolean',
         ], [
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
@@ -205,6 +206,7 @@ class CostingBomController extends Controller
                         'pricelist_id'    => $pm['pricelist_id'],
                         'raw_material_id' => $pm['raw_material_id'],
                         'quantity'        => $pm['quantity'],
+                        'is_container'    => !empty($pm['is_container']),
                     ]);
                 }
             }
@@ -245,6 +247,7 @@ class CostingBomController extends Controller
             'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
             'packing_materials.*.quantity'        => 'required|numeric|min:0.001',
+            'packing_materials.*.is_container'    => 'nullable|boolean',
         ], [
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
@@ -305,6 +308,7 @@ class CostingBomController extends Controller
                         'pricelist_id'    => $pm['pricelist_id'],
                         'raw_material_id' => $pm['raw_material_id'],
                         'quantity'        => $pm['quantity'],
+                        'is_container'    => !empty($pm['is_container']),
                     ]);
                 }
             }
@@ -396,6 +400,7 @@ class CostingBomController extends Controller
                     'pricelist_id'    => $pm->pricelist_id,
                     'raw_material_id' => $pm->raw_material_id,
                     'quantity'        => $pm->quantity,
+                    'is_container'    => $pm->is_container,
                 ]);
             }
         });
