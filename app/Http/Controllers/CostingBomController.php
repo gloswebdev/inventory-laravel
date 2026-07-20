@@ -124,7 +124,7 @@ class CostingBomController extends Controller
             ->unique('item_code')
             ->pluck('case_rate', 'item_code')
             ->toArray();
-        $pmRates = array_merge($prPrices, $localPrices);
+        $pmRates = array_merge($localPrices, $prPrices);
 
         return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists', 'pmRates'));
     }
@@ -153,6 +153,7 @@ class CostingBomController extends Controller
             'items.*.raw_material_id' => 'required|exists:products,id',
             'items.*.quantity'    => 'required|numeric|min:0.001',
             'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
+            'items.*.rate'        => 'nullable|numeric|min:0.01',
             'packing_materials'   => 'nullable|array',
             'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
@@ -206,6 +207,17 @@ class CostingBomController extends Controller
                         );
                     }
                 }
+
+                // Save manually entered rate to product_prices if provided
+                if (!empty($item['rate'])) {
+                    $product = Product::find($item['raw_material_id']);
+                    if ($product && !empty($product->item_code)) {
+                        \App\Models\ProductPrice::updateOrCreate(
+                            ['item_code' => $product->item_code],
+                            ['price_per_unit' => $item['rate']]
+                        );
+                    }
+                }
             }
 
             if (!empty($validated['packing_materials'])) {
@@ -252,6 +264,7 @@ class CostingBomController extends Controller
             'items.*.raw_material_id' => 'required|exists:products,id',
             'items.*.quantity'    => 'required|numeric|min:0.001',
             'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
+            'items.*.rate'        => 'nullable|numeric|min:0.01',
             'packing_materials'   => 'nullable|array',
             'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
@@ -304,6 +317,17 @@ class CostingBomController extends Controller
                         \App\Models\ProductPrice::updateOrCreate(
                             ['item_code' => $product->item_code],
                             ['purity' => $item['purity']]
+                        );
+                    }
+                }
+
+                // Save manually entered rate to product_prices if provided
+                if (!empty($item['rate'])) {
+                    $product = Product::find($item['raw_material_id']);
+                    if ($product && !empty($product->item_code)) {
+                        \App\Models\ProductPrice::updateOrCreate(
+                            ['item_code' => $product->item_code],
+                            ['price_per_unit' => $item['rate']]
                         );
                     }
                 }

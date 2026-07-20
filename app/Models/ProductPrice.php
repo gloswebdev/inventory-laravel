@@ -40,7 +40,7 @@ class ProductPrice extends Model
             ->unique('item_code')
             ->pluck('case_rate', 'item_code')
             ->toArray();
-        return array_merge($prPrices, $localPrices);
+        return array_merge($localPrices, $prPrices);
     }
 
     /**

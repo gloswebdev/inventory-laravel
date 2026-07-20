@@ -430,8 +430,16 @@
                                                 </div>
                                             </template>
                                             <template x-if="item.raw_material_id && getMaterialRate(item.raw_material_id) === null">
-                                                <div class="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg text-[9px] font-black">
-                                                    <i class="fas fa-tag"></i> Rate: Not Available
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <div class="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg text-[9px] font-black">
+                                                        <i class="fas fa-tag"></i> Rate: Not Available
+                                                    </div>
+                                                    <div class="flex items-center gap-1">
+                                                        <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Enter Rate (₹):</label>
+                                                        <input type="number" step="0.01" min="0.01" x-model="item.rate"
+                                                               class="w-16 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                               placeholder="Rate">
+                                                    </div>
                                                 </div>
                                             </template>
 
@@ -899,7 +907,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [] };
             this.bomModal.show = true;
         },
 
@@ -924,6 +932,7 @@ function bomApp() {
                         raw_material_id: i.raw_material_id,
                         quantity: i.quantity,
                         purity: i.purity || '',
+                        rate: '',
                         formulation: rawFormulation ? parseFloat(rawFormulation.toFixed(3)) : '',
                         rm_type_filter: '',
                         is_packing: isPacking,
@@ -996,7 +1005,7 @@ function bomApp() {
         },
 
         addRMRow(isPacking = false) {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '' });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rate: '', formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '' });
         },
 
         async submitBom() {
