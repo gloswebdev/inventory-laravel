@@ -816,7 +816,7 @@ function bomApp() {
             const fg = __finishedGoods.find(f => f.id == fgId);
             if (!fg) return [];
             const normalize = (str) => {
-                return (str || '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').replace(/\s*%\s*/g, '%').trim().toLowerCase();
+                return (str || '').replace(/\[[^\]]+\]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').replace(/\s*%\s*/g, '%').trim().toLowerCase();
             };
             const baseComposition = normalize(fg.name);
             return (__pricelists || []).filter(p => {
