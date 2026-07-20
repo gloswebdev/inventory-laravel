@@ -248,6 +248,14 @@
                         <div class="text-[11px] font-extrabold text-amber-50 truncate max-w-[350px] uppercase tracking-wider" x-show="bomModal.form.finished_product_id" x-text="getFinishedProductName(bomModal.form.finished_product_id)"></div>
                     </div>
                 </div>
+                
+                <!-- Per Unit Cost Badging -->
+                <template x-if="bomModal.form.finished_product_id && getIngredientsGrandTotal() > 0">
+                    <div class="hidden md:flex items-center bg-white/20 border border-white/30 text-white px-3 py-1.5 rounded-xl font-mono text-xs font-black shadow-sm backdrop-blur-sm">
+                        <span>Grand Total: ₹<span x-text="getIngredientsGrandTotal().toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span> / Batch: <span x-text="bomModal.form.yield_quantity"></span> <span x-text="bomModal.form.yield_uom"></span> = ₹<span x-text="(getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) || 1)).toFixed(2)"></span>/<span x-text="bomModal.form.yield_uom"></span></span>
+                    </div>
+                </template>
+
                 <button @click="bomModal.show = false" class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition">
                     <i class="fas fa-times text-white"></i>
                 </button>
