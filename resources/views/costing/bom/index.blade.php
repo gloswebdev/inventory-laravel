@@ -251,8 +251,15 @@
                 
                 <!-- Per Unit Cost Badging -->
                 <template x-if="bomModal.form.finished_product_id && getIngredientsGrandTotal() > 0">
-                    <div class="hidden md:flex items-center bg-white/20 border border-white/30 text-white px-3 py-1.5 rounded-xl font-mono text-xs font-black shadow-sm backdrop-blur-sm">
-                        <span>Grand Total: ₹<span x-text="getIngredientsGrandTotal().toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span> / Batch: <span x-text="bomModal.form.yield_quantity"></span> <span x-text="bomModal.form.yield_uom"></span> = ₹<span x-text="(getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) || 1)).toFixed(2)"></span>/<span x-text="bomModal.form.yield_uom"></span></span>
+                    <div class="hidden md:flex flex-col gap-1 items-end bg-white border border-slate-150 text-slate-800 px-3.5 py-2 rounded-xl font-sans text-xs font-bold shadow-md">
+                        <div>
+                            <span>W/o Density per Ltr/Kg Rate: <span class="text-indigo-600 font-extrabold" x-text="'₹' + (getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) || 1)).toFixed(2) + '/' + bomModal.form.yield_uom"></span></span>
+                        </div>
+                        <template x-if="bomModal.form.density && parseFloat(bomModal.form.density) > 0">
+                            <div class="text-[11px] text-slate-500 border-t border-slate-100 pt-1 w-full text-right font-medium">
+                                <span>With Density per Ltr/Kg Rate: <span class="text-emerald-600 font-extrabold" x-text="'₹' + (getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) / parseFloat(bomModal.form.density))).toFixed(2) + '/Ltr'"></span></span>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
