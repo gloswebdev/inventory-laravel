@@ -572,7 +572,6 @@
                                     <div class="flex gap-4">
                                         <div>
                                             Used: <span :class="getUsedIngredientsQty() > parseFloat(bomModal.form.yield_quantity) ? 'text-red-600' : 'text-slate-800'" x-text="getUsedIngredientsQty() + ' ' + bomModal.form.yield_uom"></span>
-                                        </div>
                                         <div>
                                             Remaining: <span :class="getRemainingIngredientsQty() < 0 ? 'text-red-600' : 'text-emerald-600'" x-text="getRemainingIngredientsQty() + ' ' + bomModal.form.yield_uom"></span>
                                         </div>
@@ -589,6 +588,32 @@
                         <p class="text-[10px] text-slate-400 font-semibold leading-relaxed">Har packing size (1Ltr, 500ml, etc.) ke side me raw packing material custom add karein.</p>
                     </div>
 
+                    <!-- Manual Linking Card -->
+                    <div class="bg-slate-50 border border-slate-200/60 p-3.5 rounded-2xl space-y-2.5">
+                        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Manually Link Finished Good (Pricelist Item)</h4>
+                        <div class="grid grid-cols-12 gap-2">
+                            <div class="col-span-5">
+                                <input type="text" x-model="bomModal.manualSearchQuery" placeholder="Search product name/code..." 
+                                       class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl outline-none font-bold text-slate-700 bg-white placeholder-slate-400 shadow-sm focus:ring-2 focus:ring-amber-400">
+                            </div>
+                            <div class="col-span-5">
+                                <select x-model="bomModal.selectedManualPricelistId" 
+                                        class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl outline-none font-bold text-slate-700 bg-white shadow-sm focus:ring-2 focus:ring-amber-400">
+                                    <option value="">Select Finished Good</option>
+                                    <template x-for="p in __pricelists.filter(x => !bomModal.manualSearchQuery || x.item_hd_name.toLowerCase().includes(bomModal.manualSearchQuery.toLowerCase()) || x.user_code.toLowerCase().includes(bomModal.manualSearchQuery.toLowerCase()))" :key="p.id">
+                                        <option :value="p.id" x-text="p.item_hd_name + ' (' + p.user_code + ') [Size: ' + p.size + ']'"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="col-span-2">
+                                <button type="button" @click="if (bomModal.selectedManualPricelistId) { if (!bomModal.form.manual_pricelist_ids) { bomModal.form.manual_pricelist_ids = []; } if (!bomModal.form.manual_pricelist_ids.includes(parseInt(bomModal.selectedManualPricelistId))) { bomModal.form.manual_pricelist_ids.push(parseInt(bomModal.selectedManualPricelistId)); } bomModal.selectedManualPricelistId = ''; bomModal.manualSearchQuery = ''; }" 
+                                        class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] py-2 rounded-xl transition-all shadow-sm">
+                                    Link
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <template x-for="fg in getLinkedPricelistItems(bomModal.form.finished_product_id)" :key="fg.id">
                         <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:border-amber-200 hover:shadow-md transition-all duration-300">
                             <!-- FG Header Row -->
@@ -598,6 +623,12 @@
                                     <div class="text-[10px] text-slate-400 font-bold mt-0.5">Code: <span class="text-slate-600 font-mono" x-text="fg.user_code"></span></div>
                                 </div>
                                 <div class="flex items-center gap-2">
+                                    <template x-if="bomModal.form.manual_pricelist_ids && bomModal.form.manual_pricelist_ids.includes(fg.id)">
+                                        <button type="button" @click="bomModal.form.manual_pricelist_ids = bomModal.form.manual_pricelist_ids.filter(id => id != fg.id); bomModal.form.packing_materials = bomModal.form.packing_materials.filter(p => p.pricelist_id != fg.id);" 
+                                                class="text-[9px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg hover:bg-rose-100 transition-all shadow-sm">
+                                            Unlink
+                                        </button>
+                                    </template>
                                     <span class="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100/60 px-2 py-0.5 rounded-lg" x-text="'Size: ' + fg.size"></span>
                                     <span class="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100/60 px-2 py-0.5 rounded-lg" x-text="'CF1: ' + (parseFloat(fg.cf_1) || 0)"></span>
                                     <button type="button" @click="addPackingRow(fg.id)"
@@ -747,7 +778,8 @@ function bomApp() {
         bomModal: {
             show: false, editId: null, submitting: false,
             typeFilter: '', rmTypeFilter: '', step: 1,
-            form: { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [] }
+            manualSearchQuery: '', selectedManualPricelistId: '',
+            form: { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [], packing_materials: [], manual_pricelist_ids: [] }
         },
         duplicateModal: {
             show: false, bomId: null, productName: '', badge: 'small', submitting: false
@@ -819,11 +851,19 @@ function bomApp() {
                 return (str || '').replace(/\[[^\]]+\]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').replace(/\s*%\s*/g, '%').trim().toLowerCase();
             };
             const baseComposition = normalize(fg.name);
-            return (__pricelists || []).filter(p => {
+            let items = (__pricelists || []).filter(p => {
                 const hdName = normalize(p.item_hd_name);
                 const grp3 = normalize(p.group3);
                 return hdName.includes(baseComposition) || grp3.includes(baseComposition);
             });
+            const manualIds = this.bomModal.form.manual_pricelist_ids || [];
+            manualIds.forEach(id => {
+                if (!items.some(it => it.id == id)) {
+                    const match = __pricelists.find(p => p.id == id);
+                    if (match) items.push(match);
+                }
+            });
+            return items;
         },
 
         getSearchedPackingMaterials(query = '', selectedId = null) {
@@ -964,7 +1004,9 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [] };
+            this.bomModal.manualSearchQuery = '';
+            this.bomModal.selectedManualPricelistId = '';
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [], manual_pricelist_ids: [] };
             this.bomModal.show = true;
         },
 
@@ -974,6 +1016,26 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
+            this.bomModal.manualSearchQuery = '';
+            this.bomModal.selectedManualPricelistId = '';
+
+            const normalize = (str) => {
+                return (str || '').replace(/\[[^\]]+\]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').replace(/\s*%\s*/g, '%').trim().toLowerCase();
+            };
+            const baseComposition = normalize(this.getFinishedProductName(recipe.finished_product_id));
+            const autoIds = (__pricelists || []).filter(p => {
+                const hdName = normalize(p.item_hd_name);
+                const grp3 = normalize(p.group3);
+                return hdName.includes(baseComposition) || grp3.includes(baseComposition);
+            }).map(p => p.id);
+
+            const manualIds = [];
+            (recipe.packing_materials || []).forEach(p => {
+                if (!autoIds.includes(p.pricelist_id) && !manualIds.includes(p.pricelist_id)) {
+                    manualIds.push(p.pricelist_id);
+                }
+            });
+
             this.bomModal.form = {
                 finished_product_id: recipe.finished_product_id,
                 badge: recipe.badge || '',
@@ -981,6 +1043,7 @@ function bomApp() {
                 density: recipe.density || '',
                 yield_quantity: recipe.yield_quantity,
                 yield_uom: recipe.yield_uom,
+                manual_pricelist_ids: manualIds,
                 items: (recipe.items || []).filter(i => !this.isPackingMaterial(i.raw_material_id)).map(i => {
                     const isPacking = false;
                     const purityVal = i.purity || this.getPurityVal(i.raw_material_id) || 100;
