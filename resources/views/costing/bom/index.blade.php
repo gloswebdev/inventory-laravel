@@ -545,8 +545,14 @@
                             <!-- Ingredients Quantity Summary -->
                             <template x-if="bomModal.form.items.filter(i => !i.is_packing).length > 0">
                                 <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs font-bold text-slate-600 shadow-sm">
-                                    <div>
-                                        Total Batch Size: <span class="text-slate-800" x-text="bomModal.form.yield_quantity + ' ' + bomModal.form.yield_uom"></span>
+                                    <div class="flex items-center gap-3">
+                                        <div>
+                                            Total Batch Size: <span class="text-slate-800" x-text="bomModal.form.yield_quantity + ' ' + bomModal.form.yield_uom"></span>
+                                        </div>
+                                        <span class="text-slate-300">|</span>
+                                        <div class="bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-lg font-black">
+                                            Grand Total: <span x-text="'₹' + getIngredientsGrandTotal().toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                        </div>
                                     </div>
                                     <div class="flex gap-4">
                                         <div>
@@ -920,6 +926,18 @@ function bomApp() {
             const batchQty = parseFloat(this.bomModal.form.yield_quantity) || 0;
             const used = this.getUsedIngredientsQty();
             return parseFloat((batchQty - used).toFixed(2));
+        },
+
+        getIngredientsGrandTotal() {
+            let sum = 0;
+            this.bomModal.form.items.forEach(i => {
+                if (!i.is_packing && i.raw_material_id && i.quantity) {
+                    const rate = parseFloat(this.getMaterialRate(i.raw_material_id)) || parseFloat(i.rate) || 0;
+                    const tc = i.transportation_cost !== undefined && i.transportation_cost !== '' ? parseFloat(i.transportation_cost) : 5;
+                    sum += parseFloat(i.quantity) * (rate + tc);
+                }
+            });
+            return parseFloat(sum.toFixed(2));
         },
 
         hasActiveSolvent() {
