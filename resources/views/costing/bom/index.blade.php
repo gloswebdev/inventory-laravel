@@ -443,6 +443,30 @@
                                                 </div>
                                             </template>
 
+                                            <!-- Transportation Cost Input -->
+                                            <template x-if="item.raw_material_id">
+                                                <div class="flex items-center gap-1">
+                                                    <label class="text-[9px] font-black text-amber-700 uppercase tracking-wider block bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">Trans Cost (₹):</label>
+                                                    <input type="number" step="0.01" min="0" x-model="item.transportation_cost"
+                                                           class="w-14 px-1.5 py-0.5 text-[10px] font-black border border-amber-200 rounded-lg outline-none focus:ring-1 focus:ring-amber-400 text-center text-amber-800 bg-amber-50/20"
+                                                           placeholder="5.00">
+                                                </div>
+                                            </template>
+
+                                            <!-- Calculation Breakdown Display -->
+                                            <template x-if="item.raw_material_id && item.quantity && (getMaterialRate(item.raw_material_id) !== null || item.rate)">
+                                                <div class="w-full mt-1 bg-slate-50 border border-slate-100 rounded-lg p-1.5 text-[9.5px] font-mono text-slate-600 font-bold">
+                                                    <span class="text-blue-700 font-extrabold" x-text="item.quantity"></span> * 
+                                                    <span class="text-emerald-700 font-extrabold" x-text="getMaterialRate(item.raw_material_id) !== null ? getMaterialRate(item.raw_material_id) : (item.rate || 0)"></span> = 
+                                                    <span class="text-slate-800 font-extrabold" x-text="'₹' + (parseFloat(item.quantity) * (getMaterialRate(item.raw_material_id) !== null ? parseFloat(getMaterialRate(item.raw_material_id)) : (parseFloat(item.rate) || 0))).toFixed(2)"></span>
+                                                    <span class="text-slate-400 font-semibold"> + </span>
+                                                    <span class="text-blue-700 font-extrabold" x-text="item.quantity"></span> * 
+                                                    <span class="text-amber-700 font-extrabold" x-text="item.transportation_cost !== undefined && item.transportation_cost !== '' ? item.transportation_cost : 5"></span> = 
+                                                    <span class="text-slate-800 font-extrabold" x-text="'₹' + (parseFloat(item.quantity) * (item.transportation_cost !== undefined && item.transportation_cost !== '' ? parseFloat(item.transportation_cost) : 5)).toFixed(2)"></span>
+                                                    <span class="text-indigo-600 font-black" x-text="' (Total: ₹' + ( (parseFloat(item.quantity) * (getMaterialRate(item.raw_material_id) !== null ? parseFloat(getMaterialRate(item.raw_material_id)) : (parseFloat(item.rate) || 0))) + (parseFloat(item.quantity) * (item.transportation_cost !== undefined && item.transportation_cost !== '' ? parseFloat(item.transportation_cost) : 5)) ).toFixed(2) + ')'"></span>
+                                                </div>
+                                            </template>
+
                                             <template x-if="item.raw_material_id && item.is_technical">
                                                 <div class="flex flex-col gap-2 mt-1.5 w-full">
                                                     <div class="flex flex-wrap gap-2 items-center">
@@ -907,7 +931,7 @@ function bomApp() {
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
             this.bomModal.step = 1;
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [] };
             this.bomModal.show = true;
         },
 
@@ -933,6 +957,7 @@ function bomApp() {
                         quantity: i.quantity,
                         purity: i.purity || '',
                         rate: '',
+                        transportation_cost: i.transportation_cost !== null && i.transportation_cost !== undefined ? parseFloat(i.transportation_cost) : 5,
                         formulation: rawFormulation ? parseFloat(rawFormulation.toFixed(3)) : '',
                         rm_type_filter: '',
                         is_packing: isPacking,
@@ -1005,7 +1030,7 @@ function bomApp() {
         },
 
         addRMRow(isPacking = false) {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rate: '', formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '' });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '' });
         },
 
         async submitBom() {

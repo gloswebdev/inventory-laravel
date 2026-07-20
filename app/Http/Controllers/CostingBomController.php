@@ -154,6 +154,7 @@ class CostingBomController extends Controller
             'items.*.quantity'    => 'required|numeric|min:0.001',
             'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
             'items.*.rate'        => 'nullable|numeric|min:0.01',
+            'items.*.transportation_cost' => 'nullable|numeric|min:0',
             'packing_materials'   => 'nullable|array',
             'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
@@ -195,6 +196,7 @@ class CostingBomController extends Controller
                     'raw_material_id' => $item['raw_material_id'],
                     'quantity'        => $item['quantity'],
                     'purity'          => $item['purity'] ?? null,
+                    'transportation_cost' => isset($item['transportation_cost']) && $item['transportation_cost'] !== '' ? $item['transportation_cost'] : 5.0,
                 ]);
 
                 // Save manually entered purity to product_prices if provided
@@ -265,6 +267,7 @@ class CostingBomController extends Controller
             'items.*.quantity'    => 'required|numeric|min:0.001',
             'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
             'items.*.rate'        => 'nullable|numeric|min:0.01',
+            'items.*.transportation_cost' => 'nullable|numeric|min:0',
             'packing_materials'   => 'nullable|array',
             'packing_materials.*.pricelist_id'    => 'required|exists:pricelists,id',
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
@@ -308,6 +311,7 @@ class CostingBomController extends Controller
                     'raw_material_id' => $item['raw_material_id'],
                     'quantity'        => $item['quantity'],
                     'purity'          => $item['purity'] ?? null,
+                    'transportation_cost' => isset($item['transportation_cost']) && $item['transportation_cost'] !== '' ? $item['transportation_cost'] : 5.0,
                 ]);
 
                 // Save manually entered purity to product_prices if provided

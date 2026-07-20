@@ -975,7 +975,8 @@ class CostingController extends Controller
             }
 
             $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
-            $subCost      = $requiredQty * $pricePerUnit;
+            $tc = (float)($item->transportation_cost ?? 5.0);
+            $subCost      = $requiredQty * ($pricePerUnit + $tc);
 
             $breakdown[] = [
                 'rm_id'        => $rm->id,
@@ -985,6 +986,7 @@ class CostingController extends Controller
                 'recipe_qty'   => round($item->quantity, 4),
                 'required_qty' => round($requiredQty, 4),
                 'price'        => $pricePerUnit,
+                'transportation_cost' => $tc,
                 'sub_cost'     => round($subCost, 4),
                 'has_price'    => $pricePerUnit > 0,
             ];
