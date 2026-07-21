@@ -269,45 +269,45 @@
             </div>
 
             {{-- Visual Step Indicators --}}
-            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center w-full justify-between max-w-2xl mx-auto gap-2">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-center flex-shrink-0">
+                <div class="flex items-center w-full justify-center max-w-2xl mx-auto gap-x-1 sm:gap-x-2">
                     <!-- Step 1 Indicator -->
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                    <div class="flex items-center gap-1">
+                        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
                              :class="bomModal.step >= 1 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">1</div>
-                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 1 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Product Info</span>
+                        <span class="text-[11px] sm:text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 1 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Product Info</span>
                     </div>
                     <!-- Connector -->
-                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 2 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <div class="w-4 sm:w-10 h-0.5 transition-all" :class="bomModal.step >= 2 ? 'bg-amber-400' : 'bg-slate-200'"></div>
                     <!-- Step 2 Indicator -->
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                    <div class="flex items-center gap-1">
+                        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
                              :class="bomModal.step >= 2 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">2</div>
-                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 2 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Batch Specs</span>
+                        <span class="text-[11px] sm:text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 2 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Batch Specs</span>
                     </div>
                     <!-- Connector -->
-                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 3 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <div class="w-4 sm:w-10 h-0.5 transition-all" :class="bomModal.step >= 3 ? 'bg-amber-400' : 'bg-slate-200'"></div>
                     <!-- Step 3 Indicator -->
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                    <div class="flex items-center gap-1">
+                        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
                              :class="bomModal.step >= 3 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">3</div>
-                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 3 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Ingredients</span>
+                        <span class="text-[11px] sm:text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 3 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Ingredients</span>
                     </div>
                     <!-- Connector -->
-                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 4 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <div class="w-4 sm:w-10 h-0.5 transition-all" :class="bomModal.step >= 4 ? 'bg-amber-400' : 'bg-slate-200'"></div>
                     <!-- Step 4 Indicator -->
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                    <div class="flex items-center gap-1">
+                        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
                              :class="bomModal.step >= 4 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">4</div>
-                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 4 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Packing</span>
+                        <span class="text-[11px] sm:text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 4 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Packing</span>
                     </div>
                     <!-- Connector -->
-                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 5 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <div class="w-4 sm:w-10 h-0.5 transition-all" :class="bomModal.step >= 5 ? 'bg-amber-400' : 'bg-slate-200'"></div>
                     <!-- Step 5 Indicator -->
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                    <div class="flex items-center gap-1">
+                        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
                              :class="bomModal.step >= 5 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">5</div>
-                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 5 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Calculations</span>
+                        <span class="text-[11px] sm:text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 5 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Calculations</span>
                     </div>
                 </div>
             </div>
