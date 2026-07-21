@@ -301,6 +301,14 @@
                              :class="bomModal.step >= 4 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">4</div>
                         <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 4 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Packing</span>
                     </div>
+                    <!-- Connector -->
+                    <div class="flex-1 h-0.5 mx-2 transition-all" :class="bomModal.step >= 5 ? 'bg-amber-400' : 'bg-slate-200'"></div>
+                    <!-- Step 5 Indicator -->
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
+                             :class="bomModal.step >= 5 ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-slate-200 text-slate-500'">5</div>
+                        <span class="text-xs font-bold transition-all hidden sm:inline whitespace-nowrap" :class="bomModal.step === 5 ? 'text-amber-600 font-extrabold' : 'text-slate-400'">Calculations</span>
+                    </div>
                 </div>
             </div>
 
@@ -703,6 +711,64 @@
                         </div>
                     </template>
                 </div>
+
+                {{-- Step 5: Calculations Summary --}}
+                <div x-show="bomModal.step === 5" class="space-y-5 max-h-[50vh] overflow-y-auto pr-1" x-transition>
+                    <div class="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl space-y-3">
+                        <h4 class="text-xs font-black text-indigo-700 uppercase tracking-widest">Calculations Summary</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold text-slate-700">
+                            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                <span class="text-slate-400 font-semibold block mb-1">W/o Density per Ltr/Kg Rate:</span>
+                                <span class="text-indigo-600 font-extrabold text-sm" x-text="bomModal.form.finished_product_id ? '₹' + (getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) || 1)).toFixed(2) + '/' + bomModal.form.yield_uom : '₹0.00'"></span>
+                            </div>
+                            <template x-if="bomModal.form.density && parseFloat(bomModal.form.density) > 0">
+                                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                    <span class="text-slate-400 font-semibold block mb-1">With Density per Ltr/Kg Rate:</span>
+                                    <span class="text-emerald-600 font-extrabold text-sm" x-text="bomModal.form.finished_product_id ? '₹' + (getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) / parseFloat(bomModal.form.density))).toFixed(2) + '/Ltr' : '₹0.00'"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Size-Wise Packing & Ingredient Costs</h4>
+                        <div class="space-y-3">
+                            <template x-for="fg in getLinkedPricelistItems(bomModal.form.finished_product_id)" :key="fg.id">
+                                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                                    <!-- FG Summary Info -->
+                                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                                        <div>
+                                            <span class="font-extrabold text-slate-800 text-xs uppercase tracking-tight" x-text="fg.item_hd_name"></span>
+                                            <span class="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100/60 px-2 py-0.5 rounded-lg ml-2" x-text="'Size: ' + fg.size"></span>
+                                            <span class="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100/60 px-2 py-0.5 rounded-lg ml-1" x-text="'CF1: ' + (parseFloat(fg.cf_1) || 0)"></span>
+                                            <div class="text-[10px] text-slate-400 font-bold mt-1">Code: <span class="text-slate-600 font-mono" x-text="fg.user_code"></span></div>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="text-xs font-black text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl shadow-sm inline-block" x-text="'PM Total = ₹' + getPmTotalRate(fg.id, fg.cf_1)"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Costs Calculation Display -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] font-semibold text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                                        <div class="space-y-1">
+                                            <span class="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">Ingredient Cost Calculation</span>
+                                            <div class="font-mono text-slate-700">
+                                                <span>₹</span><span x-text="(getIngredientsGrandTotal() / (parseFloat(bomModal.form.yield_quantity) || 1)).toFixed(2)"></span> / 1000 x <span x-text="getPackingSizeInMlOrGm(fg.size)"></span> = 
+                                                <span class="text-indigo-600 font-bold" x-text="'₹' + getIngredientCostForSize(fg.size).toFixed(2)"></span>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-1 text-right md:border-l border-slate-200 md:pl-4">
+                                            <span class="text-slate-400 font-bold block text-[10px] uppercase tracking-wider">Total Pack Cost (PM + Ingredient)</span>
+                                            <div class="text-sm font-extrabold text-slate-800">
+                                                <span>₹</span><span x-text="(getPmTotalRate(fg.id, fg.cf_1) + getIngredientCostForSize(fg.size)).toFixed(2)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- Modal Footer --}}
@@ -716,7 +782,7 @@
                     </button>
                 </template>
 
-                <template x-if="bomModal.step < 4">
+                <template x-if="bomModal.step < 5">
                     <button @click="nextStep()"
                             :disabled="bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.01"
                             :class="(bomModal.step === 3 && Math.abs(getRemainingIngredientsQty()) > 0.01) ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-amber-500 hover:bg-amber-600'"
@@ -724,7 +790,7 @@
                         Next <i class="fas fa-chevron-right text-xs"></i>
                     </button>
                 </template>
-                <template x-if="bomModal.step === 4">
+                <template x-if="bomModal.step === 5">
                     <button @click="submitBom()" :disabled="bomModal.submitting"
                             class="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-xl transition-all shadow-md shadow-amber-200 disabled:opacity-60 flex items-center justify-center gap-2">
                         <i class="fas fa-save" :class="bomModal.submitting ? 'fa-spin' : ''"></i>
@@ -922,6 +988,25 @@ function bomApp() {
                 sum += this.getPmRowRate(pm, cf1);
             });
             return parseFloat(sum.toFixed(2));
+        },
+
+        getPackingSizeInMlOrGm(sizeStr) {
+            if (!sizeStr) return 0;
+            const str = sizeStr.toLowerCase().trim();
+            const num = parseFloat(str) || 0;
+            if (str.includes('ltr') || str.includes('liter') || str.includes('litre') || str.includes(' l') || str.endsWith('l') || str.includes('kg')) {
+                return num * 1000;
+            }
+            return num;
+        },
+
+        getIngredientCostForSize(sizeStr) {
+            const yieldQty = parseFloat(this.bomModal.form.yield_quantity) || 1;
+            const sizeInMl = this.getPackingSizeInMlOrGm(sizeStr);
+            const ingredientGrandTotal = this.getIngredientsGrandTotal();
+            const ratePerUnit = ingredientGrandTotal / yieldQty;
+            const cost = (ratePerUnit / 1000) * sizeInMl;
+            return parseFloat(cost.toFixed(4));
         },
 
         getMaterialRate(rmId) {
@@ -1159,6 +1244,8 @@ function bomApp() {
                 }
                 
                 this.bomModal.step = 4;
+            } else if (this.bomModal.step === 4) {
+                this.bomModal.step = 5;
             }
         },
 
