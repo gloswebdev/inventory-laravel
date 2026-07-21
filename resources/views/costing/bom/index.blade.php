@@ -620,7 +620,10 @@
                             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-3">
                                 <div>
                                     <div class="font-extrabold text-slate-800 text-xs uppercase tracking-tight" x-text="fg.item_hd_name"></div>
-                                    <div class="text-[10px] text-slate-400 font-bold mt-0.5">Code: <span class="text-slate-600 font-mono" x-text="fg.user_code"></span></div>
+                                    <div class="flex items-center gap-3 mt-0.5">
+                                        <span class="text-[10px] text-slate-400 font-bold">Code: <span class="text-slate-600 font-mono" x-text="fg.user_code"></span></span>
+                                        <span class="text-[10px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg" x-text="'PM Total = ' + getPmTotalRate(fg.id, fg.cf_1)"></span>
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <template x-if="bomModal.form.manual_pricelist_ids && bomModal.form.manual_pricelist_ids.includes(fg.id)">
@@ -658,9 +661,19 @@
                                                 <input type="checkbox" x-model="pm.is_container" class="rounded text-amber-500 focus:ring-amber-500/20 w-3 h-3 cursor-pointer">
                                                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest cursor-pointer select-none" @click="pm.is_container = !pm.is_container">Container</span>
                                             </div>
-                                            <div class="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded" x-show="pm.raw_material_id">
+                                            <div class="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded" x-show="pm.raw_material_id && getPmRate(pm.raw_material_id, false, 1) > 0">
                                                 Rate: <span class="text-indigo-600 font-extrabold" x-text="'₹' + getPmRate(pm.raw_material_id, pm.is_container, fg.cf_1)"></span>
                                             </div>
+                                            <template x-if="pm.raw_material_id && getPmRate(pm.raw_material_id, false, 1) === 0">
+                                                <div class="flex flex-col items-center gap-1 mt-1">
+                                                    <div class="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-1 py-0.5 rounded whitespace-nowrap">
+                                                        Rate: <span class="text-rose-800 font-extrabold" x-text="'₹' + getPmRowRate(pm, fg.cf_1)"></span>
+                                                    </div>
+                                                    <input type="number" step="0.01" min="0.01" x-model="pm.rate"
+                                                           class="w-16 px-1.5 py-0.5 text-[9px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                           placeholder="Enter Rate">
+                                                </div>
+                                            </template>
                                         </div>
                                         <div class="col-span-3">
                                             <input type="number" step="0.001" x-model="pm.quantity"
@@ -889,6 +902,28 @@ function bomApp() {
             return parseFloat(rate.toFixed(2));
         },
 
+        getPmRowRate(pm, fgCf1) {
+            if (!pm.raw_material_id) return 0;
+            let baseRate = this.getPmRate(pm.raw_material_id, false, 1);
+            if (baseRate === 0 && pm.rate) {
+                baseRate = parseFloat(pm.rate) || 0;
+            }
+            if (pm.is_container) {
+                const divisor = parseFloat(fgCf1) || 1;
+                baseRate = baseRate / divisor;
+            }
+            return parseFloat(baseRate.toFixed(2));
+        },
+
+        getPmTotalRate(pricelistId, cf1) {
+            let sum = 0;
+            const pms = this.bomModal.form.packing_materials.filter(p => p.pricelist_id == pricelistId);
+            pms.forEach(pm => {
+                sum += this.getPmRowRate(pm, cf1);
+            });
+            return parseFloat(sum.toFixed(2));
+        },
+
         getMaterialRate(rmId) {
             const rm = __rawMaterials.find(r => r.id == rmId);
             if (!rm || !rm.item_code) return null;
@@ -1066,6 +1101,7 @@ function bomApp() {
                     raw_material_id: p.raw_material_id,
                     quantity: p.quantity,
                     is_container: p.is_container || false,
+                    rate: '',
                     search: ''
                 }))
             };
@@ -1081,6 +1117,7 @@ function bomApp() {
                 raw_material_id: '',
                 quantity: '',
                 is_container: false,
+                rate: '',
                 search: ''
             });
         },
@@ -1131,7 +1168,13 @@ function bomApp() {
 
         async submitBom() {
             const cleanItems = this.bomModal.form.items.filter(i => i.raw_material_id && !i.is_packing);
-            const cleanPMs = (this.bomModal.form.packing_materials || []).filter(p => p.raw_material_id && p.quantity);
+            const cleanPMs = (this.bomModal.form.packing_materials || []).filter(p => p.raw_material_id && p.quantity).map(p => ({
+                pricelist_id: p.pricelist_id,
+                raw_material_id: p.raw_material_id,
+                quantity: p.quantity,
+                is_container: p.is_container,
+                rate: p.rate || ''
+            }));
             if (!this.bomModal.form.finished_product_id || !this.bomModal.form.yield_quantity || cleanItems.length === 0) {
                 alert('Please fill all required fields and add at least one item.');
                 return;

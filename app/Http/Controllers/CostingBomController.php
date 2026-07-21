@@ -160,6 +160,7 @@ class CostingBomController extends Controller
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
             'packing_materials.*.quantity'        => 'required|numeric|min:0.001',
             'packing_materials.*.is_container'    => 'nullable|boolean',
+            'packing_materials.*.rate'            => 'nullable|numeric|min:0',
         ], [
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
@@ -231,6 +232,17 @@ class CostingBomController extends Controller
                         'quantity'        => $pm['quantity'],
                         'is_container'    => !empty($pm['is_container']),
                     ]);
+
+                    // Save manually entered rate to product_prices if provided
+                    if (!empty($pm['rate'])) {
+                        $product = Product::find($pm['raw_material_id']);
+                        if ($product && !empty($product->item_code)) {
+                            \App\Models\ProductPrice::updateOrCreate(
+                                ['item_code' => $product->item_code],
+                                ['price_per_unit' => $pm['rate']]
+                            );
+                        }
+                    }
                 }
             }
         });
@@ -273,6 +285,7 @@ class CostingBomController extends Controller
             'packing_materials.*.raw_material_id' => 'required|exists:products,id',
             'packing_materials.*.quantity'        => 'required|numeric|min:0.001',
             'packing_materials.*.is_container'    => 'nullable|boolean',
+            'packing_materials.*.rate'            => 'nullable|numeric|min:0',
         ], [
             'finished_product_id.unique' => 'A Costing BOM for this product with this badge already exists.',
         ]);
@@ -347,6 +360,17 @@ class CostingBomController extends Controller
                         'quantity'        => $pm['quantity'],
                         'is_container'    => !empty($pm['is_container']),
                     ]);
+
+                    // Save manually entered rate to product_prices if provided
+                    if (!empty($pm['rate'])) {
+                        $product = Product::find($pm['raw_material_id']);
+                        if ($product && !empty($product->item_code)) {
+                            \App\Models\ProductPrice::updateOrCreate(
+                                ['item_code' => $product->item_code],
+                                ['price_per_unit' => $pm['rate']]
+                            );
+                        }
+                    }
                 }
             }
         });
