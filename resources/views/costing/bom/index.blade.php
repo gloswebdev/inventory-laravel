@@ -270,7 +270,7 @@
 
             {{-- Visual Step Indicators --}}
             <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-shrink-0">
-                <div class="flex items-center w-full justify-between max-w-lg mx-auto">
+                <div class="flex items-center w-full justify-between max-w-2xl mx-auto gap-2">
                     <!-- Step 1 Indicator -->
                     <div class="flex items-center gap-2">
                         <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black transition-all"
@@ -734,7 +734,7 @@
                         <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Size-Wise Packing & Ingredient Costs</h4>
                         <div class="space-y-3">
                             <template x-for="fg in getLinkedPricelistItems(bomModal.form.finished_product_id)" :key="fg.id">
-                                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                                <div x-show="getPmTotalRate(fg.id, fg.cf_1) > 0" class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
                                     <!-- FG Summary Info -->
                                     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
                                         <div>
@@ -994,7 +994,10 @@ function bomApp() {
             if (!sizeStr) return 0;
             const str = sizeStr.toLowerCase().trim();
             const num = parseFloat(str) || 0;
-            if (str.includes('ltr') || str.includes('liter') || str.includes('litre') || str.includes(' l') || str.endsWith('l') || str.includes('kg')) {
+            if (str.includes('ml') || str.includes('gm') || str.includes('g') || str.includes('gram')) {
+                return num;
+            }
+            if (str.includes('ltr') || str.includes('liter') || str.includes('litre') || str.includes('kg') || str.endsWith('l')) {
                 return num * 1000;
             }
             return num;
