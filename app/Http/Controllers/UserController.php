@@ -43,6 +43,10 @@ class UserController extends Controller
         'costing_purchase' => 'Purchase Register',
         'costing_pricelist' => 'Pricelist',
         'mobile_costing' => 'Mobile: Costing',
+        'mobile_costing_bom' => 'Mobile: Costing BOMs',
+        'mobile_costing_pro' => 'Mobile: Costing Dashboard',
+        'mobile_costing_purchase' => 'Mobile: Purchase Register',
+        'mobile_costing_pricelist' => 'Mobile: Pricelist',
     ];
 
     /**
@@ -144,6 +148,25 @@ class UserController extends Controller
         'mobile_costing' => [
             'calculate' => 'Calculate Batch Cost',
             'export'    => 'Export Cost PDF',
+        ],
+        'mobile_costing_bom' => [
+            'duplicate' => 'Duplicate BOM',
+            'create'    => 'Create New BOM',
+            'delete'    => 'Delete BOM',
+            'export'    => 'Export BOM',
+        ],
+        'mobile_costing_pro' => [
+            'calculate' => 'Calculate Batch Cost',
+            'export'    => 'Export Cost PDF',
+        ],
+        'mobile_costing_purchase' => [
+            'date_filter' => 'Date Filter',
+            'item_filter' => 'Item Filter',
+            'sync'        => 'Sync ERP Register',
+        ],
+        'mobile_costing_pricelist' => [
+            'edit' => 'Edit Price & Purity',
+            'sync' => 'Sync ERP Prices',
         ],
     ];
 

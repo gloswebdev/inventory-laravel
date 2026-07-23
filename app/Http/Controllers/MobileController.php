@@ -16,6 +16,8 @@ use App\Models\Adjustment;
 use App\Models\ProductType;
 use App\Models\ProductGroup;
 use App\Models\ProductSyncLog;
+use App\Models\ProductPrice;
+use App\Models\PurchaseRegister;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -83,6 +85,17 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.costing'                => 'mobile_costing',
                     'mobile.costing.calculate'      => 'mobile_costing',
                     'mobile.costing.export'         => 'mobile_costing',
+                    'mobile.costing.boms'           => 'mobile_costing_bom',
+                    'mobile.costing.boms.store'     => 'mobile_costing_bom',
+                    'mobile.costing.boms.duplicate' => 'mobile_costing_bom',
+                    'mobile.costing.boms.destroy'   => 'mobile_costing_bom',
+                    'mobile.costing.boms.export'    => 'mobile_costing_bom',
+                    'mobile.costing.pro'            => 'mobile_costing_pro',
+                    'mobile.costing.purchase'       => 'mobile_costing_purchase',
+                    'mobile.costing.purchase.sync'  => 'mobile_costing_purchase',
+                    'mobile.costing.pricelist'      => 'mobile_costing_pricelist',
+                    'mobile.costing.pricelist.update' => 'mobile_costing_pricelist',
+                    'mobile.costing.pricelist.sync' => 'mobile_costing_pricelist',
                     'mobile.purchase-report'        => 'mobile_purchase_report',
                 ];
 
@@ -175,6 +188,34 @@ class MobileController extends Controller implements HasMiddleware
                 'route'      => 'mobile.settings',
                 'color'      => 'bg-cyan-600',
                 'permission' => 'mobile_settings'
+            ],
+            [
+                'name'       => 'Costing BOMs',
+                'icon'       => 'fas fa-layer-group',
+                'route'      => 'mobile.costing.boms',
+                'color'      => 'bg-amber-600',
+                'permission' => 'mobile_costing_bom'
+            ],
+            [
+                'name'       => 'Costing Dashboard',
+                'icon'       => 'fas fa-chart-pie',
+                'route'      => 'mobile.costing.pro',
+                'color'      => 'bg-yellow-500',
+                'permission' => 'mobile_costing_pro'
+            ],
+            [
+                'name'       => 'Purchase Register',
+                'icon'       => 'fas fa-receipt',
+                'route'      => 'mobile.costing.purchase',
+                'color'      => 'bg-orange-500',
+                'permission' => 'mobile_costing_purchase'
+            ],
+            [
+                'name'       => 'Pricelist',
+                'icon'       => 'fas fa-tags',
+                'route'      => 'mobile.costing.pricelist',
+                'color'      => 'bg-rose-500',
+                'permission' => 'mobile_costing_pricelist'
             ],
             [
                 'name'       => 'Costing',
@@ -1885,7 +1926,7 @@ class MobileController extends Controller implements HasMiddleware
      */
     public function costing()
     {
-        if (!Auth::user()->hasPermission('mobile_costing', 'view')) {
+        if (!Auth::user()->hasPermission('mobile_costing', 'view') && !Auth::user()->hasPermission('mobile_costing_pro', 'view') && !Auth::user()->hasPermission('costing_pro', 'view')) {
             abort(403, 'Unauthorized access to Costing module.');
         }
 
@@ -1902,7 +1943,149 @@ class MobileController extends Controller implements HasMiddleware
         $priceMap  = \App\Models\ProductPrice::allAsMap();
         $types     = \App\Models\ProductType::orderBy('type_name')->get();
 
-        return view('mobile.costing', compact('products', 'priceMap', 'types'));
+        $boms = CostingBom::with(['finishedProduct.type', 'items.rawMaterial', 'packingMaterials.rawMaterial', 'packingMaterials.pricelist'])->get();
+        $boms = $boms->sortBy(function ($bom) {
+            return strtolower($bom->finishedProduct->name ?? '');
+        })->values();
+
+        $localPurities = \App\Models\ProductPrice::allPuritiesAsMap();
+
+        $processedBoms = $boms->map(function ($bom) use ($localPurities, $priceMap) {
+            $product = $bom->finishedProduct;
+            $purity = '—';
+            $rmName = '—';
+
+            $techRm = null;
+            foreach ($bom->items as $item) {
+                if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
+                    $techRm = $item->rawMaterial;
+                    break;
+                }
+            }
+            if (!$techRm && $bom->items->isNotEmpty()) {
+                $techRm = $bom->items->first()->rawMaterial;
+            }
+
+            if ($techRm && $techRm->item_code) {
+                $code = trim($techRm->item_code);
+                $rmName = $techRm->name;
+                if (isset($localPurities[$code]) && $localPurities[$code] > 0) {
+                    $purity = $localPurities[$code] . '%';
+                }
+            }
+
+            $yieldQty = max((float)$bom->yield_quantity, 0.001);
+            $density  = (float)($bom->density > 0 ? $bom->density : 1.0);
+            
+            preg_match('/(\d+(?:\.\d+)?)\s*%/', $product->name ?? '', $matches);
+            $formulation = ($bom->formulation !== null) ? (float)$bom->formulation : (isset($matches[1]) ? (float)$matches[1] : 100.0);
+
+            $grandTotal = 0;
+            foreach ($bom->items as $item) {
+                $rm = $item->rawMaterial;
+                if (!$rm) continue;
+
+                $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
+                $tc = (float)($item->transportation_cost ?? 5.0);
+                $requiredQty = (float)$item->quantity;
+
+                if (strtoupper(trim($rm->rm_type ?? '')) === 'TECHNICAL') {
+                    $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
+                    if ($rmPurity <= 0 && $item->purity > 0) {
+                        $rmPurity = (float) $item->purity;
+                    }
+                    if ($rmPurity <= 0) $rmPurity = 100.0;
+
+                    $requiredQty = ($yieldQty * $formulation) / $rmPurity;
+                }
+
+                $subCost = $requiredQty * ($pricePerUnit + $tc);
+                $grandTotal += $subCost;
+            }
+
+            $woDensityRate   = $grandTotal / $yieldQty;
+            $withDensityRate = $woDensityRate * $density;
+
+            $packingCosts = [];
+            $grouped = $bom->packingMaterials->groupBy('pricelist_id');
+            foreach ($grouped as $pricelistId => $pmItems) {
+                $pricelist = $pmItems->first()->pricelist;
+                if (!$pricelist) continue;
+
+                $cf1 = (float)($pricelist->cf_1 ?? 1);
+                if ($cf1 <= 0) $cf1 = 1;
+
+                $singlePackPmCost = 0;
+                foreach ($pmItems as $pmItem) {
+                    $rm = $pmItem->rawMaterial;
+                    if (!$rm) continue;
+
+                    $pmPrice = (float)($priceMap[$rm->item_code] ?? 0);
+                    if ($pmPrice <= 0 && $pmItem->rate) {
+                        $pmPrice = (float)$pmItem->rate;
+                    }
+
+                    if ($pmItem->is_container) {
+                        $pmPrice = $cf1 > 0 ? ($pmPrice / $cf1) : $pmPrice;
+                    }
+
+                    $singlePackPmCost += round($pmPrice, 2);
+                }
+                $singlePackPmCost = round($singlePackPmCost, 2);
+
+                $sizeStr = strtolower(trim($pricelist->size ?? ''));
+                preg_match('/(\d+(?:\.\d+)?)/', $sizeStr, $matches);
+                $sizeNum = !empty($matches[1]) ? (float)$matches[1] : 1000.0;
+                $sizeInMl = $sizeNum;
+                if (str_contains($sizeStr, 'ml') || str_contains($sizeStr, 'gm') || str_contains($sizeStr, 'g') || str_contains($sizeStr, 'gram')) {
+                    $sizeInMl = $sizeNum;
+                } elseif (str_contains($sizeStr, 'ltr') || str_contains($sizeStr, 'liter') || str_contains($sizeStr, 'litre') || str_contains($sizeStr, 'kg') || preg_match('/\b\d+\s*l\b/i', $sizeStr)) {
+                    $sizeInMl = $sizeNum * 1000.0;
+                }
+                $packVolumeLtr = $sizeInMl > 0 ? ($sizeInMl / 1000.0) : 1.0;
+
+                $unitBulkWo   = $woDensityRate * $packVolumeLtr;
+                $unitBulkWith = $withDensityRate * $packVolumeLtr;
+
+                $unitTotalWo   = $unitBulkWo + $singlePackPmCost;
+                $unitTotalWith = $unitBulkWith + $singlePackPmCost;
+
+                $packingCosts[] = [
+                    'pricelist_id'     => $pricelistId,
+                    'size'             => $pricelist->size ?: 'Unknown',
+                    'fg_name'          => $pricelist->item_hd_name ?: ($pricelist->item_short_name ?: '—'),
+                    'cf1'              => $cf1,
+                    'size_in_ml'       => round($sizeInMl, 2),
+                    'pack_volume_ltr'  => round($packVolumeLtr, 4),
+                    'pm_cost'          => round($singlePackPmCost, 2),
+                    'unit_bulk_wo'     => round($unitBulkWo, 2),
+                    'unit_bulk_with'   => round($unitBulkWith, 2),
+                    'unit_total_wo'    => round($unitTotalWo, 2),
+                    'unit_total_with'  => round($unitTotalWith, 2),
+                ];
+            }
+
+            return [
+                'id'                 => $bom->id,
+                'product_name'       => $product->name ?? '—',
+                'badge'              => $bom->badge,
+                'item_code'          => $product->item_code ?? '—',
+                'pack_name'          => $product->pack_name ?? '—',
+                'yield_qty'          => $bom->yield_quantity,
+                'yield_uom'          => $bom->yield_uom,
+                'density'            => $density,
+                'formulation'        => $formulation,
+                'grand_total'        => round($grandTotal, 2),
+                'wo_density_rate'    => round($woDensityRate, 2),
+                'with_density_rate'  => round($withDensityRate, 2),
+                'packing_costs'      => $packingCosts,
+                'purity'             => $purity,
+                'rm_name'            => $rmName,
+                'raw_bom_data'       => $bom->load(['items.rawMaterial', 'packingMaterials.rawMaterial', 'packingMaterials.pricelist']),
+            ];
+        });
+
+        return view('mobile.costing', compact('products', 'priceMap', 'types', 'processedBoms'));
     }
 
     /**
@@ -2228,5 +2411,268 @@ class MobileController extends Controller implements HasMiddleware
             'fromDate', 'toDate', 'account', 'item', 'branch',
             'rmType', 'types', 'rmTypeOptions', 'typesOptions', 'accountOptions', 'itemOptions'
         ));
+    }
+
+    /**
+     * Mobile: Costing BOMs
+     */
+    public function costingBoms(\Illuminate\Http\Request $request)
+    {
+        $query = CostingBom::with(['finishedProduct.type', 'items.rawMaterial']);
+        $user = Auth::user();
+
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $permittedRMTypes = $user->getPermittedRMTypes();
+            
+            $query->whereHas('finishedProduct', function($q) use ($permittedTypeIds, $permittedRMTypes) {
+                $q->whereIn('product_type_id', $permittedTypeIds)
+                  ->where(function($sq) use ($permittedRMTypes) {
+                      $sq->whereIn('rm_type', $permittedRMTypes)
+                        ->orWhereNull('rm_type')
+                        ->orWhere('rm_type', '');
+                  });
+            });
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('finishedProduct', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('item_code', 'like', "%{$search}%");
+            });
+        }
+
+        $boms = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+
+        $fgQuery = Product::whereHas('type', function($q) {
+            $q->whereIn('type_name', ['Semi Finished Good', 'Semi Finished Goods', 'SEMI FINISHED GOOD', 'SEMI FINISHED GOODS', 'Finished Good', 'Finished Goods']);
+        })->orderBy('name');
+
+        $rmQuery = Product::whereHas('type', function($q) {
+            $q->whereIn('type_name', ['RAW MATERIAL', 'PACKING MATERIAL', 'Raw Material', 'Packing Material']);
+        })->orderBy('name');
+
+        if ($user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $fgQuery->whereIn('product_type_id', $permittedTypeIds);
+            $rmQuery->whereIn('product_type_id', $permittedTypeIds);
+        }
+
+        $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
+        $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
+
+        return view('mobile.costing_boms', compact('boms', 'finishedGoods', 'rawMaterials'));
+    }
+
+    public function storeCostingBom(\Illuminate\Http\Request $request)
+    {
+        if (!Auth::user()->hasPermission('mobile_costing_bom', 'create') && !Auth::user()->hasPermission('costing_bom', 'create')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $validated = $request->validate([
+            'finished_product_id' => 'required|exists:products,id',
+            'badge'               => 'nullable|string|in:small,big,bulk',
+            'yield_quantity'      => 'required|numeric|min:0.001',
+            'yield_uom'           => 'required|string|max:50',
+            'items'               => 'required|array|min:1',
+            'items.*.raw_material_id' => 'required|exists:products,id',
+            'items.*.quantity'    => 'required|numeric|min:0.001',
+            'items.*.purity'      => 'nullable|numeric|min:0.1|max:100',
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            $bom = CostingBom::create([
+                'finished_product_id' => $validated['finished_product_id'],
+                'yield_quantity'      => $validated['yield_quantity'],
+                'yield_uom'           => $validated['yield_uom'],
+                'badge'               => $validated['badge'] ?? null,
+            ]);
+
+            foreach ($validated['items'] as $item) {
+                CostingBomItem::create([
+                    'costing_bom_id'  => $bom->id,
+                    'raw_material_id' => $item['raw_material_id'],
+                    'quantity'        => $item['quantity'],
+                    'purity'          => $item['purity'] ?? null,
+                    'transportation_cost' => 5.0,
+                ]);
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Costing BOM created successfully.']);
+    }
+
+    public function duplicateCostingBom(\Illuminate\Http\Request $request, $id)
+    {
+        if (!Auth::user()->hasPermission('mobile_costing_bom', 'create') && !Auth::user()->hasPermission('costing_bom', 'create')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $costingBom = CostingBom::findOrFail($id);
+        $badge = $request->input('badge', 'small');
+
+        DB::transaction(function () use ($costingBom, $badge) {
+            $newBom = CostingBom::create([
+                'finished_product_id' => $costingBom->finished_product_id,
+                'yield_quantity'      => $costingBom->yield_quantity,
+                'yield_uom'           => $costingBom->yield_uom,
+                'badge'               => $badge,
+                'formulation'         => $costingBom->formulation,
+                'density'             => $costingBom->density,
+            ]);
+
+            foreach ($costingBom->items as $item) {
+                CostingBomItem::create([
+                    'costing_bom_id'  => $newBom->id,
+                    'raw_material_id' => $item->raw_material_id,
+                    'quantity'        => $item->quantity,
+                    'purity'          => $item->purity,
+                ]);
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Costing BOM duplicated successfully.']);
+    }
+
+    public function deleteCostingBom(\Illuminate\Http\Request $request, $id)
+    {
+        if (!Auth::user()->hasPermission('mobile_costing_bom', 'delete') && !Auth::user()->hasPermission('costing_bom', 'delete')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $costingBom = CostingBom::findOrFail($id);
+        DB::transaction(function () use ($costingBom) {
+            $costingBom->items()->delete();
+            $costingBom->delete();
+        });
+
+        return response()->json(['success' => true, 'message' => 'Costing BOM deleted successfully.']);
+    }
+
+    public function exportCostingBoms(\Illuminate\Http\Request $request)
+    {
+        return (new \App\Exports\CostingBomsExport($request->search))->download('mobile_costing_boms.xlsx');
+    }
+
+    /**
+     * Mobile: Costing Dashboard / Pro
+     */
+    public function costingPro(\Illuminate\Http\Request $request)
+    {
+        return $this->costing($request);
+    }
+
+    /**
+     * Mobile: Costing Purchase Register
+     */
+    public function costingPurchaseRegister(\Illuminate\Http\Request $request)
+    {
+        $query = PurchaseRegister::orderByDesc('vouch_date')->orderByDesc('id');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('item_name', 'like', "%{$search}%")
+                  ->orWhere('supplier_name', 'like', "%{$search}%")
+                  ->orWhere('item_code', 'like', "%{$search}%")
+                  ->orWhere('vouch_no', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('vouch_date', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('vouch_date', '<=', $request->to_date);
+        }
+
+        $purchases = $query->paginate(20)->withQueryString();
+
+        $totalBills  = PurchaseRegister::distinct('vouch_no')->count('vouch_no');
+        $totalItems  = PurchaseRegister::count();
+        $totalAmount = PurchaseRegister::sum(DB::raw('qty * case_rate'));
+
+        return view('mobile.purchase_register', compact('purchases', 'totalBills', 'totalItems', 'totalAmount'));
+    }
+
+    public function syncCostingPurchaseRegister(\Illuminate\Http\Request $request)
+    {
+        try {
+            $controller = new CostingController();
+            $count = $controller->syncPurchaseRegisterRaw();
+            return response()->json([
+                'success' => true,
+                'message' => "Synced {$count} purchase entries from ERP.",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mobile: Costing Pricelist (Master Finished Goods Rates)
+     */
+    public function costingPricelist(\Illuminate\Http\Request $request)
+    {
+        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('item_hd_name', 'like', "%{$search}%")
+                  ->orWhere('user_code', 'like', "%{$search}%")
+                  ->orWhere('group3', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('group1')) {
+            $query->where('group1', $request->group1);
+        }
+
+        $sortOrder = $request->input('sort', 'asc') === 'desc' ? 'desc' : 'asc';
+        $query->orderBy('item_hd_name', $sortOrder);
+
+        $pricelists = $query->paginate(20)->withQueryString();
+        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+
+        return view('mobile.pricelist', compact('pricelists', 'group1List'));
+    }
+
+    public function updateCostingPricelist(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'item_code'      => 'required|string',
+            'price_per_unit' => 'required|numeric|min:0',
+            'purity'         => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        ProductPrice::updateOrCreate(
+            ['item_code' => $request->item_code],
+            [
+                'price_per_unit' => $request->price_per_unit,
+                'purity'         => $request->purity ?? 100.0,
+                'price_source'   => 'manual',
+                'fetched_at'     => now(),
+            ]
+        );
+
+        return response()->json(['success' => true, 'message' => 'Price & purity updated successfully.']);
+    }
+
+    public function syncCostingPricelist(\Illuminate\Http\Request $request)
+    {
+        try {
+            $controller = new CostingController();
+            $count = $controller->syncPricelistRaw();
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully synced {$count} items from Product Master ERP API into database.",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 }

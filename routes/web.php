@@ -171,10 +171,25 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/indents/{indent}/process/pdf', [App\Http\Controllers\MobileController::class, 'exportProcessPdf'])->name('mobile.indents.process.pdf');
     Route::get('/stock/excel', [App\Http\Controllers\MobileController::class, 'exportStockExcel'])->name('mobile.stock.excel');
     Route::get('/stock/pdf', [App\Http\Controllers\MobileController::class, 'exportStockPdf'])->name('mobile.stock.pdf');
-    // Costing
-    Route::get('/costing',            [App\Http\Controllers\MobileController::class, 'costing'])->name('mobile.costing');
-    Route::post('/costing/calculate', [App\Http\Controllers\MobileController::class, 'calculateCosting'])->name('mobile.costing.calculate');
-    Route::post('/costing/export',    [App\Http\Controllers\MobileController::class, 'exportCosting'])->name('mobile.costing.export');
+    // Costing Sub-Modules (Mobile)
+    Route::get('/costing',                     [App\Http\Controllers\MobileController::class, 'costing'])->name('mobile.costing');
+    Route::post('/costing/calculate',          [App\Http\Controllers\MobileController::class, 'calculateCosting'])->name('mobile.costing.calculate');
+    Route::post('/costing/export',             [App\Http\Controllers\MobileController::class, 'exportCosting'])->name('mobile.costing.export');
+
+    Route::get('/costing-boms',                [App\Http\Controllers\MobileController::class, 'costingBoms'])->name('mobile.costing.boms');
+    Route::post('/costing-boms/store',         [App\Http\Controllers\MobileController::class, 'storeCostingBom'])->name('mobile.costing.boms.store');
+    Route::post('/costing-boms/{id}/duplicate', [App\Http\Controllers\MobileController::class, 'duplicateCostingBom'])->name('mobile.costing.boms.duplicate');
+    Route::delete('/costing-boms/{id}',        [App\Http\Controllers\MobileController::class, 'deleteCostingBom'])->name('mobile.costing.boms.destroy');
+    Route::get('/costing-boms-export',         [App\Http\Controllers\MobileController::class, 'exportCostingBoms'])->name('mobile.costing.boms.export');
+
+    Route::get('/costing-dashboard',           [App\Http\Controllers\MobileController::class, 'costingPro'])->name('mobile.costing.pro');
+
+    Route::get('/costing-purchase-register',   [App\Http\Controllers\MobileController::class, 'costingPurchaseRegister'])->name('mobile.costing.purchase');
+    Route::post('/costing-purchase-register/sync', [App\Http\Controllers\MobileController::class, 'syncCostingPurchaseRegister'])->name('mobile.costing.purchase.sync');
+
+    Route::get('/costing-pricelist',           [App\Http\Controllers\MobileController::class, 'costingPricelist'])->name('mobile.costing.pricelist');
+    Route::post('/costing-pricelist/update',   [App\Http\Controllers\MobileController::class, 'updateCostingPricelist'])->name('mobile.costing.pricelist.update');
+    Route::post('/costing-pricelist/sync',     [App\Http\Controllers\MobileController::class, 'syncCostingPricelist'])->name('mobile.costing.pricelist.sync');
 
     // Purchase Report
     Route::get('/purchase-report', [App\Http\Controllers\MobileController::class, 'purchaseReport'])->name('mobile.purchase-report');
