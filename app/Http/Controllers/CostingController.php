@@ -330,10 +330,17 @@ class CostingController extends Controller
     public function pro(Request $request)
     {
         if (!Auth::user()->hasPermission('costing_pro', 'view')) {
-            abort(403, 'Access denied to Costing Pro.');
+            abort(403, 'Access denied to Costing Dashboard.');
         }
 
-        $boms = CostingBom::with(['finishedProduct.type', 'items.rawMaterial'])->get();
+        $boms = CostingBom::with(['finishedProduct.type', 'items.rawMaterial', 'packingMaterials.rawMaterial', 'packingMaterials.pricelist'])->get();
+
+        // Sort BOMs A to Z by finished product name
+        $boms = $boms->sortBy(function ($bom) {
+            return strtolower($bom->finishedProduct->name ?? '');
+        })->values();
+
+        $priceMap = ProductPrice::allAsMap();
 
         $latestPurityMap = [];
         $apiSuccess = false;
@@ -385,13 +392,13 @@ class CostingController extends Controller
                 }
             }
         } catch (\Exception $e) {
-            Log::error('Costing Pro ERP API error: ' . $e->getMessage());
+            Log::error('Costing Dashboard ERP API error: ' . $e->getMessage());
         }
 
         $localPurities = ProductPrice::allPuritiesAsMap();
 
-        // Process BOMs with their purities
-        $processedBoms = $boms->map(function ($bom) use ($latestPurityMap, $localPurities) {
+        // Process BOMs with detailed batch grand total, density rates, and packing materials PM costs
+        $processedBoms = $boms->map(function ($bom) use ($latestPurityMap, $localPurities, $priceMap) {
             $product = $bom->finishedProduct;
             $purity = '—';
             $vouchDate = '—';
@@ -406,7 +413,6 @@ class CostingController extends Controller
                     break;
                 }
             }
-            // If no TECHNICAL rm found, fallback to the first raw material
             if (!$techRm && $bom->items->isNotEmpty()) {
                 $techRm = $bom->items->first()->rawMaterial;
             }
@@ -424,22 +430,148 @@ class CostingController extends Controller
                 }
             }
 
+            // Calculate Batch Grand Total RM Cost
+            $yieldQty = max((float)$bom->yield_quantity, 0.001);
+            $density  = (float)($bom->density > 0 ? $bom->density : 1.0);
+            $formulation = ($bom->formulation !== null) ? (float)$bom->formulation : $this->parseFormulation($product->name ?? '');
+
+            $grandTotal = 0;
+            foreach ($bom->items as $item) {
+                $rm = $item->rawMaterial;
+                if (!$rm) continue;
+
+                $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
+                $tc = (float)($item->transportation_cost ?? 5.0);
+                $requiredQty = (float)$item->quantity;
+
+                if (strtoupper(trim($rm->rm_type ?? '')) === 'TECHNICAL') {
+                    $rmPurity = (float) ProductPrice::where('item_code', $rm->item_code)->value('purity');
+                    if ($rmPurity <= 0 && $item->purity > 0) {
+                        $rmPurity = (float) $item->purity;
+                    }
+                    if ($rmPurity <= 0) $rmPurity = 100.0;
+
+                    $requiredQty = ($yieldQty * $formulation) / $rmPurity;
+                }
+
+                $subCost = $requiredQty * ($pricePerUnit + $tc);
+                $grandTotal += $subCost;
+            }
+
+            $woDensityRate   = $grandTotal / $yieldQty;
+            $withDensityRate = $woDensityRate * $density;
+
+            // Packing materials cost computation
+            $packingCosts = [];
+            $grouped = $bom->packingMaterials->groupBy('pricelist_id');
+            foreach ($grouped as $pricelistId => $pmItems) {
+                $pricelist = $pmItems->first()->pricelist;
+                if (!$pricelist) continue;
+
+                $cf1 = (float)($pricelist->cf_1 ?? 1);
+                if ($cf1 <= 0) $cf1 = 1;
+
+                $singlePackPmCost = 0;
+                foreach ($pmItems as $pmItem) {
+                    $rm = $pmItem->rawMaterial;
+                    if (!$rm) continue;
+
+                    $pmPrice = (float)($priceMap[$rm->item_code] ?? 0);
+                    if ($pmPrice <= 0 && $pmItem->rate) {
+                        $pmPrice = (float)$pmItem->rate;
+                    }
+
+                    if ($pmItem->is_container) {
+                        $pmPrice = $cf1 > 0 ? ($pmPrice / $cf1) : $pmPrice;
+                    }
+
+                    $singlePackPmCost += round($pmPrice, 2);
+                }
+                $singlePackPmCost = round($singlePackPmCost, 2);
+
+                $bulkCostForPackWo   = $woDensityRate * $cf1;
+                $bulkCostForPackWith = $withDensityRate * $cf1;
+
+                $packingCosts[] = [
+                    'pricelist_id'     => $pricelistId,
+                    'size'             => $pricelist->size ?: 'Unknown',
+                    'fg_name'          => $pricelist->item_hd_name ?: ($pricelist->item_short_name ?: '—'),
+                    'cf1'              => $cf1,
+                    'pm_cost'          => round($singlePackPmCost, 2),
+                    'bulk_cost_wo'     => round($bulkCostForPackWo, 2),
+                    'bulk_cost_with'   => round($bulkCostForPackWith, 2),
+                    'total_cost_wo'    => round($bulkCostForPackWo + $singlePackPmCost, 2),
+                    'total_cost_with'  => round($bulkCostForPackWith + $singlePackPmCost, 2),
+                ];
+            }
+
             return [
-                'id'            => $bom->id,
-                'product_name'  => $product->name ?? '—',
-                'badge'         => $bom->badge,
-                'item_code'     => $product->item_code ?? '—',
-                'pack_name'     => $product->pack_name ?? '—',
-                'yield_qty'     => $bom->yield_quantity,
-                'yield_uom'     => $bom->yield_uom,
-                'purity'        => $purity,
-                'purchase_date' => $vouchDate,
-                'source'        => $source,
-                'rm_name'       => $rmName,
+                'id'                 => $bom->id,
+                'product_name'       => $product->name ?? '—',
+                'badge'              => $bom->badge,
+                'item_code'          => $product->item_code ?? '—',
+                'pack_name'          => $product->pack_name ?? '—',
+                'yield_qty'          => $bom->yield_quantity,
+                'yield_uom'          => $bom->yield_uom,
+                'density'            => $density,
+                'formulation'        => $formulation,
+                'grand_total'        => round($grandTotal, 2),
+                'wo_density_rate'    => round($woDensityRate, 2),
+                'with_density_rate'  => round($withDensityRate, 2),
+                'packing_costs'      => $packingCosts,
+                'purity'             => $purity,
+                'purchase_date'      => $vouchDate,
+                'source'             => $source,
+                'rm_name'            => $rmName,
+                'raw_bom_data'       => $bom->load(['items', 'packingMaterials']),
             ];
         });
 
-        return view('costing.pro', compact('processedBoms', 'apiSuccess'));
+        $user = Auth::user();
+        $fgQuery = Product::whereHas('type', function($q) {
+            $q->whereIn('type_name', ['Semi Finished Good', 'Semi Finished Goods', 'SEMI FINISHED GOOD', 'SEMI FINISHED GOODS']);
+        })->orderBy('name');
+
+        $rmQuery = Product::whereHas('type', function($q) {
+            $q->whereIn('type_name', ['RAW MATERIAL', 'PACKING MATERIAL', 'Raw Material', 'Packing Material']);
+        })->orderBy('name');
+
+        $typesQuery = \App\Models\ProductType::orderBy('type_name');
+
+        if ($user->role !== 'admin') {
+            $this->applyTypeFilters($fgQuery);
+            $this->applyTypeFilters($rmQuery);
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $typesQuery->whereIn('id', $permittedTypeIds);
+        }
+
+        $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
+        $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
+        $types         = $typesQuery->get();
+
+        $pricelists = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
+            ->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
+
+        $localPrices = \App\Models\ProductPrice::pluck('price_per_unit', 'item_code')->toArray();
+        $prPrices = \App\Models\PurchaseRegister::orderByDesc('vouch_date')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('item_code')
+            ->pluck('case_rate', 'item_code')
+            ->toArray();
+        $pmRates = array_merge($localPrices, $prPrices);
+        $purities = $localPurities;
+
+        return view('costing.pro', compact(
+            'processedBoms', 
+            'apiSuccess', 
+            'finishedGoods', 
+            'rawMaterials', 
+            'types', 
+            'pricelists', 
+            'pmRates', 
+            'purities'
+        ));
     }
 
     public function purchaseRegister(Request $request)
@@ -903,12 +1035,15 @@ class CostingController extends Controller
                 $rm = $item->rawMaterial;
                 if (!$rm) continue;
                 $pmPrice = (float)($priceMap[$rm->item_code] ?? 0);
+                if ($pmPrice <= 0 && $item->rate) {
+                    $pmPrice = (float)$item->rate;
+                }
                 
                 if ($item->is_container) {
                     $pmPrice = $cf1 > 0 ? ($pmPrice / $cf1) : $pmPrice;
                 }
                 
-                $itemCost = $item->quantity * $pmPrice;
+                $itemCost = round($pmPrice, 2);
                 $singlePackPmCost += $itemCost;
                 
                 $pmBreakdown[] = [
@@ -918,7 +1053,8 @@ class CostingController extends Controller
                     'cost' => round($itemCost, 2),
                 ];
             }
-            
+            $singlePackPmCost = round($singlePackPmCost, 2);
+
             $bulkCostForPack = $costPerUnit * $cf1;
             $totalPackCost = $bulkCostForPack + $singlePackPmCost;
             

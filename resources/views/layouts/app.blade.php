@@ -444,7 +444,7 @@
                     @endif
                     @if(Auth::user()->hasPermission('costing_pro', 'view'))
                     <a href="{{ route('costing.pro') }}" class="sub-nav-link {{ request()->routeIs('costing.pro') ? 'active' : '' }}">
-                        <span class="sub-dot"></span> Costing Pro
+                        <span class="sub-dot"></span> Costing Dashboard
                     </a>
                     @endif
                     @if(Auth::user()->hasPermission('costing_purchase', 'view'))
