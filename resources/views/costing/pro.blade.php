@@ -158,41 +158,45 @@
 
                             {{-- W/o Density Rate --}}
                             <td class="py-4 px-5 align-top whitespace-nowrap">
-                                <label class="flex items-center gap-2 cursor-pointer group p-2 rounded-xl transition-all" :class="isRateSelected(bom.id, 'wo') ? 'bg-orange-100/80 border border-orange-300 ring-2 ring-orange-400/20' : 'hover:bg-slate-100/70'">
-                                    <input type="radio" name="selected_rate" :checked="isRateSelected(bom.id, 'wo')" @change="selectRate(bom, 'wo')" class="w-4 h-4 text-orange-600 focus:ring-orange-500">
+                                <div @click="toggleRate(bom, 'wo')" class="flex items-center gap-2 cursor-pointer group p-2 rounded-xl transition-all select-none" :class="isRateSelected(bom.id, 'wo') ? 'bg-orange-100/80 border border-orange-300 ring-2 ring-orange-400/20' : 'hover:bg-slate-100/70'">
+                                    <input type="checkbox" :checked="isRateSelected(bom.id, 'wo')" @click.stop="toggleRate(bom, 'wo')" class="w-4 h-4 text-orange-600 focus:ring-orange-500 rounded cursor-pointer">
                                     <div>
                                         <div class="font-black text-slate-800 text-sm group-hover:text-orange-600 transition-colors" x-text="'₹' + bom.wo_density_rate + '/' + bom.yield_uom"></div>
                                         <div class="text-[10px] font-bold text-slate-400">W/o Density Rate</div>
                                     </div>
-                                </label>
+                                </div>
                             </td>
 
                             {{-- With Density Rate --}}
                             <td class="py-4 px-5 align-top whitespace-nowrap">
-                                <label class="flex items-center gap-2 cursor-pointer group p-2 rounded-xl transition-all" :class="isRateSelected(bom.id, 'with') ? 'bg-emerald-100/80 border border-emerald-300 ring-2 ring-emerald-400/20' : 'hover:bg-slate-100/70'">
-                                    <input type="radio" name="selected_rate" :checked="isRateSelected(bom.id, 'with')" @change="selectRate(bom, 'with')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                                <div @click="toggleRate(bom, 'with')" class="flex items-center gap-2 cursor-pointer group p-2 rounded-xl transition-all select-none" :class="isRateSelected(bom.id, 'with') ? 'bg-emerald-100/80 border border-emerald-300 ring-2 ring-emerald-400/20' : 'hover:bg-slate-100/70'">
+                                    <input type="checkbox" :checked="isRateSelected(bom.id, 'with')" @click.stop="toggleRate(bom, 'with')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded cursor-pointer">
                                     <div>
                                         <div class="font-black text-emerald-700 text-sm group-hover:text-emerald-800 transition-colors" x-text="'₹' + bom.with_density_rate + '/Ltr'"></div>
                                         <div class="text-[10px] font-bold text-slate-400">With Density Rate</div>
                                     </div>
-                                </label>
+                                </div>
                             </td>
 
-                            {{-- Related Products & Packing PM Total --}}
+                            {{-- Related Products & Packing PM Total & Per Pack Rate --}}
                             <td class="py-4 px-5 align-top">
                                 <template x-if="bom.packing_costs && bom.packing_costs.length > 0">
                                     <div class="space-y-2">
                                         <template x-for="p in bom.packing_costs" :key="p.pricelist_id">
-                                            <label class="flex items-start gap-2.5 p-2 rounded-xl border border-slate-200/80 cursor-pointer transition-all" :class="isPmSelected(bom.id, p.pricelist_id) ? 'bg-orange-100/70 border-orange-400 ring-2 ring-orange-400/20' : 'hover:bg-slate-50 bg-white'">
-                                                <input type="radio" name="selected_pm" :checked="isPmSelected(bom.id, p.pricelist_id)" @change="selectPm(bom, p)" class="w-4 h-4 text-orange-600 focus:ring-orange-500 mt-1 flex-shrink-0">
+                                            <div @click="togglePm(bom, p)" class="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200/80 cursor-pointer transition-all select-none" :class="isPmSelected(bom.id, p.pricelist_id) ? 'bg-orange-100/80 border-orange-400 ring-2 ring-orange-400/20' : 'hover:bg-slate-50 bg-white'">
+                                                <input type="checkbox" :checked="isPmSelected(bom.id, p.pricelist_id)" @click.stop="togglePm(bom, p)" class="w-4 h-4 text-orange-600 focus:ring-orange-500 mt-1 flex-shrink-0 rounded cursor-pointer">
                                                 <div class="flex-1 min-w-0">
-                                                    <div class="font-extrabold text-slate-800 text-xs truncate" x-text="p.fg_name"></div>
-                                                    <div class="flex items-center justify-between gap-2 mt-0.5">
-                                                        <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-extrabold rounded" x-text="p.size"></span>
-                                                        <span class="text-xs font-black text-indigo-700" x-text="'PM Total: ₹' + p.pm_cost"></span>
+                                                    <div class="flex items-center justify-between gap-1">
+                                                        <div class="font-extrabold text-slate-800 text-xs truncate" x-text="p.fg_name"></div>
+                                                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-black rounded" x-text="p.size"></span>
                                                     </div>
+                                                    <div class="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-slate-100/80">
+                                                        <span class="text-[10px] font-bold text-slate-500" x-text="'PM: ₹' + p.pm_cost"></span>
+                                                        <span class="text-xs font-black text-indigo-700" x-text="'Per Pack: ₹' + (selectedRate.type === 'with' ? p.unit_total_with : p.unit_total_wo)"></span>
+                                                    </div>
+                                                    <div class="text-[9.5px] font-bold text-slate-400 mt-0.5" x-text="'(Bulk: ₹' + (selectedRate.type === 'with' ? p.unit_bulk_with : p.unit_bulk_wo) + ' + PM: ₹' + p.pm_cost + ')'"></div>
                                                 </div>
-                                            </label>
+                                            </div>
                                         </template>
                                     </div>
                                 </template>
@@ -204,10 +208,33 @@
                             {{-- Calculation Action --}}
                             <td class="py-4 px-5 align-middle text-center whitespace-nowrap">
                                 <template x-if="isBomActive(bom.id)">
-                                    <div class="p-3 bg-orange-50 border border-orange-200 rounded-2xl text-center space-y-1 shadow-sm">
-                                        <div class="text-[9px] font-black uppercase text-orange-600 tracking-wider">Row Total</div>
-                                        <div class="text-lg font-black text-orange-700" x-text="'₹' + getCalculatedTotal(bom.id).toFixed(2)"></div>
-                                        <div class="text-[9px] font-bold text-slate-500" x-text="getCalculationSummary(bom.id)"></div>
+                                    <div class="p-3 bg-orange-50 border border-orange-200 rounded-2xl text-center space-y-1.5 shadow-sm">
+                                        <div class="text-[9px] font-black uppercase text-orange-600 tracking-wider">Calculation</div>
+                                        
+                                        <!-- When both Rate & PM item selected for this BOM -->
+                                        <template x-if="selectedRate.bom_id === bom.id && selectedPm.bom_id === bom.id && selectedRate.value && selectedPm.cost !== null">
+                                            <div>
+                                                <div class="text-[11px] font-mono font-extrabold text-indigo-700" x-text="getPackBulkFormula(bom)"></div>
+                                                <div class="text-lg font-black text-emerald-700 mt-0.5" x-text="'₹' + getPackTotalCost(bom).toFixed(2) + ' / Pack'"></div>
+                                                <div class="text-[9.5px] font-bold text-slate-500" x-text="'(Bulk ₹' + getPackBulkCost(bom).toFixed(2) + ' + PM ₹' + selectedPm.cost + ')'"></div>
+                                            </div>
+                                        </template>
+
+                                        <!-- When only Rate selected -->
+                                        <template x-if="selectedRate.bom_id === bom.id && (selectedPm.bom_id !== bom.id || selectedPm.cost === null)">
+                                            <div>
+                                                <div class="text-base font-black text-orange-700" x-text="'₹' + selectedRate.value.toFixed(2) + '/' + selectedRate.unit"></div>
+                                                <div class="text-[9.5px] font-bold text-slate-500" x-text="selectedRate.type === 'wo' ? 'W/o Density Rate' : 'With Density Rate'"></div>
+                                            </div>
+                                        </template>
+
+                                        <!-- When only PM selected -->
+                                        <template x-if="selectedPm.bom_id === bom.id && (selectedRate.bom_id !== bom.id || !selectedRate.value)">
+                                            <div>
+                                                <div class="text-base font-black text-indigo-700" x-text="'₹' + selectedPm.cost.toFixed(2)"></div>
+                                                <div class="text-[9.5px] font-bold text-slate-500" x-text="'PM Total (' + selectedPm.size + ')'"></div>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
                                 <template x-if="!isBomActive(bom.id)">
@@ -271,7 +298,7 @@
                     <div class="text-[9px] font-black text-orange-100 uppercase tracking-widest">Combined Total Value</div>
                     <div class="text-2xl font-black text-white" x-text="'₹' + calculatedCombinedTotal.toFixed(2)"></div>
                     <template x-if="selectedRate.value !== null && selectedPm.cost !== null">
-                        <div class="text-[9px] font-extrabold text-orange-100 mt-0.5" x-text="'(₹' + selectedRate.value + ' × ' + selectedPm.cf1 + ' Ltr) + ₹' + selectedPm.cost + ' PM = ₹' + calculatedPackAdjustedTotal.toFixed(2) + ' / Pack'"></div>
+                        <div class="text-[9.5px] font-extrabold text-orange-100 mt-0.5" x-text="selectedPm.size_in_ml ? '(₹' + selectedRate.value + '/1000 × ' + selectedPm.size_in_ml + 'ML) = ₹' + getPackBulkCost({}).toFixed(2) + ' Bulk + ₹' + selectedPm.cost + ' PM = ₹' + getPackTotalCost({}).toFixed(2) + ' / Pack' : '(₹' + selectedRate.value + ' × ' + selectedPm.cf1 + ' Ltr) + ₹' + selectedPm.cost + ' PM = ₹' + calculatedPackAdjustedTotal.toFixed(2) + ' / Pack'"></div>
                     </template>
                 </div>
 
@@ -923,25 +950,44 @@ function costingDashboardApp() {
             this.resetSelections();
         },
 
-        selectRate(bom, type) {
-            this.selectedBomId = bom.id;
-            this.selectedRate = {
-                bom_id: bom.id,
-                type: type,
-                value: type === 'wo' ? bom.wo_density_rate : bom.with_density_rate,
-                unit: type === 'wo' ? bom.yield_uom : 'Ltr'
-            };
+        toggleRate(bom, type) {
+            if (this.isRateSelected(bom.id, type)) {
+                this.selectedRate = { bom_id: null, type: null, value: null, unit: '' };
+                if (this.selectedPm.bom_id === bom.id && (this.selectedPm.cost === null || this.selectedPm.cost === undefined)) {
+                    this.selectedBomId = null;
+                }
+            } else {
+                this.selectedBomId = bom.id;
+                this.selectedRate = {
+                    bom_id: bom.id,
+                    type: type,
+                    value: type === 'wo' ? bom.wo_density_rate : bom.with_density_rate,
+                    unit: type === 'wo' ? bom.yield_uom : 'Ltr'
+                };
+            }
         },
 
-        selectPm(bom, pm) {
-            this.selectedBomId = bom.id;
-            this.selectedPm = {
-                bom_id: bom.id,
-                pricelist_id: pm.pricelist_id,
-                cost: pm.pm_cost,
-                size: pm.size,
-                cf1: pm.cf1 || 1
-            };
+        togglePm(bom, pm) {
+            if (this.isPmSelected(bom.id, pm.pricelist_id)) {
+                this.selectedPm = { bom_id: null, pricelist_id: null, cost: null, size: '', cf1: 1, size_in_ml: 0, unit_bulk_wo: 0, unit_bulk_with: 0, unit_total_wo: 0, unit_total_with: 0 };
+                if (this.selectedRate.bom_id === bom.id && (this.selectedRate.value === null || this.selectedRate.value === undefined)) {
+                    this.selectedBomId = null;
+                }
+            } else {
+                this.selectedBomId = bom.id;
+                this.selectedPm = {
+                    bom_id: bom.id,
+                    pricelist_id: pm.pricelist_id,
+                    cost: pm.pm_cost,
+                    size: pm.size,
+                    cf1: pm.cf1 || 1,
+                    size_in_ml: pm.size_in_ml || 0,
+                    unit_bulk_wo: pm.unit_bulk_wo || 0,
+                    unit_bulk_with: pm.unit_bulk_with || 0,
+                    unit_total_wo: pm.unit_total_wo || 0,
+                    unit_total_with: pm.unit_total_with || 0,
+                };
+            }
         },
 
         isBomActive(bomId) {
@@ -959,13 +1005,34 @@ function costingDashboardApp() {
         resetSelections() {
             this.selectedBomId = null;
             this.selectedRate = { bom_id: null, type: null, value: null, unit: '' };
-            this.selectedPm = { bom_id: null, pricelist_id: null, cost: null, size: '', cf1: 1 };
+            this.selectedPm = { bom_id: null, pricelist_id: null, cost: null, size: '', cf1: 1, size_in_ml: 0, unit_bulk_wo: 0, unit_bulk_with: 0, unit_total_wo: 0, unit_total_with: 0 };
         },
 
         getActiveBomName() {
             if (!this.selectedBomId) return '';
             const b = this.boms.find(item => item.id === this.selectedBomId);
             return b ? b.product_name : '';
+        },
+
+        getPackBulkCost(bom) {
+            if (!this.selectedRate.value || !this.selectedPm.size_in_ml) return 0;
+            const rate = this.selectedRate.value;
+            const sizeInMl = this.selectedPm.size_in_ml;
+            return (rate / 1000.0) * sizeInMl;
+        },
+
+        getPackBulkFormula(bom) {
+            if (!this.selectedRate.value || !this.selectedPm.size_in_ml) return '';
+            const rateVal = this.selectedRate.value;
+            const sizeInMl = this.selectedPm.size_in_ml;
+            const bulkCost = this.getPackBulkCost(bom);
+            return `₹${rateVal}/1000 × ${sizeInMl}ML = ₹${bulkCost.toFixed(2)}`;
+        },
+
+        getPackTotalCost(bom) {
+            const bulkCost = this.getPackBulkCost(bom);
+            const pmCost = this.selectedPm.cost || 0;
+            return bulkCost + pmCost;
         },
 
         get calculatedCombinedTotal() {
@@ -975,6 +1042,9 @@ function costingDashboardApp() {
         },
 
         get calculatedPackAdjustedTotal() {
+            if (this.selectedRate.value && this.selectedPm.size_in_ml) {
+                return this.getPackTotalCost({});
+            }
             const rateVal = this.selectedRate.value || 0;
             const cf1 = this.selectedPm.cf1 || 1;
             const pmCost = this.selectedPm.cost || 0;

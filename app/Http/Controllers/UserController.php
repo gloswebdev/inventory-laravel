@@ -39,7 +39,7 @@ class UserController extends Controller
         'mobile_purchase_report' => 'Mobile: Purchase Report',
         'costing'       => 'Costing Manager',
         'costing_bom'   => 'Costing BOMs',
-        'costing_pro'   => 'Costing Pro',
+        'costing_pro'   => 'Costing Dashboard',
         'costing_purchase' => 'Purchase Register',
         'costing_pricelist' => 'Pricelist',
         'mobile_costing' => 'Mobile: Costing',

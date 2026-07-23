@@ -489,6 +489,23 @@ class CostingController extends Controller
                 }
                 $singlePackPmCost = round($singlePackPmCost, 2);
 
+                $sizeStr = strtolower(trim($pricelist->size ?? ''));
+                preg_match('/(\d+(?:\.\d+)?)/', $sizeStr, $matches);
+                $sizeNum = !empty($matches[1]) ? (float)$matches[1] : 1000.0;
+                $sizeInMl = $sizeNum;
+                if (str_contains($sizeStr, 'ml') || str_contains($sizeStr, 'gm') || str_contains($sizeStr, 'g') || str_contains($sizeStr, 'gram')) {
+                    $sizeInMl = $sizeNum;
+                } elseif (str_contains($sizeStr, 'ltr') || str_contains($sizeStr, 'liter') || str_contains($sizeStr, 'litre') || str_contains($sizeStr, 'kg') || preg_match('/\b\d+\s*l\b/i', $sizeStr)) {
+                    $sizeInMl = $sizeNum * 1000.0;
+                }
+                $packVolumeLtr = $sizeInMl > 0 ? ($sizeInMl / 1000.0) : 1.0;
+
+                $unitBulkWo   = $woDensityRate * $packVolumeLtr;
+                $unitBulkWith = $withDensityRate * $packVolumeLtr;
+
+                $unitTotalWo   = $unitBulkWo + $singlePackPmCost;
+                $unitTotalWith = $unitBulkWith + $singlePackPmCost;
+
                 $bulkCostForPackWo   = $woDensityRate * $cf1;
                 $bulkCostForPackWith = $withDensityRate * $cf1;
 
@@ -497,7 +514,13 @@ class CostingController extends Controller
                     'size'             => $pricelist->size ?: 'Unknown',
                     'fg_name'          => $pricelist->item_hd_name ?: ($pricelist->item_short_name ?: '—'),
                     'cf1'              => $cf1,
+                    'size_in_ml'       => round($sizeInMl, 2),
+                    'pack_volume_ltr'  => round($packVolumeLtr, 4),
                     'pm_cost'          => round($singlePackPmCost, 2),
+                    'unit_bulk_wo'     => round($unitBulkWo, 2),
+                    'unit_bulk_with'   => round($unitBulkWith, 2),
+                    'unit_total_wo'    => round($unitTotalWo, 2),
+                    'unit_total_with'  => round($unitTotalWith, 2),
                     'bulk_cost_wo'     => round($bulkCostForPackWo, 2),
                     'bulk_cost_with'   => round($bulkCostForPackWith, 2),
                     'total_cost_wo'    => round($bulkCostForPackWo + $singlePackPmCost, 2),
@@ -1141,5 +1164,23 @@ class CostingController extends Controller
             return (float) array_sum(array_map('floatval', $matches[1]));
         }
         return 100.0;
+    }
+
+    protected function applyTypeFilters($query)
+    {
+        $user = Auth::user();
+        if (!$user || $user->role === 'admin') {
+            return $query;
+        }
+
+        $permittedTypeIds = $user->getPermittedProductTypeIds();
+        $permittedRMTypes = $user->getPermittedRMTypes();
+
+        return $query->whereIn('product_type_id', $permittedTypeIds)
+            ->where(function ($q) use ($permittedRMTypes) {
+                $q->whereIn('rm_type', $permittedRMTypes)
+                    ->orWhereNull('rm_type')
+                    ->orWhere('rm_type', '');
+            });
     }
 }
