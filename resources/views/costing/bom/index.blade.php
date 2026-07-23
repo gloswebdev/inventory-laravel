@@ -47,6 +47,18 @@
                 </div>
             </div>
             
+            <div class="w-full sm:w-60">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Filter By BOM Product</label>
+                <select name="product_name" onchange="this.form.submit()" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm font-semibold cursor-pointer">
+                    <option value="">All Products (A to Z)</option>
+                    @foreach($allBomProducts as $pName)
+                        <option value="{{ $pName }}" {{ request('product_name') === $pName ? 'selected' : '' }}>
+                            {{ $pName }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
             <div class="w-full sm:w-44">
                 <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Product Type</label>
                 <select name="type_id" class="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm font-semibold">
@@ -74,7 +86,7 @@
                 <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 px-5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2">
                     <i class="fas fa-filter"></i> Filter
                 </button>
-                @if(request()->anyFilled(['search', 'type_id', 'badge']))
+                @if(request()->anyFilled(['search', 'product_name', 'type_id', 'badge']))
                 <a href="{{ route('costing.boms.index') }}" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2">
                     <i class="fas fa-times"></i> Clear
                 </a>
@@ -101,131 +113,190 @@
         </div>
         @endif
 
-        <table class="w-full text-left border-collapse">
-            <thead class="bg-slate-50 border-b border-slate-200">
-                <tr>
-                    <th class="py-3 px-5 border-b border-slate-200 w-10 text-center">
-                        <input type="checkbox" @change="toggleAll($event.target.checked)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
-                    </th>
-                    <th class="py-3 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Finished Product</th>
-                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Batch</th>
-                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Raw Materials (BOM)</th>
-                    <th class="py-3 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                @forelse($boms as $bom)
-                <tr class="hover:bg-amber-50/30 transition-colors group">
-                    <td class="py-3 px-5 text-center">
-                        <input type="checkbox" :checked="selectedIds.includes({{ $bom->id }})" @change="toggleSelect({{ $bom->id }}, $event.target.checked)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
-                    </td>
-                    <td class="py-3 px-5">
-                        <div class="font-bold text-slate-800 text-sm flex items-center gap-2">
-                            {{ $bom->finishedProduct->name ?? '—' }}
-                            @if($bom->badge)
-                            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider {{ $bom->badge === 'small' ? 'bg-orange-500 text-white' : ($bom->badge === 'big' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white') }} border border-transparent shadow-sm">
-                                {{ strtoupper($bom->badge) }}
-                            </span>
-                            @endif
-                        </div>
-                        <div class="flex items-center gap-2 mt-1">
-                            @php 
-                                $typeName = $bom->finishedProduct->type->type_name ?? 'N/A'; 
-                                preg_match_all('/(\d+(?:\.\d+)?)\s*%/', $bom->finishedProduct->name ?? '', $matches);
-                                $formulation = !empty($matches[1]) ? array_sum(array_map('floatval', $matches[1])) . '%' : '100%';
-                            @endphp
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
-                                {{ $typeName }}
-                            </span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100">
-                                Formulation: {{ $formulation }}
-                            </span>
-                            @if($bom->finishedProduct->item_code)
-                            <span class="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{{ $bom->finishedProduct->item_code }}</span>
-                            @endif
-                            <span class="text-[10px] text-slate-400 font-medium">{{ $bom->finishedProduct->pack_name ?? '' }}</span>
-                        </div>
-                    </td>
-                    <td class="py-3 px-4">
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-blue-50 text-blue-700 border border-blue-100">
-                            {{ $bom->yield_quantity }} {{ $bom->yield_uom }}
-                        </span>
-                    </td>
-                    <td class="py-3 px-4">
-                        <div class="space-y-1">
-                            @foreach($bom->items->take(4) as $item)
-                            <div class="flex items-center gap-1.5 text-xs">
-                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
-                                <span class="font-semibold text-slate-700 truncate max-w-[160px]">{{ $item->rawMaterial->name ?? '?' }}</span>
-                                <span class="text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">{{ $item->quantity }}</span>
-                                <span class="text-slate-400 text-[10px]">{{ $item->rawMaterial->uom ?? '' }}</span>
-                                @if(strtoupper(trim($item->rawMaterial->rm_type ?? '')) === 'TECHNICAL')
-                                    @php
-                                        $purity = $purities[$item->rawMaterial->item_code] ?? $item->purity;
-                                    @endphp
-                                    <span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 whitespace-nowrap">
-                                        Purity: {{ $purity ? $purity . '%' : '—' }}
-                                    </span>
+        <div class="overflow-x-auto max-h-[70vh] custom-scrollbar">
+            <table class="w-full text-left border-collapse">
+                <thead class="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md shadow-sm border-b border-slate-200">
+                    <tr>
+                        <th class="py-3 px-5 border-b border-slate-200 w-10 text-center bg-slate-50/95">
+                            <input type="checkbox" @change="toggleAll($event.target.checked)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                        </th>
+                        <th class="py-3 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/95">Finished Product</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/95">Batch</th>
+                        <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/95">Raw Materials (BOM)</th>
+                        <th class="py-3 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right bg-slate-50/95">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @forelse($boms as $bom)
+                    <tr class="hover:bg-amber-50/30 transition-colors group">
+                        <td class="py-3 px-5 text-center">
+                            <input type="checkbox" :checked="selectedIds.includes({{ $bom->id }})" @change="toggleSelect({{ $bom->id }}, $event.target.checked)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                        </td>
+                        <td class="py-3 px-5">
+                            <div class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                {{ $bom->finishedProduct->name ?? '—' }}
+                                @if($bom->badge)
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider {{ $bom->badge === 'small' ? 'bg-orange-500 text-white' : ($bom->badge === 'big' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white') }} border border-transparent shadow-sm">
+                                    {{ strtoupper($bom->badge) }}
+                                </span>
                                 @endif
                             </div>
-                            @endforeach
-                            @if($bom->items->count() > 4)
-                            <div class="text-[10px] text-slate-400 font-bold ml-3">+{{ $bom->items->count() - 4 }} more ingredients</div>
-                            @endif
-                        </div>
-                    </td>
-                    <td class="py-3 px-5 text-right whitespace-nowrap">
-                        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            @if(Auth::user()->hasPermission('costing_bom', 'edit'))
-                            <button type="button"
-                                    data-bom='@json($bom->load(["items", "packingMaterials"]))'
-                                    @click="editBomFromData($event.currentTarget.getAttribute('data-bom'))"
-                                    class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50 flex items-center justify-center transition-all shadow-sm">
-                                <i class="fas fa-edit text-xs"></i>
-                            </button>
-                            @endif
+                            <div class="flex items-center gap-2 mt-1">
+                                @php 
+                                    $typeName = $bom->finishedProduct->type->type_name ?? 'N/A'; 
+                                    preg_match_all('/(\d+(?:\.\d+)?)\s*%/', $bom->finishedProduct->name ?? '', $matches);
+                                    $formulation = !empty($matches[1]) ? array_sum(array_map('floatval', $matches[1])) . '%' : '100%';
+                                @endphp
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+                                    {{ $typeName }}
+                                </span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100">
+                                    Formulation: {{ $formulation }}
+                                </span>
+                                @if($bom->finishedProduct->item_code)
+                                <span class="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{{ $bom->finishedProduct->item_code }}</span>
+                                @endif
+                                <span class="text-[10px] text-slate-400 font-medium">{{ $bom->finishedProduct->pack_name ?? '' }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-blue-50 text-blue-700 border border-blue-100">
+                                {{ $bom->yield_quantity }} {{ $bom->yield_uom }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="space-y-1">
+                                @foreach($bom->items->take(4) as $item)
+                                <div class="flex items-center gap-1.5 text-xs">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
+                                    <span class="font-semibold text-slate-700 truncate max-w-[160px]">{{ $item->rawMaterial->name ?? '?' }}</span>
+                                    <span class="text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">{{ $item->quantity }}</span>
+                                    <span class="text-slate-400 text-[10px]">{{ $item->rawMaterial->uom ?? '' }}</span>
+                                    @if(strtoupper(trim($item->rawMaterial->rm_type ?? '')) === 'TECHNICAL')
+                                        @php
+                                            $purity = $purities[$item->rawMaterial->item_code] ?? $item->purity;
+                                        @endphp
+                                        <span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 whitespace-nowrap">
+                                            Purity: {{ $purity ? $purity . '%' : '—' }}
+                                        </span>
+                                    @endif
+                                </div>
+                                @endforeach
+                                @if($bom->items->count() > 4)
+                                <div class="text-[10px] text-slate-400 font-bold ml-3">+{{ $bom->items->count() - 4 }} more ingredients</div>
+                                @endif
+                            </div>
+                        </td>
+                        <td class="py-3 px-5 text-right whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                @if(Auth::user()->hasPermission('costing_bom', 'edit'))
+                                <button type="button"
+                                        data-bom='@json($bom->load(["items", "packingMaterials"]))'
+                                        @click="editBomFromData($event.currentTarget.getAttribute('data-bom'))"
+                                        class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50 flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fas fa-edit text-xs"></i>
+                                </button>
+                                @endif
+                                @if(Auth::user()->hasPermission('costing_bom', 'create'))
+                                <button type="button"
+                                        @click="openDuplicateModal({{ $bom->id }}, '{{ addslashes($bom->finishedProduct->name ?? '') }}')"
+                                        class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm"
+                                        title="Duplicate BOM">
+                                    <i class="fas fa-copy text-xs"></i>
+                                </button>
+                                @endif
+                                @if(Auth::user()->hasPermission('costing_bom', 'delete'))
+                                <button type="button"
+                                        @click="deleteBom({{ $bom->id }})"
+                                        class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fas fa-trash-alt text-xs"></i>
+                                </button>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" class="py-16 text-center">
+                            <div class="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-flask text-2xl text-amber-300"></i>
+                            </div>
+                            <p class="text-slate-500 font-bold mb-2">No costing BOMs found.</p>
                             @if(Auth::user()->hasPermission('costing_bom', 'create'))
-                            <button type="button"
-                                    @click="openDuplicateModal({{ $bom->id }}, '{{ addslashes($bom->finishedProduct->name ?? '') }}')"
-                                    class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm"
-                                    title="Duplicate BOM">
-                                <i class="fas fa-copy text-xs"></i>
+                            <button @click="openBomModal()" class="px-5 py-2 bg-amber-500 text-white font-black rounded-xl text-sm shadow">
+                                <i class="fas fa-plus mr-2"></i> Create First Costing BOM
                             </button>
                             @endif
-                            @if(Auth::user()->hasPermission('costing_bom', 'delete'))
-                            <button type="button"
-                                    @click="deleteBom({{ $bom->id }})"
-                                    class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 flex items-center justify-center transition-all shadow-sm">
-                                <i class="fas fa-trash-alt text-xs"></i>
-                            </button>
-                            @endif
-                        </div>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="5" class="py-16 text-center">
-                        <div class="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-flask text-2xl text-amber-300"></i>
-                        </div>
-                        <p class="text-slate-500 font-bold mb-2">No costing BOMs found.</p>
-                        @if(Auth::user()->hasPermission('costing_bom', 'create'))
-                        <button @click="openBomModal()" class="px-5 py-2 bg-amber-500 text-white font-black rounded-xl text-sm shadow">
-                            <i class="fas fa-plus mr-2"></i> Create First Costing BOM
-                        </button>
-                        @endif
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-
-        @if($boms instanceof \Illuminate\Pagination\LengthAwarePaginator && $boms->hasPages())
-        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-            {{ $boms->links() }}
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-        @endif
-    </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-bold text-slate-500">Items per page:</span>
+                <select onchange="window.location.href=this.value" class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:ring-2 focus:ring-amber-400 outline-none">
+                    <option value="{{ request()->fullUrlWithQuery(['per_page' => 10]) }}" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
+                    <option value="{{ request()->fullUrlWithQuery(['per_page' => 25]) }}" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
+                    <option value="{{ request()->fullUrlWithQuery(['per_page' => 50]) }}" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                    <option value="{{ request()->fullUrlWithQuery(['per_page' => 100]) }}" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
+                    <option value="{{ request()->fullUrlWithQuery(['per_page' => 'all']) }}" {{ request('per_page') == 'all' ? 'selected' : '' }}>All</option>
+                </select>
+
+                @if($boms instanceof \Illuminate\Pagination\LengthAwarePaginator)
+                <span class="text-xs font-bold text-slate-500 ml-2">
+                    Showing {{ $boms->firstItem() ?? 0 }} to {{ $boms->lastItem() ?? 0 }} of {{ $boms->total() }} entries
+                </span>
+                @else
+                <span class="text-xs font-bold text-slate-500 ml-2">
+                    Total {{ count($boms) }} entries
+                </span>
+                @endif
+            </div>
+
+            @if($boms instanceof \Illuminate\Pagination\LengthAwarePaginator)
+            <div class="flex items-center gap-2">
+                {{-- Prev Button --}}
+                @if($boms->onFirstPage())
+                <span class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-300 opacity-50 cursor-not-allowed shadow-sm select-none">
+                    &larr; Prev
+                </span>
+                @else
+                <a href="{{ $boms->previousPageUrl() }}" class="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition">
+                    &larr; Prev
+                </a>
+                @endif
+
+                {{-- Page Numbers --}}
+                <div class="flex items-center gap-1">
+                    @foreach(range(1, $boms->lastPage()) as $i)
+                        @if($i == $boms->currentPage())
+                        <span class="w-8 h-8 rounded-xl bg-amber-500 text-white font-black text-xs flex items-center justify-center shadow-sm shadow-amber-200">
+                            {{ $i }}
+                        </span>
+                        @else
+                        <a href="{{ $boms->url($i) }}" class="w-8 h-8 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center shadow-sm transition">
+                            {{ $i }}
+                        </a>
+                        @endif
+                    @endforeach
+                </div>
+
+                {{-- Next Button --}}
+                @if($boms->hasMorePages())
+                <a href="{{ $boms->nextPageUrl() }}" class="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-700 shadow-sm transition">
+                    Next &rarr;
+                </a>
+                @else
+                <span class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-300 opacity-50 cursor-not-allowed shadow-sm select-none">
+                    Next &rarr;
+                </span>
+                @endif
+            </div>
+            @endif
+        </div>
 
     {{-- ══════════════════════
          BOM MODAL (Add / Edit)

@@ -44,6 +44,12 @@ class CostingBomController extends Controller
             });
         }
 
+        if ($request->filled('product_name')) {
+            $query->whereHas('finishedProduct', function($q) use ($request) {
+                $q->where('name', $request->product_name);
+            });
+        }
+
         if ($request->filled('type_id')) {
             $query->whereHas('finishedProduct', function($q) use ($request) {
                 $q->where('product_type_id', $request->type_id);
@@ -60,11 +66,11 @@ class CostingBomController extends Controller
             }
         }
 
-        $perPage = $request->get('per_page', 20);
+        $perPage = $request->get('per_page', 10);
         if ($perPage === 'all') {
             $boms = $query->orderByDesc('created_at')->get();
         } else {
-            $boms = $query->orderByDesc('created_at')->paginate($perPage)->withQueryString();
+            $boms = $query->orderByDesc('created_at')->paginate((int)$perPage)->withQueryString();
         }
 
         $fgQuery = Product::whereHas('type', function($q) {
@@ -126,7 +132,13 @@ class CostingBomController extends Controller
             ->toArray();
         $pmRates = array_merge($localPrices, $prPrices);
 
-        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists', 'pmRates'));
+        $allBomProducts = Product::whereHas('costingBoms')
+            ->orderBy('name')
+            ->pluck('name')
+            ->unique()
+            ->values();
+
+        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists', 'pmRates', 'allBomProducts'));
     }
 
     public function store(Request $request)

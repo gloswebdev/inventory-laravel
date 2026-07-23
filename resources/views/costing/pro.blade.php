@@ -99,26 +99,26 @@
             </div>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto max-h-[70vh] custom-scrollbar">
             <table class="w-full text-left border-collapse">
-                <thead class="bg-slate-50/80 border-b border-slate-200">
+                <thead class="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md shadow-sm border-b border-slate-200">
                     <tr>
-                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[220px]">BOM Name (A-Z) & View BOM</th>
-                        <th class="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">Total Batch Size</th>
-                        <th class="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Grand Total (Batch RM)</th>
-                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">W/o Density Rate</th>
-                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">With Density Rate</th>
-                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[260px]">Related Products, Packing & PM Total</th>
-                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">Calculation</th>
+                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[220px] bg-slate-50/95">BOM Name (A-Z) & View BOM</th>
+                        <th class="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap bg-slate-50/95">Total Batch Size</th>
+                        <th class="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap bg-slate-50/95">Grand Total (Batch RM)</th>
+                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap bg-slate-50/95">W/o Density Rate</th>
+                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap bg-slate-50/95">With Density Rate</th>
+                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest min-w-[260px] bg-slate-50/95">Related Products, Packing & PM Total</th>
+                        <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap bg-slate-50/95">Calculation</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-sm">
-                    <template x-for="(bom, index) in filteredBoms" :key="bom.id">
+                    <template x-for="(bom, index) in paginatedBoms" :key="bom.id">
                         <tr class="hover:bg-orange-50/20 transition-colors" :class="isBomActive(bom.id) ? 'bg-orange-50/30' : ''">
                             {{-- BOM Name & View BOM button --}}
                             <td class="py-4 px-5 align-top">
                                 <div class="flex items-start gap-3">
-                                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5" x-text="index + 1"></div>
+                                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5" x-text="(currentPage - 1) * pageSize + index + 1"></div>
                                     <div class="space-y-1.5">
                                         <div class="font-extrabold text-slate-800 text-sm leading-snug flex items-center gap-2 flex-wrap">
                                             <span x-text="bom.product_name"></span>
@@ -262,6 +262,35 @@
                     </template>
                 </tbody>
             </table>
+        </div>
+
+        {{-- Pagination Footer Bar --}}
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-bold text-slate-500">Items per page:</span>
+                <select x-model.number="pageSize" @change="currentPage = 1" class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm cursor-pointer focus:ring-2 focus:ring-orange-400 outline-none">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="999999">All</option>
+                </select>
+                <span class="text-xs font-bold text-slate-500 ml-2" x-text="'Showing ' + (filteredBoms.length > 0 ? (currentPage - 1) * pageSize + 1 : 0) + ' to ' + Math.min(currentPage * pageSize, filteredBoms.length) + ' of ' + filteredBoms.length + ' entries'"></span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button @click="if (currentPage > 1) currentPage--" :disabled="currentPage === 1" class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+                    &larr; Prev
+                </button>
+                <div class="flex items-center gap-1">
+                    <template x-for="p in totalPages" :key="p">
+                        <button @click="currentPage = p" class="w-8 h-8 rounded-xl text-xs font-black transition-all shadow-sm" :class="currentPage === p ? 'bg-orange-500 text-white shadow-orange-200' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'" x-text="p"></button>
+                    </template>
+                </div>
+                <button @click="if (currentPage < totalPages) currentPage++" :disabled="currentPage === totalPages" class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+                    Next &rarr;
+                </button>
+            </div>
         </div>
     </div>
 
@@ -887,10 +916,21 @@ function costingDashboardApp() {
     return {
         search: '',
         selectedProductFilter: '',
+        currentPage: 1,
+        pageSize: 10,
         boms: @json($processedBoms),
         selectedBomId: null,
         selectedRate: { bom_id: null, type: null, value: null, unit: '' },
         selectedPm: { bom_id: null, pricelist_id: null, cost: null, size: '', cf1: 1 },
+
+        get totalPages() {
+            return Math.max(1, Math.ceil(this.filteredBoms.length / this.pageSize));
+        },
+
+        get paginatedBoms() {
+            const start = (this.currentPage - 1) * this.pageSize;
+            return this.filteredBoms.slice(start, start + this.pageSize);
+        },
 
         bomModal: {
             show: false,
