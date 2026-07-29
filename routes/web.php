@@ -101,6 +101,9 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
         Route::get('/pricelist',           [CostingController::class, 'pricelist'])->name('pricelist');
         Route::post('/sync-pricelist',     [CostingController::class, 'syncPricelist'])->name('sync-pricelist');
         Route::post('/save-pricelist-sync-settings', [CostingController::class, 'savePricelistSyncSettings'])->name('save-pricelist-sync-settings');
+        Route::get('/pricelist-update',    [CostingController::class, 'pricelistUpdate'])->name('pricelist-update');
+        Route::post('/push-pricelist',     [CostingController::class, 'pushPricelist'])->name('push-pricelist');
+        Route::get('/pricelist-push-history/{id}', [CostingController::class, 'pricelistPushHistory'])->name('pricelist-push-history');
         Route::get('/product/{product}',  [CostingController::class, 'show'])->name('show');
         Route::post('/calculate',         [CostingController::class, 'calculate'])->name('calculate');
         Route::post('/fetch-prices',      [CostingController::class, 'fetchPrices'])->name('fetch-prices');
@@ -190,6 +193,11 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/costing-pricelist',           [App\Http\Controllers\MobileController::class, 'costingPricelist'])->name('mobile.costing.pricelist');
     Route::post('/costing-pricelist/update',   [App\Http\Controllers\MobileController::class, 'updateCostingPricelist'])->name('mobile.costing.pricelist.update');
     Route::post('/costing-pricelist/sync',     [App\Http\Controllers\MobileController::class, 'syncCostingPricelist'])->name('mobile.costing.pricelist.sync');
+
+    Route::get('/costing-pricelist-update',       [App\Http\Controllers\MobileController::class, 'costingPricelistUpdate'])->name('mobile.costing.pricelist-update');
+    Route::get('/costing-pricelist-update/items', [App\Http\Controllers\MobileController::class, 'costingPricelistUpdateItems'])->name('mobile.costing.pricelist-update.items');
+    Route::post('/costing-pricelist-update/push', [App\Http\Controllers\MobileController::class, 'pushCostingPricelist'])->name('mobile.costing.pricelist-update.push');
+    Route::get('/costing-pricelist-update/history/{id}', [App\Http\Controllers\MobileController::class, 'costingPricelistPushHistory'])->name('mobile.costing.pricelist-update.history');
 
     // Purchase Report
     Route::get('/purchase-report', [App\Http\Controllers\MobileController::class, 'purchaseReport'])->name('mobile.purchase-report');

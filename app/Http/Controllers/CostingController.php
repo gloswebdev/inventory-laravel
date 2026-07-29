@@ -1012,6 +1012,194 @@ class CostingController extends Controller
     }
 
     // ─────────────────────────────────────────────
+    //  Pricelist Update (push rates to ERP)
+    // ─────────────────────────────────────────────
+
+    /** Local column <=> ERP PriceList field, with the branch each rate belongs to. */
+    public const PRICE_LIST_MAP = [
+        'Sp_Rate1' => ['column' => 'sp_rate1', 'label' => 'Factory'],
+        'Sp_Rate2' => ['column' => 'sp_rate2', 'label' => 'Indore'],
+        'Sp_Rate3' => ['column' => 'sp_rate3', 'label' => 'Pune'],
+        'Sp_Rate4' => ['column' => 'sp_rate4', 'label' => 'Akola'],
+        'Sp_Rate5' => ['column' => 'sp_rate5', 'label' => 'Ghaziabad'],
+    ];
+
+    /**
+     * Desktop: Pricelist Update view - edit rates and push them to the ERP
+     */
+    public function pricelistUpdate(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing_pricelist_update', 'view')) {
+            abort(403, 'Access denied to Pricelist Update module.');
+        }
+
+        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('item_hd_name', 'like', "%{$search}%")
+                  ->orWhere('user_code', 'like', "%{$search}%")
+                  ->orWhere('group3', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('group1')) {
+            $query->where('group1', $request->group1);
+        }
+
+        $sortOrder = $request->input('sort', 'asc') === 'desc' ? 'desc' : 'asc';
+        $query->orderBy('item_hd_name', $sortOrder);
+
+        $pricelists = $query->paginate(30)->withQueryString();
+
+        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+
+        $priceLists = self::PRICE_LIST_MAP;
+        $recentPushes = \App\Models\PricelistPushLog::latest()->limit(10)->get();
+        $rateMatrix = self::buildRateMatrix($pricelists);
+
+        return view('costing.pricelist-update', compact('pricelists', 'group1List', 'priceLists', 'recentPushes', 'rateMatrix'));
+    }
+
+    /**
+     * user_code => ['Sp_Rate1' => float, ...] for the Alpine grid state.
+     */
+    public static function buildRateMatrix($pricelists): array
+    {
+        $matrix = [];
+        foreach ($pricelists as $row) {
+            $rates = [];
+            foreach (self::PRICE_LIST_MAP as $erpField => $meta) {
+                $rates[$erpField] = (float) $row->{$meta['column']};
+            }
+            $matrix[$row->user_code] = $rates;
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * POST: Push edited rates to the ERP and record the run in history
+     */
+    public function pushPricelist(Request $request)
+    {
+        if (!Auth::user()->hasPermission('costing_pricelist_update', 'view')
+            && !Auth::user()->hasPermission('mobile_costing_pricelist_update', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $request->validate([
+            'price_list'         => 'required|in:Sp_Rate1,Sp_Rate2,Sp_Rate3,Sp_Rate4,Sp_Rate5',
+            'items'              => 'required|array|min:1',
+            'items.*.user_code'  => 'required|string',
+            'items.*.new_value'  => 'required|numeric|min:0',
+        ]);
+
+        $priceList = $request->price_list;
+        $rateCol   = self::PRICE_LIST_MAP[$priceList]['column'];
+        $prevCol   = 'prev_' . $rateCol;
+
+        // Resolve every submitted code against the local pricelist; unknown codes
+        // are skipped rather than sent to the ERP.
+        $resolved = [];
+        $skipped  = 0;
+        foreach ($request->items as $item) {
+            $userCode = trim($item['user_code']);
+            $row = \App\Models\Pricelist::where('user_code', $userCode)->first();
+            if (!$row) {
+                $skipped++;
+                continue;
+            }
+
+            $resolved[] = [
+                'user_code' => $userCode,
+                'item_name' => $row->item_hd_name,
+                'old_value' => $row->$rateCol !== null ? (float) $row->$rateCol : null,
+                'new_value' => (float) $item['new_value'],
+            ];
+        }
+
+        if (empty($resolved)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No valid items to push. None of the submitted item codes exist in the pricelist.',
+            ], 422);
+        }
+
+        $service = new \App\Library\ErpPricelistPushService();
+        $result  = $service->push($resolved, $priceList);
+
+        // Only mirror the change locally when the ERP accepted it.
+        if ($result['pushed'] > 0) {
+            DB::transaction(function () use ($resolved, $rateCol, $prevCol) {
+                foreach ($resolved as $item) {
+                    $updateData = [$rateCol => $item['new_value']];
+
+                    if ($item['old_value'] !== null && abs($item['new_value'] - $item['old_value']) > 0.001) {
+                        $updateData[$prevCol] = $item['old_value'];
+                    }
+
+                    \App\Models\Pricelist::where('user_code', $item['user_code'])->update($updateData);
+                }
+            });
+        }
+
+        $status = $result['failed'] === 0
+            ? 'success'
+            : ($result['pushed'] > 0 ? 'partial' : 'failed');
+
+        $log = \App\Models\PricelistPushLog::create([
+            'total_items'     => count($resolved),
+            'total_success'   => $result['pushed'],
+            'total_failed'    => $result['failed'],
+            'price_list'      => $priceList,
+            'status'          => $status,
+            'error_message'   => $status === 'success' ? null : $result['message'],
+            'request_payload' => $result['payload'],
+            'response_body'   => $result['response'],
+            'pushed_by'       => Auth::user()->name ?? 'Unknown',
+        ]);
+
+        $log->items()->createMany(array_map(fn($i) => [
+            'user_code'  => $i['user_code'],
+            'item_name'  => $i['item_name'],
+            'price_list' => $priceList,
+            'old_value'  => $i['old_value'],
+            'new_value'  => $i['new_value'],
+        ], $resolved));
+
+        $message = "Pushed {$result['pushed']} item(s) to ERP.";
+        if ($result['failed'] > 0) {
+            $message .= " Failed: {$result['failed']}. {$result['message']}";
+        }
+        if ($skipped > 0) {
+            $message .= " Skipped {$skipped} unknown item code(s).";
+        }
+
+        return response()->json([
+            'success' => $status !== 'failed',
+            'message' => $message,
+            'log_id'  => $log->id,
+        ]);
+    }
+
+    /**
+     * GET: JSON detail of one push run, for the history modal
+     */
+    public function pricelistPushHistory($id)
+    {
+        if (!Auth::user()->hasPermission('costing_pricelist_update', 'view')
+            && !Auth::user()->hasPermission('mobile_costing_pricelist_update', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $log = \App\Models\PricelistPushLog::with('items')->findOrFail($id);
+
+        return response()->json($log);
+    }
+
+    // ─────────────────────────────────────────────
     //  Private Helpers
     // ─────────────────────────────────────────────
 

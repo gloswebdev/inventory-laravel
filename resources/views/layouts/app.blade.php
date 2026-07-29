@@ -423,10 +423,10 @@
             </div>
             @endif
 
-            @if(Auth::user()->hasPermission('costing', 'view') || Auth::user()->hasPermission('costing_bom', 'view') || Auth::user()->hasPermission('costing_pro', 'view') || Auth::user()->hasPermission('costing_purchase', 'view') || Auth::user()->hasPermission('costing_pricelist', 'view'))
-            <div x-data="{ open: {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist')) ? 'true' : 'false' }} }">
+            @if(Auth::user()->hasPermission('costing', 'view') || Auth::user()->hasPermission('costing_bom', 'view') || Auth::user()->hasPermission('costing_pro', 'view') || Auth::user()->hasPermission('costing_purchase', 'view') || Auth::user()->hasPermission('costing_pricelist', 'view') || Auth::user()->hasPermission('costing_pricelist_update', 'view'))
+            <div x-data="{ open: {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist') || request()->routeIs('costing.pricelist-update')) ? 'true' : 'false' }} }">
                 <button @click="open = !open"
-                    class="nav-link link-costing w-[calc(100%-20px)] justify-between {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist')) ? 'active' : '' }}">
+                    class="nav-link link-costing w-[calc(100%-20px)] justify-between {{ (request()->routeIs('costing.boms.*') || request()->routeIs('costing.pro') || request()->routeIs('costing.purchase-register') || request()->routeIs('costing.pricelist') || request()->routeIs('costing.pricelist-update')) ? 'active' : '' }}">
                     <div class="flex items-center gap-[11px]">
                         <i class="fas fa-coins nav-icon"></i>
                         <span>Costing</span>
@@ -455,6 +455,11 @@
                     @if(Auth::user()->hasPermission('costing_pricelist', 'view'))
                     <a href="{{ route('costing.pricelist') }}" class="sub-nav-link {{ request()->routeIs('costing.pricelist') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Pricelist
+                    </a>
+                    @endif
+                    @if(Auth::user()->hasPermission('costing_pricelist_update', 'view'))
+                    <a href="{{ route('costing.pricelist-update') }}" class="sub-nav-link {{ request()->routeIs('costing.pricelist-update') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Pricelist Update
                     </a>
                     @endif
                 </div>

@@ -42,11 +42,13 @@ class UserController extends Controller
         'costing_pro'   => 'Costing Dashboard',
         'costing_purchase' => 'Purchase Register',
         'costing_pricelist' => 'Pricelist',
+        'costing_pricelist_update' => 'Pricelist Update',
         'mobile_costing' => 'Mobile: Costing',
         'mobile_costing_bom' => 'Mobile: Costing BOMs',
         'mobile_costing_pro' => 'Mobile: Costing Dashboard',
         'mobile_costing_purchase' => 'Mobile: Purchase Register',
         'mobile_costing_pricelist' => 'Mobile: Pricelist',
+        'mobile_costing_pricelist_update' => 'Mobile: Pricelist Update',
     ];
 
     /**
@@ -167,6 +169,12 @@ class UserController extends Controller
         'mobile_costing_pricelist' => [
             'edit' => 'Edit Price & Purity',
             'sync' => 'Sync ERP Prices',
+        ],
+        'costing_pricelist_update' => [
+            'push' => 'Push Prices to ERP',
+        ],
+        'mobile_costing_pricelist_update' => [
+            'push' => 'Push Prices to ERP',
         ],
     ];
 

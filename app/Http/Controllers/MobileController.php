@@ -96,6 +96,10 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.costing.pricelist'      => 'mobile_costing_pricelist',
                     'mobile.costing.pricelist.update' => 'mobile_costing_pricelist',
                     'mobile.costing.pricelist.sync' => 'mobile_costing_pricelist',
+                    'mobile.costing.pricelist-update'      => 'mobile_costing_pricelist_update',
+                    'mobile.costing.pricelist-update.items' => 'mobile_costing_pricelist_update',
+                    'mobile.costing.pricelist-update.push' => 'mobile_costing_pricelist_update',
+                    'mobile.costing.pricelist-update.history' => 'mobile_costing_pricelist_update',
                     'mobile.purchase-report'        => 'mobile_purchase_report',
                 ];
 
@@ -216,6 +220,13 @@ class MobileController extends Controller implements HasMiddleware
                 'route'      => 'mobile.costing.pricelist',
                 'color'      => 'bg-rose-500',
                 'permission' => 'mobile_costing_pricelist'
+            ],
+            [
+                'name'       => 'Pricelist Update',
+                'icon'       => 'fas fa-cloud-arrow-up',
+                'route'      => 'mobile.costing.pricelist-update',
+                'color'      => 'bg-sky-500',
+                'permission' => 'mobile_costing_pricelist_update'
             ],
             [
                 'name'       => 'Costing',
@@ -2674,5 +2685,76 @@ class MobileController extends Controller implements HasMiddleware
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Shared filter/sort query for the mobile Pricelist Update list & its infinite-scroll feed.
+     */
+    private function pricelistUpdateQuery(\Illuminate\Http\Request $request)
+    {
+        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('item_hd_name', 'like', "%{$search}%")
+                  ->orWhere('user_code', 'like', "%{$search}%")
+                  ->orWhere('group3', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('group1')) {
+            $query->where('group1', $request->group1);
+        }
+
+        $sortOrder = $request->input('sort', 'asc') === 'desc' ? 'desc' : 'asc';
+        $query->orderBy('item_hd_name', $sortOrder);
+
+        return $query;
+    }
+
+    /**
+     * Mobile: Pricelist Update (push rates to ERP)
+     */
+    public function costingPricelistUpdate(\Illuminate\Http\Request $request)
+    {
+        $pricelists = $this->pricelistUpdateQuery($request)->paginate(20)->withQueryString();
+        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
+            ->whereNotNull('group1')->where('group1', '!=', '')
+            ->distinct()->pluck('group1')->sort()->values();
+
+        $priceLists = CostingController::PRICE_LIST_MAP;
+        $recentPushes = \App\Models\PricelistPushLog::latest()->limit(10)->get();
+        $rateMatrix = CostingController::buildRateMatrix($pricelists);
+
+        return view('mobile.pricelist-update', compact('pricelists', 'group1List', 'priceLists', 'recentPushes', 'rateMatrix'));
+    }
+
+    /**
+     * Mobile: Pricelist Update — infinite-scroll feed (returns rendered cards + rate data as JSON)
+     */
+    public function costingPricelistUpdateItems(\Illuminate\Http\Request $request)
+    {
+        $pricelists = $this->pricelistUpdateQuery($request)->paginate(20)->withQueryString();
+        $rateMatrix = CostingController::buildRateMatrix($pricelists);
+
+        return response()->json([
+            'html'     => view('mobile.partials.pricelist-update-items', compact('pricelists'))->render(),
+            'has_more' => $pricelists->hasMorePages(),
+            'next_page' => $pricelists->currentPage() + 1,
+            'rates'    => $rateMatrix,
+        ]);
+    }
+
+    public function pushCostingPricelist(\Illuminate\Http\Request $request)
+    {
+        $controller = new CostingController();
+        return $controller->pushPricelist($request);
+    }
+
+    public function costingPricelistPushHistory($id)
+    {
+        $controller = new CostingController();
+        return $controller->pricelistPushHistory($id);
     }
 }
