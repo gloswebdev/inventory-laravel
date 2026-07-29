@@ -401,13 +401,17 @@
                         </div>
                         <div class="col-span-12 md:col-span-8">
                             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Bom Container *</label>
-                            <select x-model="bomModal.form.finished_product_id"
-                                    class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer" required>
-                                <option value="">Select Finished Good</option>
-                                <template x-for="(p, index) in filteredFGs" :key="p.id">
-                                    <option :value="p.id" x-text="(index + 1) + '. ' + p.name + (p.pack_name ? ' ['+p.pack_name+']' : '') + ' ('+p.item_code+')'"></option>
-                                </template>
-                            </select>
+                            <div class="space-y-1.5">
+                                <input type="text" x-model="bomModal.fgSearchQuery" placeholder="🔍 Search Finished Good..." 
+                                       class="w-full px-4 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-medium shadow-sm" />
+                                <select x-model="bomModal.form.finished_product_id"
+                                        class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer" required>
+                                    <option value="">Select Finished Good</option>
+                                    <template x-for="(p, index) in filteredFGs" :key="p.id">
+                                        <option :value="p.id" x-text="(index + 1) + '. ' + p.name + (p.pack_name ? ' ['+p.pack_name+']' : '') + ' ('+p.item_code+')'"></option>
+                                    </template>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -491,15 +495,19 @@
                                      :class="item.is_solvent ? 'bg-indigo-50/40 border-indigo-300 ring-2 ring-indigo-100/50' : 'bg-amber-50/50 border-amber-100'"
                                      class="grid grid-cols-12 gap-2 p-3 border rounded-xl items-center transition-all duration-200">
                                     <div class="col-span-7">
-                                        <select x-model="item.raw_material_id"
-                                                @change="if (isTechnical(item.raw_material_id)) { item.is_technical = true; } else { item.is_technical = false; }"
-                                                class="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer">
-                                            <option value="">Select Raw Material</option>
-                                            <template x-for="(rm, index) in getFilteredRMs(item.rm_type_filter, false)" :key="rm.id">
-                                                <option :value="rm.id" :selected="rm.id == item.raw_material_id"
-                                                         x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
-                                            </template>
-                                        </select>
+                                        <div class="space-y-1">
+                                            <input type="text" x-model="item.searchQuery" placeholder="🔍 Search Raw Material..." 
+                                                   class="w-full px-3 py-1.5 text-[11px] border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-medium shadow-sm" />
+                                            <select x-model="item.raw_material_id"
+                                                    @change="if (isTechnical(item.raw_material_id)) { item.is_technical = true; } else { item.is_technical = false; }"
+                                                    class="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold text-slate-700 bg-white shadow-sm hover:border-slate-300 transition-all cursor-pointer">
+                                                <option value="">Select Raw Material</option>
+                                                <template x-for="(rm, index) in getFilteredRMs(item.rm_type_filter, false, item.searchQuery)" :key="rm.id">
+                                                    <option :value="rm.id" :selected="rm.id == item.raw_material_id"
+                                                             x-text="(index + 1) + '. ' + rm.name + (rm.pack_name ? ' ['+rm.pack_name+']' : '') + ' ('+rm.item_code+')'"></option>
+                                                </template>
+                                            </select>
+                                        </div>
                                         <div class="mt-1.5 flex flex-wrap gap-2 items-center">
                                             <label :class="item.is_solvent ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-100 text-slate-500 border-slate-200'"
                                                     class="inline-flex items-center gap-1.5 cursor-pointer select-none text-[9px] font-black border px-2.5 py-1 rounded-lg hover:bg-opacity-90 transition-all">
@@ -951,8 +959,18 @@ function bomApp() {
 
         // ─── BOM / Recipe ─────────────────────────────
         get filteredFGs() {
-            if (!this.bomModal.typeFilter) return __finishedGoods;
-            return __finishedGoods.filter(p => p.product_type_id == this.bomModal.typeFilter);
+            let list = __finishedGoods;
+            if (this.bomModal.typeFilter) {
+                list = list.filter(p => p.product_type_id == this.bomModal.typeFilter);
+            }
+            if (this.bomModal.fgSearchQuery) {
+                const q = this.bomModal.fgSearchQuery.toLowerCase();
+                list = list.filter(p => 
+                    (p.name || '').toLowerCase().includes(q) || 
+                    (p.item_code || '').toLowerCase().includes(q)
+                );
+            }
+            return list;
         },
         get rmTypes() {
             return [...new Set(__rawMaterials.map(r => r.rm_type).filter(Boolean))].sort();
@@ -963,16 +981,24 @@ function bomApp() {
             const type = __types.find(t => t.id == rm.product_type_id);
             return type && type.type_name.toUpperCase().includes('PACKING');
         },
-        getFilteredRMs(filter, wantPacking = false) {
+        getFilteredRMs(filter, wantPacking = false, searchQuery = '') {
             let list = __rawMaterials;
             if (filter || this.bomModal.rmTypeFilter) {
                 const f = filter || this.bomModal.rmTypeFilter;
                 list = list.filter(r => r.rm_type === f);
             }
-            return list.filter(r => {
+            list = list.filter(r => {
                 const isPM = this.isPackingMaterial(r.id);
                 return wantPacking ? isPM : !isPM;
             });
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                list = list.filter(r => 
+                    (r.name || '').toLowerCase().includes(q) || 
+                    (r.item_code || '').toLowerCase().includes(q)
+                );
+            }
+            return list;
         },
         getItemUom(id) {
             const rm = __rawMaterials.find(r => r.id == id);
@@ -1197,10 +1223,11 @@ function bomApp() {
             this.bomModal.editId = null;
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
+            this.bomModal.fgSearchQuery = '';
             this.bomModal.step = 1;
             this.bomModal.manualSearchQuery = '';
             this.bomModal.selectedManualPricelistId = '';
-            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '' }], packing_materials: [], manual_pricelist_ids: [] };
+            this.bomModal.form = { finished_product_id: '', badge: '', formulation: '', density: '', yield_quantity: 1, yield_uom: 'KG', items: [{ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: false, is_solvent: false, is_technical: '', searchQuery: '' }], packing_materials: [], manual_pricelist_ids: [] };
             this.bomModal.show = true;
         },
 
@@ -1209,6 +1236,7 @@ function bomApp() {
             this.bomModal.editId = recipe.id;
             this.bomModal.typeFilter = '';
             this.bomModal.rmTypeFilter = '';
+            this.bomModal.fgSearchQuery = '';
             this.bomModal.step = 1;
             this.bomModal.manualSearchQuery = '';
             this.bomModal.selectedManualPricelistId = '';
@@ -1252,7 +1280,8 @@ function bomApp() {
                         rm_type_filter: '',
                         is_packing: isPacking,
                         is_solvent: false,
-                        is_technical: this.isTechnical(i.raw_material_id)
+                        is_technical: this.isTechnical(i.raw_material_id),
+                        searchQuery: ''
                     };
                 }),
                 packing_materials: (recipe.packing_materials || []).map(p => ({
@@ -1324,7 +1353,7 @@ function bomApp() {
         },
 
         addRMRow(isPacking = false) {
-            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '' });
+            this.bomModal.form.items.push({ raw_material_id: '', quantity: '', purity: '', rate: '', transportation_cost: 5, formulation: '', rm_type_filter: '', is_packing: isPacking, is_solvent: false, is_technical: '', searchQuery: '' });
         },
 
         async submitBom() {
