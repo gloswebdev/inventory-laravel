@@ -183,84 +183,103 @@
                         <th class="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Qty</th>
                         <th class="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Case Rate</th>
                         <th class="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Voucher info</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    @forelse($purchases as $row)
-                    <tr class="hover:bg-slate-50/50 transition-colors">
-                        <td class="py-3.5 px-5">
-                            <div class="font-bold text-slate-800 text-sm whitespace-normal break-words max-w-[280px]">
-                                {{ $row->supplier_name ?: '—' }}
-                            </div>
-                        </td>
-                        <td class="py-3.5 px-5">
-                            <div class="font-semibold text-slate-700 text-xs">{{ $row->item_name }}</div>
-                            @if($row->group_name4 || $row->group_name5)
-                            <div class="flex gap-1.5 mt-1">
-                                @if($row->group_name4)
-                                <span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">{{ $row->group_name4 }}</span>
-                                @endif
-                                @if($row->group_name5)
-                                <span class="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">{{ $row->group_name5 }}</span>
-                                @endif
-                            </div>
+                                   <tbody class="divide-y divide-slate-100">
+                    @php
+                        $groupedPurchases = collect($purchases->items())->groupBy(function($item) {
+                            return $item->vouch_no . '_' . $item->supplier_name . '_' . $item->vouch_date;
+                        });
+                    @endphp
+
+                    @forelse($groupedPurchases as $groupKey => $items)
+                        @foreach($items as $index => $row)
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            @if($index === 0)
+                            <td class="py-3.5 px-5 align-top border-r border-slate-100" rowspan="{{ count($items) }}">
+                                <div class="font-bold text-slate-800 text-sm whitespace-normal break-words max-w-[280px]">
+                                    {{ $row->supplier_name ?: '—' }}
+                                </div>
+                            </td>
                             @endif
-                        </td>
-                        <td class="py-3.5 px-4">
-                            <span class="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                                {{ $row->item_code }}
-                            </span>
-                        </td>
-                        <td class="py-3.5 px-4 text-center">
-                            @if($row->purity !== null)
-                            <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                {{ $row->purity }}%
-                            </span>
-                            @else
-                            <span class="text-slate-300">—</span>
-                            @endif
-                        </td>
-                        <td class="py-3.5 px-4 text-right font-semibold text-slate-600 text-xs">
-                            {{ number_format($row->qty, 2) }}
-                        </td>
-                        <td class="py-3.5 px-4 text-right">
-                            <div class="font-black text-slate-800 text-xs">₹{{ number_format($row->case_rate, 2) }}</div>
-                            {{-- Price Difference Badging --}}
-                            @php
-                                $prevPurchase = \App\Models\PurchaseRegister::where('item_code', $row->item_code)
-                                    ->where(function($q) use ($row) {
-                                        $q->where('vouch_date', '<', $row->vouch_date)
-                                          ->orWhere(function($sq) use ($row) {
-                                              $sq->where('vouch_date', '=', $row->vouch_date)
-                                                 ->where('id', '<', $row->id);
-                                          });
-                                    })
-                                    ->orderByDesc('vouch_date')
-                                    ->orderByDesc('id')
-                                    ->first();
-                            @endphp
-                            @if($prevPurchase && $prevPurchase->case_rate > 0)
+                            
+                            <td class="py-3.5 px-5">
+                                <div class="font-semibold text-slate-700 text-xs">{{ $row->item_name }}</div>
+                                @if($row->group_name4 || $row->group_name5)
+                                <div class="flex gap-1.5 mt-1">
+                                    @if($row->group_name4)
+                                    <span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">{{ $row->group_name4 }}</span>
+                                    @endif
+                                    @if($row->group_name5)
+                                    <span class="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">{{ $row->group_name5 }}</span>
+                                    @endif
+                                </div>
+                                @endif
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <span class="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                                    {{ $row->item_code }}
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 text-center">
+                                @if($row->purity !== null)
+                                <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                    {{ $row->purity }}%
+                                </span>
+                                @else
+                                <span class="text-slate-300">—</span>
+                                @endif
+                            </td>
+                            <td class="py-3.5 px-4 text-right font-semibold text-slate-600 text-xs">
+                                {{ number_format($row->qty, 2) }}
+                            </td>
+                            <td class="py-3.5 px-4 text-right">
+                                <div class="font-black text-slate-800 text-xs">₹{{ number_format($row->case_rate, 2) }}</div>
+                                {{-- Price Difference Badging --}}
                                 @php
-                                    $diff = (float)$row->case_rate - (float)$prevPurchase->case_rate;
+                                    $prevPurchase = \App\Models\PurchaseRegister::where('item_code', $row->item_code)
+                                        ->where(function($q) use ($row) {
+                                            $q->where('vouch_date', '<', $row->vouch_date)
+                                              ->orWhere(function($sq) use ($row) {
+                                                  $sq->where('vouch_date', '=', $row->vouch_date)
+                                                     ->where('id', '<', $row->id);
+                                              });
+                                        })
+                                        ->orderByDesc('vouch_date')
+                                        ->orderByDesc('id')
+                                        ->first();
                                 @endphp
-                                @if($diff > 0)
-                                    <div class="inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-50 text-rose-600 border border-rose-100" title="Previous Rate: ₹{{ number_format($prevPurchase->case_rate, 2) }}">
-                                        <i class="fas fa-arrow-trend-up text-[8px]"></i> +₹{{ number_format($diff, 2) }}
-                                    </div>
-                                @elseif($diff < 0)
-                                    <div class="inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100" title="Previous Rate: ₹{{ number_format($prevPurchase->case_rate, 2) }}">
-                                        <i class="fas fa-arrow-trend-down text-[8px]"></i> -₹{{ number_format(abs($diff), 2) }}
-                                    </div>
+                                @if($prevPurchase && $prevPurchase->case_rate > 0)
+                                    @php
+                                        $diff = (float)$row->case_rate - (float)$prevPurchase->case_rate;
+                                    @endphp
+                                    @if($diff > 0)
+                                        <div class="inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-50 text-rose-600 border border-rose-100" title="Previous Rate: ₹{{ number_format($prevPurchase->case_rate, 2) }}">
+                                            <i class="fas fa-arrow-trend-up text-[8px]"></i> +₹{{ number_format($diff, 2) }}
+                                        </div>
+                                    @elseif($diff < 0)
+                                        <div class="inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100" title="Previous Rate: ₹{{ number_format($prevPurchase->case_rate, 2) }}">
+                                            <i class="fas fa-arrow-trend-down text-[8px]"></i> -₹{{ number_format(abs($diff), 2) }}
+                                        </div>
+                                    @endif
                                 @endif
+                            </td>
+                            
+                            @if($index === 0)
+                            @php
+                                $billTotalAmount = $items->sum(fn($r) => (float)$r->qty * (float)$r->case_rate);
+                            @endphp
+                            <td class="py-3.5 px-5 text-right align-top border-l border-slate-100 bg-slate-50/20" rowspan="{{ count($items) }}">
+                                <div class="text-xs font-bold text-slate-600">Vouch No: {{ $row->vouch_no }}</div>
+                                <div class="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                    {{ $row->vouch_date ? \Carbon\Carbon::parse($row->vouch_date)->format('d M Y') : '—' }}
+                                </div>
+                                <div class="mt-3 pt-2 border-t border-slate-100">
+                                    <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bill Total</div>
+                                    <div class="text-sm font-black text-amber-600 mt-0.5">₹{{ number_format($billTotalAmount, 2) }}</div>
+                                </div>
+                            </td>
                             @endif
-                        </td>
-                        <td class="py-3.5 px-5 text-right">
-                            <div class="text-xs font-bold text-slate-600">Vouch No: {{ $row->vouch_no }}</div>
-                            <div class="text-[10px] text-slate-400 font-semibold mt-0.5">
-                                {{ $row->vouch_date ? \Carbon\Carbon::parse($row->vouch_date)->format('d M Y') : '—' }}
-                            </div>
-                        </td>
-                    </tr>
+                        </tr>
+                        @endforeach
                     @empty
                     <tr>
                         <td colspan="7" class="py-16 text-center">
