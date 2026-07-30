@@ -220,84 +220,110 @@
 
     {{-- Records List --}}
     <div class="space-y-3" id="mobileRecordList">
-        @foreach($reportData as $index => $row)
         @php
-            $netAmt   = (float)str_replace(',', '', $row['Calc_Net_Amt']   ?? 0);
-            $grossAmt = (float)str_replace(',', '', $row['Calc_Gross_Amt'] ?? 0);
-            $gst      = (float)str_replace(',', '', $row['GST']            ?? 0);
-            $qty      = (float)str_replace(',', '', $row['Qty']            ?? 0);
-            $rate     = (float)str_replace(',', '', $row['CaseRate']       ?? 0);
-            $purity   = $row['Purity'] ?? '';
+            $groupedReport = collect($reportData)->groupBy(function($item) {
+                return ($item['Bill_No'] ?? '') ?: (($item['Vouch_No'] ?? '') ?: 'unq_' . uniqid());
+            });
         @endphp
-        <div class="bg-white/80 backdrop-blur-xl rounded-[1.5rem] border border-white shadow-sm overflow-hidden mobile-purchase-row"
-             data-search="{{ strtolower(($row['SupplierName'] ?? '') . ' ' . ($row['User_Code'] ?? '') . ' ' . ($row['Item_Hd_Name'] ?? '') . ' ' . ($row['Bill_No'] ?? '') . ' ' . ($row['Branch_Name'] ?? '')) }}">
 
-            {{-- Header: Supplier + Net Amount --}}
-            <div class="px-4 pt-3 pb-2 flex items-start justify-between gap-2 border-b border-slate-50">
-                <div class="flex-1 min-w-0">
-                    <div class="text-[11px] font-900 text-slate-800 leading-tight truncate" title="{{ $row['SupplierName'] ?? '' }}">
-                        {{ $row['SupplierName'] ?? '—' }}
+        @foreach($groupedReport as $billNo => $items)
+            @php
+                $firstRow = $items->first();
+                $billNetAmt = $items->sum(fn($r) => (float)str_replace(',', '', $r['Calc_Net_Amt'] ?? 0));
+                $billGrossAmt = $items->sum(fn($r) => (float)str_replace(',', '', $r['Calc_Gross_Amt'] ?? 0));
+                $billGST = $items->sum(fn($r) => (float)str_replace(',', '', $r['GST'] ?? 0));
+                
+                // Construct search string combining all items in this bill
+                $searchStr = strtolower(
+                    ($firstRow['SupplierName'] ?? '') . ' ' . 
+                    ($firstRow['Bill_No'] ?? '') . ' ' . 
+                    ($firstRow['Branch_Name'] ?? '') . ' ' .
+                    $items->map(fn($r) => ($r['User_Code'] ?? '') . ' ' . ($r['Item_Hd_Name'] ?? ''))->implode(' ')
+                );
+            @endphp
+            <div class="bg-white/80 backdrop-blur-xl rounded-[1.5rem] border border-white shadow-sm overflow-hidden mobile-purchase-row"
+                 data-search="{{ $searchStr }}">
+
+                {{-- Header: Supplier + Total Bill Net Amount --}}
+                <div class="px-4 pt-3 pb-2 flex items-start justify-between gap-2 border-b border-slate-100 bg-slate-50/50">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[11px] font-900 text-slate-800 leading-tight truncate" title="{{ $firstRow['SupplierName'] ?? '' }}">
+                            {{ $firstRow['SupplierName'] ?? '—' }}
+                        </div>
+                        <div class="flex items-center gap-2 mt-1 flex-wrap">
+                            <span class="text-[8px] font-black uppercase bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{{ $firstRow['Branch_Name'] ?? '—' }}</span>
+                            <span class="text-[8px] text-slate-400 font-bold">{{ $firstRow['Vouch_Date'] ?? '' }}</span>
+                            @if($billNo && !str_starts_with($billNo, 'unq_'))
+                            <span class="text-[8px] font-black text-indigo-600">Bill: {{ $billNo }}</span>
+                            @endif
+                        </div>
                     </div>
-                    <div class="flex items-center gap-2 mt-1 flex-wrap">
-                        <span class="text-[8px] font-black uppercase bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{{ $row['Branch_Name'] ?? '—' }}</span>
-                        <span class="text-[8px] text-slate-400 font-bold">{{ $row['Vouch_Date'] ?? '' }}</span>
-                        @if(isset($row['Bill_No']))
-                        <span class="text-[8px] font-black text-indigo-600">{{ $row['Bill_No'] }}</span>
-                        @endif
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-sm font-900 text-amber-700">₹{{ number_format($billNetAmt, 0) }}</div>
+                        <div class="text-[8px] text-slate-400 font-bold">Total Net</div>
                     </div>
                 </div>
-                <div class="text-right flex-shrink-0">
-                    <div class="text-sm font-900 text-amber-700">₹{{ number_format($netAmt, 0) }}</div>
-                    <div class="text-[8px] text-slate-400 font-bold">Net</div>
-                </div>
-            </div>
 
-            {{-- Item --}}
-            <div class="px-4 py-2 border-b border-slate-50 flex items-center gap-2">
-                <span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded text-[8px] font-black uppercase flex-shrink-0">
-                    {{ $row['User_Code'] ?? '—' }}
-                </span>
-                <span class="text-[10px] text-slate-700 font-bold truncate flex-1" title="{{ $row['Item_Hd_Name'] ?? '' }}">
-                    {{ $row['Item_Hd_Name'] ?? '—' }}
-                </span>
-                @if($purity !== '' && $purity !== null)
-                <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded text-[8px] font-black flex-shrink-0">{{ $purity }}%</span>
-                @endif
-            </div>
+                {{-- Items --}}
+                <div class="divide-y divide-slate-100">
+                    @foreach($items as $row)
+                    @php
+                        $rowGrossAmt = (float)str_replace(',', '', $row['Calc_Gross_Amt'] ?? 0);
+                        $rowGst      = (float)str_replace(',', '', $row['GST']            ?? 0);
+                        $rowQty      = (float)str_replace(',', '', $row['Qty']            ?? 0);
+                        $rowRate     = (float)str_replace(',', '', $row['CaseRate']       ?? 0);
+                        $purity      = $row['Purity'] ?? '';
+                    @endphp
+                    <div class="p-3.5 space-y-2">
+                        {{-- Code, Name, Purity --}}
+                        <div class="flex items-center gap-2">
+                            <span class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded text-[8px] font-black uppercase flex-shrink-0">
+                                {{ $row['User_Code'] ?? '—' }}
+                            </span>
+                            <span class="text-[10px] text-slate-700 font-bold truncate flex-1" title="{{ $row['Item_Hd_Name'] ?? '' }}">
+                                {{ $row['Item_Hd_Name'] ?? '—' }}
+                            </span>
+                            @if($purity !== '' && $purity !== null)
+                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded text-[8px] font-black flex-shrink-0">{{ $purity }}%</span>
+                            @endif
+                        </div>
 
-            {{-- Groups / Tags --}}
-            <div class="px-4 py-2 border-b border-slate-50 flex items-center gap-2 flex-wrap">
-                @if(isset($row['GroupName4']) && $row['GroupName4'])
-                <span class="bg-teal-50 text-teal-700 border border-teal-100 px-1.5 py-0.5 rounded text-[8px] font-black">{{ $row['GroupName4'] }}</span>
-                @endif
-                @if(isset($row['GroupName5']) && $row['GroupName5'])
-                <span class="bg-violet-50 text-violet-700 border border-violet-100 px-1.5 py-0.5 rounded text-[8px] font-black">{{ $row['GroupName5'] }}</span>
-                @endif
-                @if(isset($row['Pack_Name']) && $row['Pack_Name'])
-                <span class="bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded text-[8px] font-black">{{ $row['Pack_Name'] }}</span>
-                @endif
-            </div>
+                        {{-- Groups / Tags --}}
+                        <div class="flex items-center gap-2 flex-wrap">
+                            @if(isset($row['GroupName4']) && $row['GroupName4'])
+                            <span class="bg-teal-50 text-teal-700 border border-teal-100 px-1.5 py-0.5 rounded text-[8px] font-black">{{ $row['GroupName4'] }}</span>
+                            @endif
+                            @if(isset($row['GroupName5']) && $row['GroupName5'])
+                            <span class="bg-violet-50 text-violet-700 border border-violet-100 px-1.5 py-0.5 rounded text-[8px] font-black">{{ $row['GroupName5'] }}</span>
+                            @endif
+                            @if(isset($row['Pack_Name']) && $row['Pack_Name'])
+                            <span class="bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded text-[8px] font-black">{{ $row['Pack_Name'] }}</span>
+                            @endif
+                        </div>
 
-            {{-- Financials --}}
-            <div class="px-4 py-2.5 grid grid-cols-4 gap-2 text-center">
-                <div>
-                    <div class="text-[8px] font-black text-slate-400 uppercase">Qty</div>
-                    <div class="text-[11px] font-900 text-slate-700 mt-0.5">{{ number_format($qty, 0) }}</div>
-                </div>
-                <div>
-                    <div class="text-[8px] font-black text-slate-400 uppercase">Rate</div>
-                    <div class="text-[11px] font-900 text-slate-700 mt-0.5">₹{{ number_format($rate, 0) }}</div>
-                </div>
-                <div>
-                    <div class="text-[8px] font-black text-rose-500 uppercase">GST</div>
-                    <div class="text-[11px] font-900 text-rose-600 mt-0.5">₹{{ number_format($gst, 0) }}</div>
-                </div>
-                <div class="bg-amber-50 rounded-xl">
-                    <div class="text-[8px] font-black text-amber-600 uppercase mt-1">Gross</div>
-                    <div class="text-[11px] font-900 text-amber-700 mb-1">₹{{ number_format($grossAmt, 0) }}</div>
+                        {{-- Financials --}}
+                        <div class="grid grid-cols-4 gap-2 text-center pt-1.5">
+                            <div>
+                                <div class="text-[8px] font-black text-slate-400 uppercase">Qty</div>
+                                <div class="text-[10px] font-900 text-slate-700 mt-0.5">{{ number_format($rowQty, 0) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-[8px] font-black text-slate-400 uppercase">Rate</div>
+                                <div class="text-[10px] font-900 text-slate-700 mt-0.5">₹{{ number_format($rowRate, 0) }}</div>
+                            </div>
+                            <div>
+                                <div class="text-[8px] font-black text-rose-500 uppercase">GST</div>
+                                <div class="text-[10px] font-900 text-rose-600 mt-0.5">₹{{ number_format($rowGst, 0) }}</div>
+                            </div>
+                            <div class="bg-amber-50 rounded-xl">
+                                <div class="text-[8px] font-black text-amber-600 uppercase mt-0.5">Gross</div>
+                                <div class="text-[10px] font-900 text-amber-700 mb-0.5">₹{{ number_format($rowGrossAmt, 0) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
                 </div>
             </div>
-        </div>
         @endforeach
     </div>
 
