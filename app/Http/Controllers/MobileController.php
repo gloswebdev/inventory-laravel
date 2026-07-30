@@ -2640,6 +2640,7 @@ class MobileController extends Controller implements HasMiddleware
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('item_hd_name', 'like', "%{$search}%")
+                  ->orWhere('item_short_name', 'like', "%{$search}%")
                   ->orWhere('user_code', 'like', "%{$search}%")
                   ->orWhere('group3', 'like', "%{$search}%");
             });
@@ -2654,6 +2655,14 @@ class MobileController extends Controller implements HasMiddleware
 
         $pricelists = $query->paginate(20)->withQueryString();
         $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+
+        if ($request->ajax()) {
+            return response()->json([
+                'html' => view('mobile.partials.pricelist-items', compact('pricelists'))->render(),
+                'has_more' => $pricelists->hasMorePages(),
+                'next_page' => $pricelists->currentPage() + 1
+            ]);
+        }
 
         return view('mobile.pricelist', compact('pricelists', 'group1List'));
     }
