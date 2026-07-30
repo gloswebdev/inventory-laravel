@@ -30,12 +30,31 @@
     {{-- Rate Type Selector --}}
     <div class="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/70 rounded-3xl p-4">
         <label class="block text-[9px] font-black text-amber-700 uppercase tracking-widest mb-1.5">Price List / Branch</label>
-        <select x-model="priceList" @change="clearEdits()"
-                class="w-full py-3 px-4 bg-white border border-amber-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer">
-            @foreach($priceLists as $key => $meta)
-                <option value="{{ $key }}">{{ $key }} — {{ $meta['label'] }}</option>
-            @endforeach
-        </select>
+        <div class="flex items-center gap-2">
+            <select x-model="priceList" @change="clearEdits(); updateUrlPriceList()"
+                    class="flex-1 py-3 px-4 bg-white border border-amber-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer">
+                @foreach($priceLists as $key => $meta)
+                    <option value="{{ $key }}">{{ $key }} — {{ $meta['label'] }}</option>
+                @endforeach
+            </select>
+
+            {{-- Search Button --}}
+            <button @click="showSearchSheet = true"
+                    class="relative w-11 h-11 shrink-0 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 active:scale-90 transition-transform">
+                <i class="fas fa-search text-sm"></i>
+                @if(request()->anyFilled(['search', 'group1']))
+                <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-white"></span>
+                @endif
+            </button>
+
+            {{-- Push / Update Button --}}
+            <button @click="pushToErp()" :disabled="pushing"
+                    class="relative w-11 h-11 shrink-0 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-200 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-60">
+                <i class="fas fa-cloud-arrow-up text-sm" :class="pushing ? 'fa-spin' : ''"></i>
+                <span x-show="selectedCount > 0" x-cloak x-text="selectedCount"
+                      class="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-500 border-2 border-white text-white text-[9px] font-black flex items-center justify-center"></span>
+            </button>
+        </div>
     </div>
 
     {{-- Active Filter Chip (tap the floating search button to change) --}}
@@ -51,7 +70,7 @@
             {{ request('group1') }}
         </span>
         @endif
-        <a href="{{ route('mobile.costing.pricelist-update') }}" class="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center">
+        <a :href="'{{ route('mobile.costing.pricelist-update') }}?price_list=' + priceList" class="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center">
             Clear
         </a>
     </div>
@@ -77,37 +96,18 @@
                 class="px-4 py-2 rounded-full bg-slate-800 shadow-xl text-[10px] font-black text-white uppercase tracking-widest active:scale-90 transition-transform">
             Clear <span x-text="selectedCount"></span>
         </button>
-
-        {{-- Search + Push pill bar --}}
-        <div class="flex items-center gap-1 bg-white rounded-full border border-slate-200 shadow-2xl shadow-slate-900/20 p-1.5">
-            {{-- Search FAB --}}
-            <button @click="showSearchSheet = true"
-                    class="relative w-11 h-11 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 active:scale-90 transition-transform">
-                <i class="fas fa-search text-sm"></i>
-                @if(request()->anyFilled(['search', 'group1']))
-                <span class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white"></span>
-                @endif
-            </button>
-
-            {{-- Push / Update FAB --}}
-            <button @click="pushToErp()" :disabled="pushing"
-                    class="relative w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-900/30 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-60">
-                <i class="fas fa-cloud-arrow-up text-lg" :class="pushing ? 'fa-spin' : ''"></i>
-                <span x-show="selectedCount > 0" x-cloak x-text="selectedCount"
-                      class="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-rose-500 border-2 border-white text-white text-[10px] font-black flex items-center justify-center"></span>
-            </button>
-        </div>
     </div>
 
     {{-- Search & Category Filter Sheet --}}
-    <div x-show="showSearchSheet" x-cloak class="fixed inset-0 z-50 flex items-end">
+    <div x-show="showSearchSheet" x-cloak class="fixed inset-0 z-50 flex items-start">
         <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="showSearchSheet = false"></div>
-        <div class="relative bg-white rounded-t-3xl w-full p-5 pb-8" x-transition>
+        <div class="relative bg-white rounded-b-3xl w-full p-5 pb-8 shadow-2xl" x-transition>
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest">Search &amp; Filter</h3>
                 <button @click="showSearchSheet = false" class="text-slate-400"><i class="fas fa-times"></i></button>
             </div>
             <form method="GET" action="{{ route('mobile.costing.pricelist-update') }}" class="space-y-3">
+                <input type="hidden" name="price_list" :value="priceList">
                 <div class="relative">
                     <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                     <input type="text" name="search" value="{{ request('search') }}"
@@ -128,7 +128,7 @@
                         Apply
                     </button>
                     @if(request()->anyFilled(['search', 'group1']))
-                    <a href="{{ route('mobile.costing.pricelist-update') }}" class="px-5 py-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-xs font-black uppercase flex items-center justify-center">
+                    <a :href="'{{ route('mobile.costing.pricelist-update') }}?price_list=' + priceList" class="px-5 py-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-xs font-black uppercase flex items-center justify-center">
                         Clear
                     </a>
                     @endif
@@ -207,7 +207,7 @@
 <script>
 function mobilePricelistUpdateApp() {
     return {
-        priceList: 'Sp_Rate1',
+        priceList: '{{ request('price_list', 'Sp_Rate1') }}',
         pushing: false,
         showHistory: false,
         showSearchSheet: false,
@@ -267,6 +267,12 @@ function mobilePricelistUpdateApp() {
 
         clearEdits() {
             this.edits = {};
+        },
+
+        updateUrlPriceList() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('price_list', this.priceList);
+            window.history.replaceState({}, '', url.toString());
         },
 
         payloadItems() {
