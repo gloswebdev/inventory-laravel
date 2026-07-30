@@ -784,7 +784,8 @@ class CostingController extends Controller
                     }
                 }
 
-                $vouchNo = trim($row['Bill_No'] ?? $row['Vouch_No'] ?? '');
+                $vouchNo = trim(!empty($row['Bill_No']) ? $row['Bill_No'] : ($row['Vouch_No'] ?? ''));
+                if (empty($vouchNo)) continue;
 
                 PurchaseRegister::updateOrCreate(
                     [
