@@ -451,7 +451,9 @@ class CostingController extends Controller
                     }
                     if ($rmPurity <= 0) $rmPurity = 100.0;
 
-                    $requiredQty = ($yieldQty * $formulation) / $rmPurity;
+                    $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
+                    $itemFormulation = ($item->quantity * $recipePurity) / $yieldQty;
+                    $requiredQty = ($yieldQty * $itemFormulation) / $rmPurity;
                 }
 
                 $subCost = $requiredQty * ($pricePerUnit + $tc);
@@ -1318,7 +1320,9 @@ class CostingController extends Controller
                 if ($rmPurity <= 0) {
                     $rmPurity = 100.0;
                 }
-                $requiredQty = ($baseQty * $formulation) / $rmPurity;
+                $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
+                $itemFormulation = ($item->quantity * $recipePurity) / max($recipe->yield_quantity, 0.001);
+                $requiredQty = ($baseQty * $itemFormulation) / $rmPurity;
             }
 
             $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);

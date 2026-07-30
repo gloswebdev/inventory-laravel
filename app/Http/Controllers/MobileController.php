@@ -2007,7 +2007,9 @@ class MobileController extends Controller implements HasMiddleware
                     }
                     if ($rmPurity <= 0) $rmPurity = 100.0;
 
-                    $requiredQty = ($yieldQty * $formulation) / $rmPurity;
+                    $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
+                    $itemFormulation = ($item->quantity * $recipePurity) / $yieldQty;
+                    $requiredQty = ($yieldQty * $itemFormulation) / $rmPurity;
                 }
 
                 $subCost = $requiredQty * ($pricePerUnit + $tc);
@@ -2179,7 +2181,9 @@ class MobileController extends Controller implements HasMiddleware
                     if ($itemPurity <= 0) {
                         $itemPurity = 100.0;
                     }
-                    $requiredQty = ($baseQty * $formulation) / $itemPurity;
+                    $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
+                    $itemFormulation = ($item->quantity * $recipePurity) / max($recipe->yield_quantity, 0.001);
+                    $requiredQty = ($baseQty * $itemFormulation) / $itemPurity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
@@ -2284,7 +2288,9 @@ class MobileController extends Controller implements HasMiddleware
                     if ($itemPurity <= 0) {
                         $itemPurity = 100.0;
                     }
-                    $requiredQty = ($baseQty * $formulation) / $itemPurity;
+                    $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
+                    $itemFormulation = ($item->quantity * $recipePurity) / max($recipe->yield_quantity, 0.001);
+                    $requiredQty = ($baseQty * $itemFormulation) / $itemPurity;
                 }
 
                 $pricePerUnit = (float)($priceMap[$rm->item_code] ?? 0);
