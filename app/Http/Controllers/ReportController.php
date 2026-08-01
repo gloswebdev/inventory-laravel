@@ -485,5 +485,598 @@ class ReportController extends Controller
             'accountOptions', 'itemOptions'
         ));
     }
+
+    public function collectionReport(Request $request)
+    {
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        // Fetch PartyMaster (cached 2 hours) first — needed for filter dropdowns too
+        if ($request->has('refresh_party_master')) {
+            Cache::forget('party_master_map');
+        }
+        $partyMasterMap = $this->getPartyMasterMap($baseUrl, $apiKey);
+
+        // Build branch & agent options from PartyMaster
+        $branchOptions = collect($partyMasterMap)
+            ->pluck('BranchName')->filter(fn($v) => $v && $v !== '—')
+            ->unique()->sort()->values()->toArray();
+        $agentOptions = collect($partyMasterMap)
+            ->pluck('AgentName')->filter(fn($v) => $v && $v !== '—')
+            ->unique()->sort()->values()->toArray();
+
+        // --- Filters ---
+        $fromDate = $request->input('from_date', '2026-07-01');
+        $toDate   = $request->input('to_date',   '2027-07-31');
+        $finYear  = $request->input('fin_year',  '2627');
+
+        // Support array (multiple select) or string for branch_filter
+        $branchFilter = $request->input('branch_filter', []);
+        if (is_string($branchFilter)) {
+            $branchFilter = $branchFilter ? [$branchFilter] : [];
+        }
+        
+        $agentFilter   = $request->input('agent_filter', '');
+        $selectedTeams = $request->input('teams', []); // Selected team IDs
+
+        // Load Teams from Database
+        $dbTeams = \App\Models\Team::all();
+
+        // If a team is clicked/active, accumulate agents and branches from the selected teams
+        $teamAgents = [];
+        $teamBranches = [];
+        if (!empty($selectedTeams)) {
+            $activeTeamsData = $dbTeams->whereIn('id', $selectedTeams);
+            foreach ($activeTeamsData as $team) {
+                if (is_array($team->agents)) {
+                    $teamAgents = array_merge($teamAgents, $team->agents);
+                }
+                if (is_array($team->branches)) {
+                    $teamBranches = array_merge($teamBranches, $team->branches);
+                }
+            }
+            $teamAgents   = array_unique(array_filter($teamAgents));
+            $teamBranches = array_unique(array_filter($teamBranches));
+        }
+
+        $defaults = [
+            'fin_year'  => '2627',
+            'from_date' => '2026-07-01',
+            'to_date'   => '2027-07-31',
+        ];
+
+        // Only call Collection API when form is submitted
+        if (!$request->hasAny(['from_date', 'to_date', 'branch_filter', 'agent_filter', 'teams', 'fetch'])) {
+            return view('reports.collection_report', compact(
+                'defaults', 'finYear', 'fromDate', 'toDate',
+                'branchFilter', 'agentFilter', 'selectedTeams', 'dbTeams', 'branchOptions', 'agentOptions'
+            ));
+        }
+
+        $payload = [
+            'apikey'    => $apiKey,
+            'FinYear'   => $finYear,
+            'PartyCode' => 'ALL',
+            'FromDate'  => $fromDate,
+            'ToDate'    => $toDate,
+        ];
+
+        Log::info('Collection Report API Call', ['url' => $baseUrl . '/LogicPartyCollection', 'payload' => $payload]);
+
+        $reportData = [];
+        $error      = null;
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(90)
+                ->connectTimeout(20)
+                ->post("{$baseUrl}/LogicPartyCollection", $payload);
+
+            Log::info('Collection Report API Response', ['status' => $response->status(), 'body' => substr($response->body(), 0, 300)]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+                    $reportData = $data['resultdata'];
+                } elseif (is_array($data) && !isset($data['response'])) {
+                    $reportData = $data;
+                } else {
+                    $error = "API: " . ($data['message'] ?? $data['response'] ?? 'Unknown error');
+                }
+            } else {
+                $error = 'HTTP ' . $response->status();
+            }
+        } catch (\Exception $e) {
+            $error = 'Connection error: ' . $e->getMessage();
+            Log::error('Collection Report API Exception: ' . $e->getMessage());
+        }
+
+        // ── Remove DEPOSIT rows ──
+        $reportData = array_values(array_filter($reportData, function ($row) {
+            foreach ($row as $v) {
+                if (is_string($v) && stripos($v, 'DEPOSIT') !== false) return false;
+            }
+            return true;
+        }));
+
+        // ── Merge PartyMaster (Branch_Name, Agent_Name, Town) ──
+        $reportData = array_map(function ($row) use ($partyMasterMap) {
+            // Strictly align the Collection API's "act_code" and "act_name"
+            $colPartyCode = trim(
+                $row['act_code']   ?? $row['Act_Code']   ?? $row['ActCode']   ??
+                $row['AC_Code']    ?? $row['Ac_Code']    ??
+                $row['PartyCode']  ?? $row['Party_Code']  ?? ''
+            );
+            
+            $masterInfo = null;
+            if ($colPartyCode && isset($partyMasterMap[$colPartyCode])) {
+                $masterInfo = $partyMasterMap[$colPartyCode];
+            }
+
+            // Fallback to name match (check act_name)
+            if (!$masterInfo) {
+                $rowName = strtolower(trim(
+                    $row['act_name']   ?? $row['AC_Name']    ?? $row['AcName']    ?? 
+                    $row['PartyName']  ?? $row['Party_Name']  ?? ''
+                ));
+                foreach ($partyMasterMap as $info) {
+                    if (strtolower(trim($info['PartyName'] ?? '')) === $rowName) {
+                        $masterInfo = $info; 
+                        break;
+                    }
+                }
+            }
+
+            $row['_AgentName']  = $masterInfo['AgentName']  ?? '—';
+            $row['_AgentCode']  = $masterInfo['AgentCode']  ?? '—';
+            $row['_BranchName'] = $masterInfo['BranchName'] ?? '—';
+            $row['_TownName']   = $masterInfo['TownName']   ?? '—';
+            
+            // Override raw names/codes for rendering consistency
+            $row['PartyName']   = $row['act_name'] ?? $row['PartyName'] ?? ($masterInfo['PartyName'] ?? '—');
+            $row['ActCode']     = $colPartyCode;
+            
+            return $row;
+        }, $reportData);
+
+        // ── Apply Branch filter (handles array of selected branches) ──
+        if (!empty($branchFilter)) {
+            $reportData = array_values(array_filter($reportData, function($r) use ($branchFilter) {
+                return in_array(trim($r['_BranchName'] ?? ''), $branchFilter);
+            }));
+        }
+
+        // ── Apply Team / Agent Filter ──
+        // If specific agents in active teams are selected, limit search to them
+        if (!empty($teamAgents)) {
+            $reportData = array_values(array_filter($reportData, function($r) use ($teamAgents) {
+                return in_array(trim($r['_AgentName'] ?? ''), $teamAgents);
+            }));
+        }
+
+        // ── Apply Agent filter (direct agent selector overrides team filters) ──
+        if (!empty($agentFilter)) {
+            $reportData = array_values(array_filter($reportData,
+                fn($r) => trim($r['_AgentName'] ?? '') === trim($agentFilter)
+            ));
+        }
+
+        // ── Detect amount fields (smart auto-detection) ──
+        $firstRow  = $reportData[0] ?? [];
+
+        // Log actual keys so we can see what the API returns
+        Log::info('Collection API first row keys', ['keys' => array_keys($firstRow), 'sample' => $firstRow]);
+
+        // All possible collection/credit field names
+        $amtFields = [
+            'Collection_Amount','SL_Amount','Collection_Amt','CollectionAmt',
+            'BL_Amount','Bl_Amount','BLAmount','bl_amount',
+            'Credit_Amount','CreditAmt','Credit_Amt','Credit','Cr','CrAmt',
+            'Amount','Amt','Net_Amount','NetAmt','Net_Amt',
+            'TotalAmt','Total_Amount','Total',
+        ];
+        $crField = collect($amtFields)->first(fn($k) => array_key_exists($k, $firstRow));
+
+        // If still not found → auto-detect: pick first numeric field that looks like an amount
+        if (!$crField) {
+            $skipKeys = ['_AgentName','_BranchName','_TownName','ActCode','AC_Code','Ac_Code',
+                         'Act_Code','PartyCode','Fin_Year','VouchNo','Vouch_No'];
+            foreach ($firstRow as $key => $val) {
+                if (str_starts_with($key, '_')) continue;
+                if (in_array($key, $skipKeys)) continue;
+                $clean = str_replace([',',' '], '', (string)$val);
+                if (is_numeric($clean) && (float)$clean >= 0) {
+                    // Prefer fields whose name contains 'col','amt','amount','credit','cr','total','bl'
+                    $keyLower = strtolower($key);
+                    if (str_contains($keyLower,'col') || str_contains($keyLower,'amt') ||
+                        str_contains($keyLower,'amount') || str_contains($keyLower,'credit') ||
+                        str_contains($keyLower,'cr') || str_contains($keyLower,'total') ||
+                        str_contains($keyLower,'bl')) {
+                        $crField = $key;
+                        break;
+                    }
+                }
+            }
+            // Last resort: any numeric field with value > 0
+            if (!$crField) {
+                foreach ($firstRow as $key => $val) {
+                    if (str_starts_with($key, '_')) continue;
+                    $clean = str_replace([',',' '], '', (string)$val);
+                    if (is_numeric($clean) && (float)$clean > 0) {
+                        $crField = $key;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $drField  = collect(['Debit','Dr','DrAmt','Debit_Amt','Debit_Amount'])->first(fn($k) => array_key_exists($k, $firstRow));
+        Log::info('Collection amount fields detected', ['crField' => $crField, 'drField' => $drField]);
+
+        // Helper to parse amount
+        $parseAmt = fn($v) => is_numeric(str_replace([',',' '], '', (string)$v)) ? (float)str_replace(',', '', (string)$v) : 0;
+
+        // ── Build grouped structure: Team Name -> Agent Name -> [rows] ──
+        $grouped = [];
+        
+        foreach ($reportData as $row) {
+            $agentName = $row['_AgentName'] ?: '(No Agent)';
+            
+            // Find which team this agent belongs to
+            $matchedTeams = [];
+            foreach ($dbTeams as $team) {
+                if (is_array($team->agents) && in_array($agentName, $team->agents)) {
+                    $matchedTeams[] = $team->name;
+                }
+            }
+            
+            // If agent doesn't belong to any team, assign to "Unassigned Agents"
+            if (empty($matchedTeams)) {
+                $matchedTeams = ['Unassigned Agents'];
+            }
+            
+            foreach ($matchedTeams as $tName) {
+                $grouped[$tName][$agentName][] = $row;
+            }
+        }
+        
+        ksort($grouped);
+        foreach ($grouped as $teamName => &$agents) {
+            ksort($agents);
+        }
+        unset($agents);
+
+        // ── Team-level summaries ──
+        $branchSummary = []; // reusing variable name to avoid changing view variables too much, but acts as Team Summary
+        foreach ($grouped as $teamName => $agents) {
+            $tTotal = 0; $tParties = 0; $tAgents = count($agents);
+            foreach ($agents as $agent => $rows) {
+                $aTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $rows));
+                $tTotal += $aTotal;
+                $tParties += count($rows);
+            }
+            $branchSummary[$teamName] = ['total' => $tTotal, 'parties' => $tParties, 'agents' => $tAgents];
+        }
+
+        $grandTotal   = array_sum(array_column($branchSummary, 'total'));
+        $totalParties = array_sum(array_column($branchSummary, 'parties'));
+        $totalAgents  = collect($reportData)->pluck('_AgentName')->filter(fn($v)=>$v&&$v!=='—')->unique()->count();
+
+        // Party name key
+        $partyNameKey = collect(['AC_Name','AcName','PartyName','Party_Name'])
+                          ->first(fn($k) => array_key_exists($k, $firstRow));
+
+        // Load Agent & Team Targets for selected filter date's month
+        // We extract YYYY-MM from $fromDate
+        $targetMonth = substr($fromDate, 0, 7);
+        $agentTargets = \App\Models\AgentTarget::where('target_month', $targetMonth)
+            ->get()
+            ->pluck('target_amount', 'agent_name')
+            ->toArray();
+
+        $teamTargets = \App\Models\TeamTarget::where('target_month', $targetMonth)
+            ->get()
+            ->pluck('target_amount', 'team_id')
+            ->toArray();
+
+        return view('reports.collection_report', compact(
+            'reportData', 'grouped', 'branchSummary',
+            'grandTotal', 'totalParties', 'totalAgents',
+            'error', 'defaults',
+            'finYear', 'fromDate', 'toDate', 'selectedTeams', 'dbTeams',
+            'branchFilter', 'agentFilter', 'branchOptions', 'agentOptions',
+            'crField', 'drField', 'partyNameKey', 'agentTargets', 'teamTargets'
+        ));
+    }
+
+    /**
+     * Fetch & cache PartyMaster from Algebra ERP API.
+     * Returns a map keyed by ActCode => [PartyName, AgentName, AgentCode, TownName, BranchName, GroupName]
+     */
+    private function getPartyMasterMap(string $baseUrl, string $apiKey): array
+    {
+        return Cache::remember('party_master_map', 7200, function () use ($baseUrl, $apiKey) {
+            try {
+                $pmBranch    = AppSetting::get('partymaster_api_branch', 'ALL');
+                $pmActCode   = AppSetting::get('partymaster_api_actcode', 'ALL');
+                $pmAgentCode = AppSetting::get('partymaster_api_agentcode', 'ALL');
+                $pmTxnType   = AppSetting::get('partymaster_api_txntype', 'New');
+
+                Log::info('PartyMaster API Call', [
+                    'url'       => $baseUrl . '/PartyMaster',
+                    'Branch'    => $pmBranch,
+                    'ActCode'   => $pmActCode,
+                    'AgentCode' => $pmAgentCode,
+                    'TxnType'   => $pmTxnType,
+                ]);
+
+                $response = Http::withoutVerifying()
+                    ->timeout(120)
+                    ->connectTimeout(20)
+                    ->post("{$baseUrl}/PartyMaster", [
+                        'apikey'       => $apiKey,
+                        'Branch'       => $pmBranch,
+                        'ActCode'      => $pmActCode,
+                        'AgentCode'    => $pmAgentCode,
+                        'modifieddate' => 'ALL',
+                        'TxnType'      => $pmTxnType,
+                    ]);
+
+                Log::info('PartyMaster API Response', ['status' => $response->status()]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $rows = [];
+
+                    if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+                        $rows = $data['resultdata'];
+                    } elseif (is_array($data) && !isset($data['response'])) {
+                        $rows = $data;
+                    }
+
+                    $map = [];
+                    foreach ($rows as $row) {
+                        // Try various key names for act code
+                        $actCode = trim(
+                            $row['ActCode']    ?? $row['Act_Code']   ??
+                            $row['AC_Code']    ?? $row['Ac_Code']    ??
+                            $row['PartyCode']  ?? $row['Party_Code'] ?? ''
+                        );
+                        if (!$actCode) continue;
+
+                        // Auto detect AgentCode by looking for keys containing 'agent' or 'salesman' or 'sm' (case-insensitive)
+                        $agentCodeVal = '';
+                        foreach ($row as $k => $v) {
+                            $kLower = strtolower($k);
+                            if ($kLower !== 'agentname' && $kLower !== 'salesman' && $kLower !== 'salesmanname' && $kLower !== 'agent_name' &&
+                                (str_contains($kLower, 'agentcode') || str_contains($kLower, 'agent_code') || 
+                                 str_contains($kLower, 'salesmancode') || str_contains($kLower, 'salesman_code') ||
+                                 str_contains($kLower, 'agentid') || str_contains($kLower, 'agent_id') ||
+                                 $kLower === 'actcode' || $kLower === 'act_code' || $kLower === 'agent_code' ||
+                                 $kLower === 'smcode' || $kLower === 'sm_code')) {
+                                // Skip if it's the main party code (we already have $actCode)
+                                if (trim($v) === $actCode && ($kLower === 'actcode' || $kLower === 'act_code' || $kLower === 'ac_code')) {
+                                    continue;
+                                }
+                                $agentCodeVal = trim($v);
+                                if ($agentCodeVal) break;
+                            }
+                        }
+                        
+                        // Fallback check on common names
+                        if (!$agentCodeVal) {
+                            $agentCodeVal = trim($row['AgentCode'] ?? $row['Agent_Code'] ?? $row['SalesmanCode'] ?? $row['SalesManCode'] ?? $row['Agent_Id'] ?? $row['AgentID'] ?? '');
+                        }
+
+                        $map[$actCode] = [
+                            'PartyName'  => trim($row['ActName']     ?? $row['PartyName']   ?? $row['Party_Name']  ?? $row['AC_Name']    ?? $row['AcName']    ?? $row['AccountName'] ?? $row['Account_Name'] ?? $row['party_name'] ?? ''),
+                            'AgentName'  => trim($row['AgentName']   ?? $row['Agent_Name']  ?? $row['SalesMan']   ?? $row['Salesman']  ?? ''),
+                            'AgentCode'  => $agentCodeVal,
+                            'TownName'   => trim($row['TownName']    ?? $row['Town_Name']   ?? $row['Town']       ?? $row['City']      ?? ''),
+                            'BranchName' => trim($row['BranchName']  ?? $row['Branch_Name'] ?? $row['Branch']     ?? ''),
+                            'GroupName'  => trim($row['GroupName']   ?? $row['Group_Name']  ?? $row['GroupName1'] ?? ''),
+                        ];
+                    }
+
+                    Log::info('PartyMaster loaded', ['count' => count($map)]);
+                    return $map;
+                }
+
+                Log::error('PartyMaster API failed', ['status' => $response->status()]);
+            } catch (\Exception $e) {
+                Log::error('PartyMaster API Exception: ' . $e->getMessage());
+            }
+
+            return [];
+        });
+    }
+
+    /**
+     * Display a report of all parties from PartyMaster API
+     */
+    public function partyMasterReport(Request $request)
+    {
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        if ($request->has('refresh')) {
+            Cache::forget('party_master_map');
+        }
+
+        $partyMasterMap = $this->getPartyMasterMap($baseUrl, $apiKey);
+        $parties = collect($partyMasterMap);
+
+        // Filters
+        $branchFilter = $request->input('branch_filter', '');
+        $agentFilter  = $request->input('agent_filter', '');
+
+        $branchOptions = $parties->pluck('BranchName')->filter()->unique()->sort()->values()->toArray();
+        $agentOptions  = $parties->pluck('AgentName')->filter()->unique()->sort()->values()->toArray();
+
+        if ($branchFilter) {
+            $parties = $parties->filter(fn($p) => ($p['BranchName'] ?? '') === $branchFilter);
+        }
+        if ($agentFilter) {
+            $parties = $parties->filter(fn($p) => ($p['AgentName'] ?? '') === $agentFilter);
+        }
+
+        $reportData = $parties->values()->toArray();
+
+        return view('reports.party_master', compact(
+            'reportData', 'branchFilter', 'agentFilter', 'branchOptions', 'agentOptions'
+        ));
+    }
+
+    /**
+     * Store new Team in DB
+     */
+    public function storeTeam(Request $request)
+    {
+        $request->validate([
+            'name'     => 'required|string|unique:teams,name',
+            'agents'   => 'nullable|array',
+            'branches' => 'nullable|array',
+        ]);
+
+        \App\Models\Team::create([
+            'name'     => $request->input('name'),
+            'agents'   => $request->input('agents', []),
+            'branches' => $request->input('branches', []),
+        ]);
+
+        return redirect()->back()->with('success', 'Team created successfully!');
+    }
+
+    /**
+     * Update Team in DB
+     */
+    public function updateTeam(Request $request, \App\Models\Team $team)
+    {
+        $request->validate([
+            'name'     => 'required|string|unique:teams,name,' . $team->id,
+            'agents'   => 'nullable|array',
+            'branches' => 'nullable|array',
+        ]);
+
+        $team->update([
+            'name'     => $request->input('name'),
+            'agents'   => $request->input('agents', []),
+            'branches' => $request->input('branches', []),
+        ]);
+
+        return redirect()->back()->with('success', 'Team updated successfully!');
+    }
+
+    /**
+     * Delete Team from DB
+     */
+    public function deleteTeam(\App\Models\Team $team)
+    {
+        $team->delete();
+        return redirect()->back()->with('success', 'Team deleted successfully!');
+    }
+
+    public function agentTargetsIndex(Request $request)
+    {
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+        
+        $partyMasterMap = $this->getPartyMasterMap($baseUrl, $apiKey);
+        $agentOptions = collect($partyMasterMap)
+            ->pluck('AgentName')->filter(fn($v) => $v && $v !== '—')
+            ->unique()->sort()->values()->toArray();
+
+        // Month filter
+        $targetMonth = $request->input('month', date('Y-m'));
+
+        // Load existing targets for this month
+        $targets = \App\Models\AgentTarget::where('target_month', $targetMonth)
+            ->get()
+            ->pluck('target_amount', 'agent_name')
+            ->toArray();
+
+        // Load custom teams and their targets
+        $dbTeams = \App\Models\Team::all();
+        $teamTargets = \App\Models\TeamTarget::where('target_month', $targetMonth)
+            ->get()
+            ->pluck('target_amount', 'team_id')
+            ->toArray();
+
+        return view('reports.agent_targets', compact('agentOptions', 'targetMonth', 'targets', 'dbTeams', 'teamTargets'));
+    }
+
+    /**
+     * Batch store agent targets
+     */
+    public function agentTargetsStore(Request $request)
+    {
+        $request->validate([
+            'month'   => 'required|string',
+            'targets' => 'required|array',
+        ]);
+
+        $month = $request->input('month');
+
+        foreach ($request->input('targets') as $agentName => $amount) {
+            if ($amount === null || $amount === '') {
+                \App\Models\AgentTarget::where('agent_name', $agentName)
+                    ->where('target_month', $month)
+                    ->delete();
+                continue;
+            }
+
+            \App\Models\AgentTarget::updateOrCreate(
+                ['agent_name' => $agentName, 'target_month' => $month],
+                ['target_amount' => (float)$amount]
+            );
+        }
+
+        return redirect()->back()->with('success', 'Agent targets updated successfully!');
+    }
+
+    public function teamTargetsStore(Request $request)
+    {
+        $request->validate([
+            'month'         => 'required|string',
+            'targets'       => 'required|array',
+            'agent_targets' => 'nullable|array',
+        ]);
+
+        $month = $request->input('month');
+
+        // Save Team Targets
+        foreach ($request->input('targets') as $teamId => $amount) {
+            if ($amount === null || $amount === '') {
+                \App\Models\TeamTarget::where('team_id', $teamId)
+                    ->where('target_month', $month)
+                    ->delete();
+                continue;
+            }
+
+            \App\Models\TeamTarget::updateOrCreate(
+                ['team_id' => $teamId, 'target_month' => $month],
+                ['target_amount' => (float)$amount]
+            );
+        }
+
+        // Save Team Members (Agents) targets if provided
+        if ($request->has('agent_targets')) {
+            foreach ($request->input('agent_targets') as $agentName => $amount) {
+                if ($amount === null || $amount === '') {
+                    \App\Models\AgentTarget::where('agent_name', $agentName)
+                        ->where('target_month', $month)
+                        ->delete();
+                    continue;
+                }
+
+                \App\Models\AgentTarget::updateOrCreate(
+                    ['agent_name' => $agentName, 'target_month' => $month],
+                    ['target_amount' => (float)$amount]
+                );
+            }
+        }
+
+        return redirect()->back()->with('success', 'Team and Member targets updated successfully!');
+    }
 }
 

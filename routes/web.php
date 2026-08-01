@@ -128,6 +128,16 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::get('reports/live-stock/excel', [ReportController::class, 'exportLiveStockExcel'])->name('reports.live-stock.excel');
     Route::get('reports/live-stock/pdf', [ReportController::class, 'exportLiveStockPdf'])->name('reports.live-stock.pdf');
     Route::get('reports/purchase', [ReportController::class, 'purchaseReport'])->name('reports.purchase');
+    Route::get('reports/collection', [ReportController::class, 'collectionReport'])->name('reports.collection');
+    Route::get('reports/party-master', [ReportController::class, 'partyMasterReport'])->name('reports.party-master');
+    Route::post('reports/collection/teams', [ReportController::class, 'storeTeam'])->name('reports.collection.teams.store');
+    Route::put('reports/collection/teams/{team}', [ReportController::class, 'updateTeam'])->name('reports.collection.teams.update');
+    Route::delete('reports/collection/teams/{team}', [ReportController::class, 'deleteTeam'])->name('reports.collection.teams.destroy');
+    
+    // Agent & Team Targets Routes
+    Route::get('reports/agent-targets', [ReportController::class, 'agentTargetsIndex'])->name('reports.agent-targets.index');
+    Route::post('reports/agent-targets', [ReportController::class, 'agentTargetsStore'])->name('reports.agent-targets.store');
+    Route::post('reports/team-targets', [ReportController::class, 'teamTargetsStore'])->name('reports.team-targets.store');
 
     // Settings
     Route::get('settings/branches', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.branches.index');

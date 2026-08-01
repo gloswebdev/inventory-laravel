@@ -419,6 +419,19 @@
                         <span class="sub-dot"></span> Purchase Report
                     </a>
                     @endif
+                    @if(Auth::user()->hasPermission('collection_report', 'view') || Auth::user()->role === 'admin')
+                    <a href="{{ route('reports.collection') }}" class="sub-nav-link {{ request()->routeIs('reports.collection') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Collection Report
+                    </a>
+                    <a href="{{ route('reports.agent-targets.index') }}" class="sub-nav-link {{ request()->routeIs('reports.agent-targets.*') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Agent Targets
+                    </a>
+                    @endif
+                    @if(Auth::user()->role === 'admin')
+                    <a href="{{ route('reports.party-master') }}" class="sub-nav-link {{ request()->routeIs('reports.party-master') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Party Master
+                    </a>
+                    @endif
                 </div>
             </div>
             @endif

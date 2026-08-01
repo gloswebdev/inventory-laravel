@@ -42,6 +42,11 @@ class SettingController extends Controller
             'costing_api_account'       => 'nullable|string',
             'costing_api_item'          => 'nullable|string',
             'costing_api_branch'        => 'nullable|string',
+            // Party Master API
+            'partymaster_api_branch'    => 'nullable|string',
+            'partymaster_api_actcode'   => 'nullable|string',
+            'partymaster_api_agentcode' => 'nullable|string',
+            'partymaster_api_txntype'   => 'nullable|string',
             // ERP Push (optional)
             'erp_push_enabled'          => 'nullable|string',
             'erp_push_base_url'         => 'nullable|string',
@@ -64,6 +69,8 @@ class SettingController extends Controller
             // Costing API settings
             'costing_api_from_date', 'costing_api_to_date',
             'costing_api_account', 'costing_api_item', 'costing_api_branch',
+            // Party Master API settings
+            'partymaster_api_branch', 'partymaster_api_actcode', 'partymaster_api_agentcode', 'partymaster_api_txntype',
             // ERP Push settings
             'erp_push_base_url', 'erp_push_username', 'erp_push_password',
             'erp_receipt_doc_prefix', 'erp_receipt_godown_name', 'erp_receipt_received_from', 'erp_receipt_issue_to',
@@ -80,6 +87,7 @@ class SettingController extends Controller
         // Bust the stock cache so new settings take effect immediately
         Cache::forget('external_stock_data_grouped');
         Cache::forget('external_stock_branch2');
+        Cache::forget('party_master_map'); // Also clear party master cache on save
 
         return redirect()->back()->with('success', 'API settings saved successfully! Stock cache cleared.');
     }

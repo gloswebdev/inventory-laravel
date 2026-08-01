@@ -259,6 +259,54 @@
 
                 <hr class="border-slate-100">
 
+                {{-- ---- SECTION 5: PartyMaster API Config ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-black">5</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">PartyMaster API Config</h4>
+                        <span class="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-bold rounded">PARTY MASTER</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Collection Report, Party Master List</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-violet-700 text-[10px]">POST /PartyMaster</code>
+                    </p>
+
+                    <div class="bg-violet-50/50 border border-violet-100 rounded-xl p-4 space-y-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Branch</label>
+                                <input type="text" name="partymaster_api_branch"
+                                    value="{{ $settings['partymaster_api_branch']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white"
+                                    placeholder="ALL">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">ActCode</label>
+                                <input type="text" name="partymaster_api_actcode"
+                                    value="{{ $settings['partymaster_api_actcode']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white"
+                                    placeholder="ALL">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">AgentCode</label>
+                                <input type="text" name="partymaster_api_agentcode"
+                                    value="{{ $settings['partymaster_api_agentcode']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white"
+                                    placeholder="ALL">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">TxnType</label>
+                                <input type="text" name="partymaster_api_txntype"
+                                    value="{{ $settings['partymaster_api_txntype']->value ?? 'New' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white"
+                                    placeholder="New">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
                 {{-- ---- SECTION 5: Purchase Report API ---- --}}
                 <div>
                     <div class="flex items-center gap-2 mb-1">
