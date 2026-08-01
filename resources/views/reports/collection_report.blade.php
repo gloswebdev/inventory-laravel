@@ -42,11 +42,18 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
+            @if(Auth::user()->hasPermission('collection_report', 'create') || Auth::user()->role === 'admin')
+            <a href="{{ route('reports.agent-targets.index') }}"
+               class="bg-indigo-600 hover:bg-indigo-750 border border-indigo-500 rounded-2xl px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition flex items-center gap-2">
+                <i class="fas fa-bullseye"></i>
+                <span>Set targets</span>
+            </a>
             <button onclick="toggleTeamCreatorModal(true)"
                class="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500 rounded-2xl px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition flex items-center gap-2">
                 <i class="fas fa-plus"></i>
                 <span>Create Custom Team</span>
             </button>
+            @endif
             <a href="{{ route('reports.collection', array_merge(request()->except('refresh_party_master'), ['refresh_party_master' => 1])) }}"
                class="bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition">
                 <i class="fas fa-arrows-rotate text-blue-300"></i>

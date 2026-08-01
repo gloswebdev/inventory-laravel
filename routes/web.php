@@ -241,7 +241,11 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/settings/product-groups', [App\Http\Controllers\MobileController::class, 'productGroups'])->name('mobile.settings.product-groups');
     Route::post('/settings/product-groups', [App\Http\Controllers\MobileController::class, 'storeProductGroup'])->name('mobile.settings.product-groups.store');
     // Export Planning (MRP)
-    Route::post('/planning/export', [App\Http\Controllers\MobileController::class, 'exportPlanning'])->name('mobile.planning.pdf');
+    // Collection Report & Targets (Mobile)
+    Route::get('/collection-report', [App\Http\Controllers\MobileController::class, 'collectionReport'])->name('mobile.collection-report');
+    Route::get('/agent-targets', [App\Http\Controllers\MobileController::class, 'agentTargetsIndex'])->name('mobile.agent-targets.index');
+    Route::post('/agent-targets', [App\Http\Controllers\MobileController::class, 'agentTargetsStore'])->name('mobile.agent-targets.store');
+    Route::post('/team-targets', [App\Http\Controllers\MobileController::class, 'teamTargetsStore'])->name('mobile.team-targets.store');
 });
 
 // System Management (Admin Only)

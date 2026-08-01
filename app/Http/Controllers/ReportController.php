@@ -1002,7 +1002,21 @@ class ReportController extends Controller
             ->pluck('target_amount', 'team_id')
             ->toArray();
 
-        return view('reports.agent_targets', compact('agentOptions', 'targetMonth', 'targets', 'dbTeams', 'teamTargets'));
+        // Fetch months that already have targets configured
+        $configuredAgentMonths = \App\Models\AgentTarget::select('target_month')
+            ->distinct()
+            ->pluck('target_month')
+            ->toArray();
+
+        $configuredTeamMonths = \App\Models\TeamTarget::select('target_month')
+            ->distinct()
+            ->pluck('target_month')
+            ->toArray();
+
+        $configuredMonths = array_unique(array_merge($configuredAgentMonths, $configuredTeamMonths));
+        sort($configuredMonths);
+
+        return view('reports.agent_targets', compact('agentOptions', 'targetMonth', 'targets', 'dbTeams', 'teamTargets', 'configuredMonths'));
     }
 
     /**

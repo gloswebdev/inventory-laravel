@@ -33,9 +33,22 @@
 
     {{-- Month Filter Selector --}}
     <div class="bg-white rounded-3xl shadow-sm border border-gray-150 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <div class="space-y-1.5">
             <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest">Select Target Month</h3>
             <p class="text-xs text-slate-400 mt-1">Goal settings automatically refresh for the chosen month.</p>
+            
+            {{-- Target Month Badges --}}
+            <div class="flex flex-wrap gap-2 pt-1 items-center">
+                <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Months with Targets Set:</span>
+                @forelse($configuredMonths ?? [] as $m)
+                    <a href="{{ route('reports.agent-targets.index', ['month' => $m]) }}" 
+                       class="px-2 py-0.5 rounded-lg text-[10px] font-black border transition duration-150 {{ $m === $targetMonth ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100' }}">
+                        {{ \Carbon\Carbon::parse($m . '-01')->format('M Y') }}
+                    </a>
+                @empty
+                    <span class="text-[10px] text-gray-300 italic">No targets set yet</span>
+                @endforelse
+            </div>
         </div>
         <form method="GET" action="{{ route('reports.agent-targets.index') }}" id="monthFilterForm">
             <input type="month" name="month" value="{{ $targetMonth }}" onchange="document.getElementById('monthFilterForm').submit()"

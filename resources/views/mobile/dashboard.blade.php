@@ -92,24 +92,49 @@
                 $iconStyleMap = [
                     'mobile_stock' => ['bg' => 'bg-cyan-500', 'text' => 'text-white', 'shadow' => 'shadow-cyan-200'],
                     'mobile_production' => ['bg' => 'bg-rose-500', 'text' => 'text-white', 'shadow' => 'shadow-rose-200'],
-                    'mobile_planning' => ['bg' => 'bg-emerald-500', 'text' => 'text-white', 'shadow' => 'shadow-emerald-200'],
+                    'mobile_planning' => ['bg' => 'bg-teal-500', 'text' => 'text-white', 'shadow' => 'shadow-teal-200'],
                     'mobile_indents' => ['bg' => 'bg-violet-500', 'text' => 'text-white', 'shadow' => 'shadow-violet-200'],
-                    'mobile_products' => ['bg' => 'bg-slate-700', 'text' => 'text-white', 'shadow' => 'shadow-slate-300'],
                     'mobile_recipes' => ['bg' => 'bg-amber-500', 'text' => 'text-white', 'shadow' => 'shadow-amber-200'],
                     'mobile_adjustments' => ['bg' => 'bg-orange-500', 'text' => 'text-white', 'shadow' => 'shadow-orange-200'],
-                    'mobile_ledger' => ['bg' => 'bg-rose-600', 'text' => 'text-white', 'shadow' => 'shadow-rose-200'],
-                    'mobile_users'    => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
-                    'mobile_settings' => ['bg' => 'bg-slate-800',  'text' => 'text-white', 'shadow' => 'shadow-slate-300'],
-                    'mobile_costing'  => ['bg' => 'bg-yellow-500', 'text' => 'text-white', 'shadow' => 'shadow-yellow-200'],
-                    'mobile_purchase_report' => ['bg' => 'bg-orange-600', 'text' => 'text-white', 'shadow' => 'shadow-orange-200'],
+                    'mobile_ledger' => ['bg' => 'bg-fuchsia-600', 'text' => 'text-white', 'shadow' => 'shadow-fuchsia-200'],
+                    'mobile_products' => ['bg' => 'bg-slate-700', 'text' => 'text-white', 'shadow' => 'shadow-slate-300'],
+                    'mobile_users' => ['bg' => 'bg-blue-600', 'text' => 'text-white', 'shadow' => 'shadow-blue-200'],
+                    'mobile_settings' => ['bg' => 'bg-zinc-800', 'text' => 'text-white', 'shadow' => 'shadow-zinc-300'],
+                    'mobile_costing' => ['bg' => 'bg-yellow-500', 'text' => 'text-white', 'shadow' => 'shadow-yellow-200'],
+                    'mobile_costing_bom' => ['bg' => 'bg-amber-600', 'text' => 'text-white', 'shadow' => 'shadow-amber-300'],
+                    'mobile_costing_pro' => ['bg' => 'bg-purple-600', 'text' => 'text-white', 'shadow' => 'shadow-purple-200'],
+                    'mobile_costing_purchase' => ['bg' => 'bg-emerald-600', 'text' => 'text-white', 'shadow' => 'shadow-emerald-250'],
+                    'mobile_costing_pricelist' => ['bg' => 'bg-pink-500', 'text' => 'text-white', 'shadow' => 'shadow-pink-200'],
+                    'mobile_costing_pricelist_update' => ['bg' => 'bg-sky-500', 'text' => 'text-white', 'shadow' => 'shadow-sky-200'],
+                    'mobile_purchase_report' => ['bg' => 'bg-red-500', 'text' => 'text-white', 'shadow' => 'shadow-red-200'],
+                    'collection_report' => ['bg' => 'bg-lime-600', 'text' => 'text-white', 'shadow' => 'shadow-lime-200'],
+                ];
+
+                $newFeatures = [
+                    'mobile.agent-targets.index',
+                    'mobile.collection-report',
+                    'mobile.purchase-report',
+                    'mobile.costing.pricelist',
+                    'mobile.costing.pricelist-update'
                 ];
             @endphp
 
             @foreach($modules as $module)
             @php
-                $style = $iconStyleMap[$module['permission']] ?? ['bg' => 'bg-indigo-500', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'];
+                // Determine style dynamically (Set targets has route mobile.agent-targets.index)
+                if ($module['route'] === 'mobile.agent-targets.index') {
+                    $style = ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-250'];
+                } else {
+                    $style = $iconStyleMap[$module['permission']] ?? ['bg' => 'bg-indigo-500', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'];
+                }
+                $isNew = in_array($module['route'], $newFeatures);
             @endphp
             <a href="{{ route($module['route']) }}" class="group relative bg-white/60 backdrop-blur-xl p-5 rounded-[1.5rem] flex flex-col items-center justify-center text-center transition-all active:scale-95 border border-white/80 shadow-sm hover:shadow-lg hover:bg-white/80 overflow-hidden">
+                @if($isNew)
+                <span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[7px] font-black text-rose-600 bg-rose-50 border border-rose-100 rounded-md uppercase tracking-wider animate-pulse z-20">
+                    New
+                </span>
+                @endif
                 <div class="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="w-12 h-12 {{ $style['bg'] }} {{ $style['text'] }} rounded-2xl flex items-center justify-center text-xl shadow-md {{ $style['shadow'] }} mb-3 transform transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1 group-hover:rotate-3">
                     <i class="{{ $module['icon'] }}"></i>

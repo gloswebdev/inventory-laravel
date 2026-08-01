@@ -101,6 +101,12 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.costing.pricelist-update.push' => 'mobile_costing_pricelist_update',
                     'mobile.costing.pricelist-update.history' => 'mobile_costing_pricelist_update',
                     'mobile.purchase-report'        => 'mobile_purchase_report',
+                    
+                    // Collection Report & Targets
+                    'mobile.collection-report'      => 'collection_report',
+                    'mobile.agent-targets.index'    => 'collection_report',
+                    'mobile.agent-targets.store'    => 'collection_report',
+                    'mobile.team-targets.store'     => 'collection_report',
                 ];
 
                 if (isset($permissionMap[$route])) {
@@ -241,6 +247,20 @@ class MobileController extends Controller implements HasMiddleware
                 'route'      => 'mobile.purchase-report',
                 'color'      => 'bg-orange-500',
                 'permission' => 'mobile_purchase_report'
+            ],
+            [
+                'name'       => 'Collection Report',
+                'icon'       => 'fas fa-wallet',
+                'route'      => 'mobile.collection-report',
+                'color'      => 'bg-emerald-600',
+                'permission' => 'collection_report'
+            ],
+            [
+                'name'       => 'Set Targets',
+                'icon'       => 'fas fa-bullseye',
+                'route'      => 'mobile.agent-targets.index',
+                'color'      => 'bg-indigo-600',
+                'permission' => 'collection_report'
             ],
         ];
 
@@ -2771,5 +2791,52 @@ class MobileController extends Controller implements HasMiddleware
     {
         $controller = new CostingController();
         return $controller->pricelistPushHistory($id);
+    }
+
+    /**
+     * Mobile: Collection Report
+     */
+    public function collectionReport(Request $request)
+    {
+        // Re-use core ReportController's collection report calculations but render to a mobile blade view.
+        $reportController = new ReportController();
+        $response = $reportController->collectionReport($request);
+        
+        if ($response instanceof \Illuminate\Http\RedirectResponse) {
+            return $response;
+        }
+
+        // Extract view parameters from the view object
+        $data = $response->getData();
+        return view('mobile.collection_report', $data);
+    }
+
+    /**
+     * Mobile: Target management index
+     */
+    public function agentTargetsIndex(Request $request)
+    {
+        $reportController = new ReportController();
+        $response = $reportController->agentTargetsIndex($request);
+        $data = $response->getData();
+        return view('mobile.agent_targets', $data);
+    }
+
+    /**
+     * Mobile: Target store for agents
+     */
+    public function agentTargetsStore(Request $request)
+    {
+        $reportController = new ReportController();
+        return $reportController->agentTargetsStore($request);
+    }
+
+    /**
+     * Mobile: Target store for teams
+     */
+    public function teamTargetsStore(Request $request)
+    {
+        $reportController = new ReportController();
+        return $reportController->teamTargetsStore($request);
     }
 }

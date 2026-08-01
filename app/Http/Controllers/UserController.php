@@ -37,6 +37,7 @@ class UserController extends Controller
         'mobile_users'  => 'Mobile: User Manager',
         'mobile_settings' => 'Mobile: System Settings',
         'mobile_purchase_report' => 'Mobile: Purchase Report',
+        'collection_report' => 'Collection Analyzer & Targets',
         'costing'       => 'Costing Manager',
         'costing_bom'   => 'Costing BOMs',
         'costing_pro'   => 'Costing Dashboard',
@@ -175,6 +176,13 @@ class UserController extends Controller
         ],
         'mobile_costing_pricelist_update' => [
             'push' => 'Push Prices to ERP',
+        ],
+        'collection_report' => [
+            'view'            => 'View collection list',
+            'team_management' => 'Create & Edit Custom Teams',
+            'target_setting'  => 'Configure Monthly Targets',
+            'branch_filter'   => 'Group / Branch filtering',
+            'agent_filter'    => 'Agent Selection Filters',
         ],
     ];
 
