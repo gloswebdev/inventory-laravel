@@ -37,6 +37,7 @@ class UserController extends Controller
         'mobile_users'  => 'Mobile: User Manager',
         'mobile_settings' => 'Mobile: System Settings',
         'mobile_purchase_report' => 'Mobile: Purchase Report',
+        'mobile_collection' => 'Mobile: Collection & Targets',
         'collection_report' => 'Collection Analyzer & Targets',
         'costing'       => 'Costing Manager',
         'costing_bom'   => 'Costing BOMs',
@@ -138,6 +139,13 @@ class UserController extends Controller
         'mobile_purchase_report' => [
             'date_filter'  => 'Date Range Filter',
             'item_filter'  => 'Item Filter',
+        ],
+        'mobile_collection' => [
+            'view'            => 'View Collection List',
+            'team_management' => 'Create & Edit Custom Teams',
+            'target_setting'  => 'Configure Monthly Targets',
+            'branch_filter'   => 'Group / Branch Filtering',
+            'agent_filter'    => 'Agent Selection Filters',
         ],
         'costing' => [
             'fetch_prices' => 'Sync Prices from ERP/Product Master',

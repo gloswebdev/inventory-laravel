@@ -7,6 +7,20 @@
 
 <div class="space-y-6 pb-20" x-data="collectionReportApp()">
     
+    {{-- Success/Error Flash Messages --}}
+    @if(session('success'))
+    <div class="bg-emerald-50 border border-emerald-150 text-emerald-800 rounded-3xl p-4 flex items-center gap-3 text-xs font-bold shadow-sm shadow-emerald-50">
+        <i class="fas fa-circle-check text-emerald-500 text-sm"></i>
+        <span>{{ session('success') }}</span>
+    </div>
+    @endif
+    @if(session('error'))
+    <div class="bg-rose-50 border border-rose-150 text-rose-800 rounded-3xl p-4 flex items-center gap-3 text-xs font-bold shadow-sm shadow-rose-50">
+        <i class="fas fa-circle-exclamation text-rose-500 text-sm"></i>
+        <span>{{ session('error') }}</span>
+    </div>
+    @endif
+
     {{-- Header Banner --}}
     <div class="flex items-center justify-between bg-white/50 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white/70 shadow-xl shadow-indigo-100/20 relative overflow-hidden">
         <div class="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
@@ -20,11 +34,17 @@
                         class="w-11 h-11 rounded-2xl flex items-center justify-center border border-white/60 shadow-md transition active:scale-90">
                     <i class="fas fa-filter text-xs"></i>
                 </button>
-                @if(Auth::user()->hasPermission('collection_report', 'create') || Auth::user()->role === 'admin')
+                @if(Auth::user()->hasFeature('mobile_collection', 'target_setting') || Auth::user()->role === 'admin')
                 <a href="{{ route('mobile.agent-targets.index') }}" 
-                   class="w-11 h-11 bg-white text-indigo-500 rounded-2xl flex items-center justify-center border border-white/60 shadow-md">
+                   class="w-11 h-11 bg-white text-indigo-500 rounded-2xl flex items-center justify-center border border-white/60 shadow-md transition active:scale-90">
                     <i class="fas fa-bullseye text-xs"></i>
                 </a>
+                @endif
+                @if(Auth::user()->hasFeature('mobile_collection', 'team_management') || Auth::user()->role === 'admin')
+                <button @click="openCreateTeamModal()" 
+                        class="w-11 h-11 bg-white text-emerald-500 rounded-2xl flex items-center justify-center border border-white/60 shadow-md transition active:scale-90">
+                    <i class="fas fa-plus text-xs"></i>
+                </button>
                 @endif
             </div>
         </div>
@@ -49,6 +69,7 @@
                 </div>
             </div>
 
+            @if(Auth::user()->hasFeature('mobile_collection', 'agent_filter') || Auth::user()->role === 'admin')
             <div class="space-y-1 mb-3">
                 <label class="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Agent</label>
                 <select name="agent_filter" class="w-full bg-white/60 border-none rounded-xl py-3 px-4 text-xs font-bold text-slate-700">
@@ -58,7 +79,9 @@
                     @endforeach
                 </select>
             </div>
+            @endif
 
+            @if(Auth::user()->hasFeature('mobile_collection', 'branch_filter') || Auth::user()->role === 'admin')
             <div class="space-y-1 mb-4">
                 <label class="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Group Name (Multiple)</label>
                 <select name="branch_filter[]" multiple class="w-full bg-white/60 border-none rounded-xl p-2.5 text-xs font-semibold text-slate-700" size="3">
@@ -67,20 +90,38 @@
                     @endforeach
                 </select>
             </div>
+            @endif
 
-            <div class="flex gap-2">
-                @foreach($dbTeams ?? [] as $team)
-                    @php $isActive = in_array($team->id, $selectedTeams ?? []); @endphp
-                    <button type="button" 
-                            onclick="toggleMobileTeamFilter('{{ $team->id }}')" 
-                            id="mob_btn_team_{{ $team->id }}"
-                            class="px-3 py-1.5 text-[10px] font-bold border border-gray-200 rounded-lg {{ $isActive ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-slate-700' }}">
-                        {{ $team->name }}
-                    </button>
-                    @if($isActive)
-                        <input type="hidden" name="teams[]" value="{{ $team->id }}" id="mob_input_team_{{ $team->id }}">
-                    @endif
-                @endforeach
+            <div class="space-y-2 mb-2">
+                <label class="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Select Teams (Group Filters)</label>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($dbTeams ?? [] as $team)
+                        @php $isActive = in_array($team->id, $selectedTeams ?? []); @endphp
+                        <div class="inline-flex items-center bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
+                            <button type="button" 
+                                    onclick="toggleMobileTeamFilter('{{ $team->id }}')" 
+                                    id="mob_btn_team_{{ $team->id }}"
+                                    class="px-3 py-2 text-[10px] font-bold border-r border-slate-100 transition-colors {{ $isActive ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-slate-700' }}">
+                                <i class="fas fa-users text-[9px] mr-1 opacity-70"></i> {{ $team->name }}
+                            </button>
+                            @if(Auth::user()->hasFeature('mobile_collection', 'team_management') || Auth::user()->role === 'admin')
+                                <button type="button"
+                                        @click="openEditTeamModal({{ json_encode($team) }})"
+                                        class="px-2 py-2 text-[9px] text-blue-500 hover:text-blue-700 bg-white hover:bg-slate-50 transition border-r border-slate-100">
+                                    <i class="fas fa-pencil"></i>
+                                </button>
+                                <button type="button" 
+                                        @click="deleteMobileTeam('{{ $team->id }}', '{{ addslashes($team->name) }}')"
+                                        class="px-2 py-2 text-[9px] text-red-500 hover:text-red-700 bg-white hover:bg-slate-50 transition">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            @endif
+                        </div>
+                        @if($isActive)
+                            <input type="hidden" name="teams[]" value="{{ $team->id }}" id="mob_input_team_{{ $team->id }}">
+                        @endif
+                    @endforeach
+                </div>
             </div>
 
             <button type="submit" class="w-full bg-blue-600 text-white font-bold rounded-xl py-3 text-xs mt-4">
@@ -217,12 +258,116 @@
     </div>
     @endif
 
+    <!-- Create/Edit Team Modal -->
+    @if(Auth::user()->hasFeature('mobile_collection', 'team_management') || Auth::user()->role === 'admin')
+    <div x-show="showTeamModal" x-cloak class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showTeamModal = false"></div>
+        <div class="relative w-full max-w-lg bg-white rounded-[3rem] p-8 space-y-6 shadow-2xl overflow-y-auto max-h-[90vh] z-10">
+            <div class="flex items-center justify-between">
+                <h3 class="text-2xl font-black text-slate-800 tracking-tight" x-text="isEditing ? 'Edit Custom Team' : 'New Custom Team'"></h3>
+                <button @click="showTeamModal = false" class="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form :action="teamForm.action" method="POST" id="teamForm">
+                @csrf
+                <template x-if="isEditing">
+                    <input type="hidden" name="_method" value="PUT">
+                </template>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1.5 block">Team Name</label>
+                        <input type="text" name="name" x-model="teamForm.name" required placeholder="e.g. Team West Coast"
+                               class="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    </div>
+
+                    <!-- Assign Agents Checkbox List -->
+                    <div class="space-y-2">
+                        <label class="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Assign Agents</label>
+                        <div class="bg-slate-50/50 rounded-[2rem] p-4 border border-slate-100 max-h-40 overflow-y-auto space-y-2">
+                            @foreach($agentOptions ?? [] as $opt)
+                            <label class="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors">
+                                <input type="checkbox" name="agents[]" value="{{ $opt }}" x-model="teamForm.agents" class="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-xs font-bold text-slate-750">{{ $opt }}</span>
+                            </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Assign Branches/Groups Checkbox List -->
+                    <div class="space-y-2">
+                        <label class="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Assign Group Names</label>
+                        <div class="bg-slate-50/50 rounded-[2rem] p-4 border border-slate-100 max-h-40 overflow-y-auto space-y-2">
+                            @foreach($branchOptions ?? [] as $opt)
+                            <label class="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors">
+                                <input type="checkbox" name="branches[]" value="{{ $opt }}" x-model="teamForm.branches" class="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-xs font-bold text-slate-750">{{ $opt }}</span>
+                            </label>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-655 text-white p-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-6" style="background-color: #059669;">
+                    Save Team
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hidden Delete Team Form -->
+    <form id="deleteMobileTeamForm" method="POST" action="" class="hidden">
+        @csrf
+        @method('DELETE')
+    </form>
+    @endif
+
 </div>
 
 <script>
 function collectionReportApp() {
     return {
         showFilters: {{ request()->has('fetch') ? 'false' : 'true' }},
+        showTeamModal: false,
+        isEditing: false,
+        teamForm: {
+            id: '',
+            name: '',
+            agents: [],
+            branches: [],
+            action: '{{ route('mobile.reports.collection.teams.store') }}'
+        },
+        openCreateTeamModal() {
+            this.isEditing = false;
+            this.teamForm = {
+                id: '',
+                name: '',
+                agents: [],
+                branches: [],
+                action: '{{ route('mobile.reports.collection.teams.store') }}'
+            };
+            this.showTeamModal = true;
+        },
+        openEditTeamModal(team) {
+            this.isEditing = true;
+            this.teamForm = {
+                id: team.id,
+                name: team.name,
+                agents: team.agents || [],
+                branches: team.branches || [],
+                action: '/mobile/collection/teams/' + team.id
+            };
+            this.showTeamModal = true;
+        },
+        deleteMobileTeam(id, name) {
+            if (confirm('Are you sure you want to delete "' + name + '"?')) {
+                const form = document.getElementById('deleteMobileTeamForm');
+                form.action = '/mobile/collection/teams/' + id;
+                form.submit();
+            }
+        }
     }
 }
 

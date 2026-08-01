@@ -213,8 +213,12 @@ function usersApp() {
 
             // Map existing permissions
             user.permissions.forEach(p => {
-                if (this.permForm.features[p.module] && this.permForm.features[p.module].hasOwnProperty(p.feature)) {
-                    this.permForm.features[p.module][p.feature] = true;
+                if (p.features && typeof p.features === 'object') {
+                    Object.keys(p.features).forEach(fKey => {
+                        if (this.permForm.features[p.page_key] && this.permForm.features[p.page_key].hasOwnProperty(fKey)) {
+                            this.permForm.features[p.page_key][fKey] = !!p.features[fKey];
+                        }
+                    });
                 }
             });
             

@@ -246,6 +246,9 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::get('/agent-targets', [App\Http\Controllers\MobileController::class, 'agentTargetsIndex'])->name('mobile.agent-targets.index');
     Route::post('/agent-targets', [App\Http\Controllers\MobileController::class, 'agentTargetsStore'])->name('mobile.agent-targets.store');
     Route::post('/team-targets', [App\Http\Controllers\MobileController::class, 'teamTargetsStore'])->name('mobile.team-targets.store');
+    Route::post('/collection/teams', [App\Http\Controllers\MobileController::class, 'storeTeam'])->name('mobile.reports.collection.teams.store');
+    Route::put('/collection/teams/{team}', [App\Http\Controllers\MobileController::class, 'updateTeam'])->name('mobile.reports.collection.teams.update');
+    Route::delete('/collection/teams/{team}', [App\Http\Controllers\MobileController::class, 'deleteTeam'])->name('mobile.reports.collection.teams.destroy');
 });
 
 // System Management (Admin Only)

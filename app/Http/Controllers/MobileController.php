@@ -103,10 +103,13 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.purchase-report'        => 'mobile_purchase_report',
                     
                     // Collection Report & Targets
-                    'mobile.collection-report'      => 'collection_report',
-                    'mobile.agent-targets.index'    => 'collection_report',
-                    'mobile.agent-targets.store'    => 'collection_report',
-                    'mobile.team-targets.store'     => 'collection_report',
+                    'mobile.collection-report'      => 'mobile_collection',
+                    'mobile.agent-targets.index'    => 'mobile_collection',
+                    'mobile.agent-targets.store'    => 'mobile_collection',
+                    'mobile.team-targets.store'     => 'mobile_collection',
+                    'mobile.reports.collection.teams.store'   => 'mobile_collection',
+                    'mobile.reports.collection.teams.update'  => 'mobile_collection',
+                    'mobile.reports.collection.teams.destroy' => 'mobile_collection',
                 ];
 
                 if (isset($permissionMap[$route])) {
@@ -253,14 +256,14 @@ class MobileController extends Controller implements HasMiddleware
                 'icon'       => 'fas fa-wallet',
                 'route'      => 'mobile.collection-report',
                 'color'      => 'bg-emerald-600',
-                'permission' => 'collection_report'
+                'permission' => 'mobile_collection'
             ],
             [
                 'name'       => 'Set Targets',
                 'icon'       => 'fas fa-bullseye',
                 'route'      => 'mobile.agent-targets.index',
                 'color'      => 'bg-indigo-600',
-                'permission' => 'collection_report'
+                'permission' => 'mobile_collection'
             ],
         ];
 
@@ -1687,16 +1690,26 @@ class MobileController extends Controller implements HasMiddleware
                 // Sync Features (via UserPermission model)
                 if ($request->has('features')) {
                     \App\Models\UserPermission::where('user_id', $user->id)->delete();
-                    foreach ($request->features as $module => $features) {
-                        foreach ($features as $feature => $allowed) {
+                    foreach ($request->features as $pageKey => $features) {
+                        $hasAnyEnabled = false;
+                        $featuresData = [];
+                        foreach ($features as $fKey => $allowed) {
+                            $featuresData[$fKey] = (bool)$allowed;
                             if ($allowed) {
-                                \App\Models\UserPermission::create([
-                                    'user_id' => $user->id,
-                                    'module' => $module,
-                                    'feature' => $feature,
-                                    'is_allowed' => true
-                                ]);
+                                $hasAnyEnabled = true;
                             }
+                        }
+
+                        if ($hasAnyEnabled) {
+                            \App\Models\UserPermission::create([
+                                'user_id' => $user->id,
+                                'page_key' => $pageKey,
+                                'can_view' => $featuresData['view'] ?? true,
+                                'can_create' => $featuresData['create'] ?? $featuresData['management'] ?? false,
+                                'can_edit' => $featuresData['edit'] ?? false,
+                                'can_delete' => $featuresData['delete'] ?? false,
+                                'features' => $featuresData,
+                            ]);
                         }
                     }
                 }
@@ -2838,5 +2851,32 @@ class MobileController extends Controller implements HasMiddleware
     {
         $reportController = new ReportController();
         return $reportController->teamTargetsStore($request);
+    }
+
+    /**
+     * Mobile: Store a custom team
+     */
+    public function storeTeam(Request $request)
+    {
+        $reportController = new ReportController();
+        return $reportController->storeTeam($request);
+    }
+
+    /**
+     * Mobile: Update a custom team
+     */
+    public function updateTeam(Request $request, \App\Models\Team $team)
+    {
+        $reportController = new ReportController();
+        return $reportController->updateTeam($request, $team);
+    }
+
+    /**
+     * Mobile: Delete a custom team
+     */
+    public function deleteTeam(\App\Models\Team $team)
+    {
+        $reportController = new ReportController();
+        return $reportController->deleteTeam($team);
     }
 }

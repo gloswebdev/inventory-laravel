@@ -107,7 +107,7 @@
                     'mobile_costing_pricelist' => ['bg' => 'bg-pink-500', 'text' => 'text-white', 'shadow' => 'shadow-pink-200'],
                     'mobile_costing_pricelist_update' => ['bg' => 'bg-sky-500', 'text' => 'text-white', 'shadow' => 'shadow-sky-200'],
                     'mobile_purchase_report' => ['bg' => 'bg-red-500', 'text' => 'text-white', 'shadow' => 'shadow-red-200'],
-                    'collection_report' => ['bg' => 'bg-lime-600', 'text' => 'text-white', 'shadow' => 'shadow-lime-200'],
+                    'mobile_collection' => ['bg' => 'bg-emerald-600', 'text' => 'text-white', 'shadow' => 'shadow-emerald-200'],
                 ];
 
                 $newFeatures = [
