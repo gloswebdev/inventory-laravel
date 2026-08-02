@@ -5,39 +5,7 @@
 @section('content')
 <div class="pt-8">
 
-{{-- Flash Messages --}}
-@if(session('success'))
-<div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert" id="flashSuccess">
-    <strong class="font-bold"><i class="fas fa-check-circle mr-2"></i>Success!</strong>
-    <span class="block sm:inline">{{ session('success') }}</span>
-    @if(session('sync_log_id'))
-    <button type="button" onclick="openSyncReport({{ session('sync_log_id') }})" class="ml-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-1 px-3 rounded">
-        <i class="fas fa-list-alt mr-1"></i> View Sync Report
-    </button>
-    @endif
-    <button onclick="this.parentElement.remove()" class="absolute top-0 bottom-0 right-0 px-4 py-3"><i class="fas fa-times"></i></button>
-</div>
-@endif
 
-@if(session('error'))
-<div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert" id="flashError">
-    <strong class="font-bold"><i class="fas fa-exclamation-circle mr-2"></i>Error!</strong>
-    <span class="block sm:inline">{{ session('error') }}</span>
-    <button onclick="this.parentElement.remove()" class="absolute top-0 bottom-0 right-0 px-4 py-3"><i class="fas fa-times"></i></button>
-</div>
-@endif
-
-@if($errors->any())
-<div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert" id="flashValidation">
-    <strong class="font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>Validation Error!</strong>
-    <ul class="mt-1 list-disc list-inside">
-        @foreach($errors->all() as $error)
-            <li>{{ $error }}</li>
-        @endforeach
-    </ul>
-    <button onclick="this.parentElement.remove()" class="absolute top-0 bottom-0 right-0 px-4 py-3"><i class="fas fa-times"></i></button>
-</div>
-@endif
 
 <div class="bg-white rounded-3xl shadow-sm border border-slate-100/80">
     {{-- Header Section --}}

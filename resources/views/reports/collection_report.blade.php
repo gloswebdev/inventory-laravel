@@ -16,15 +16,6 @@
 </style>
 
 <div class="space-y-6">
-
-{{-- Success Flash Message --}}
-@if(session('success'))
-<div class="bg-green-50 border border-green-200 text-green-800 rounded-2xl px-5 py-3.5 flex items-center gap-3 text-sm font-semibold">
-    <i class="fas fa-circle-check text-green-500 text-base"></i>
-    <span>{{ session('success') }}</span>
-</div>
-@endif
-
 {{-- ═══ HEADER ═══ --}}
 <div class="bg-gradient-to-br from-blue-700 to-indigo-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
     <div class="absolute -right-8 -top-8 w-44 h-44 bg-white/10 rounded-full blur-xl"></div>
@@ -606,7 +597,7 @@ function openEditTeamModal(team) {
     modal.querySelector('h3').innerHTML = '<i class="fas fa-pencil text-blue-400"></i> Edit Team: ' + team.name;
     
     const form = modal.querySelector('form');
-    form.action = '/inventorymanager/inventory-laravel/public/reports/collection/teams/' + team.id;
+    form.action = "{{ url('reports/collection/teams') }}/" + team.id;
     
     // Insert PUT method spoof
     let putInput = form.querySelector('input[name="_method"]');
@@ -644,7 +635,7 @@ function openEditTeamModal(team) {
 function deleteTeam(id, name) {
     if (confirm('Are you sure you want to delete "' + name + '"?')) {
         const form = document.getElementById('deleteTeamForm');
-        form.action = '/inventorymanager/inventory-laravel/public/reports/collection/teams/' + id;
+        form.action = "{{ url('reports/collection/teams') }}/" + id;
         form.submit();
     }
 }

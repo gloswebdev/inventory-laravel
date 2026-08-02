@@ -107,11 +107,6 @@
 
     {{-- Recipe Table --}}
     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        @if(session('success'))
-        <div class="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center gap-2 text-emerald-700 text-sm font-bold animate-pulse">
-            <i class="fas fa-check-circle text-emerald-500"></i> {{ session('success') }}
-        </div>
-        @endif
 
         <div class="overflow-x-auto max-h-[70vh] custom-scrollbar">
             <table class="w-full text-left border-collapse">

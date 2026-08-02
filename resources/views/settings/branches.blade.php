@@ -5,18 +5,6 @@
 @section('content')
 <div class="max-w-4xl mx-auto space-y-6">
 
-    @if(session('success'))
-    <div class="bg-green-50 border border-green-200 text-green-800 rounded-xl px-5 py-3 flex items-center gap-3 text-sm font-medium">
-        <i class="fas fa-check-circle text-green-500"></i> {{ session('success') }}
-    </div>
-    @endif
-
-    @if($errors->any())
-    <div class="bg-red-50 border border-red-200 text-red-800 rounded-xl px-5 py-3 text-sm">
-        <ul class="list-disc list-inside space-y-1">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-    </div>
-    @endif
-
     {{-- ============================
          API CONFIGURATION CARD
          ============================ --}}

@@ -4,14 +4,6 @@
 @section('content')
 <div class="space-y-6">
 
-    {{-- Success Flash Message --}}
-    @if(session('success'))
-    <div class="bg-green-50 border border-green-200 text-green-800 rounded-2xl px-5 py-3.5 flex items-center gap-3 text-sm font-semibold">
-        <i class="fas fa-circle-check text-green-500 text-base"></i>
-        <span>{{ session('success') }}</span>
-    </div>
-    @endif
-
     {{-- Info Header --}}
     <div class="bg-gradient-to-br from-indigo-700 to-violet-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
         <div class="absolute -right-8 -top-8 w-44 h-44 bg-white/10 rounded-full blur-xl"></div>

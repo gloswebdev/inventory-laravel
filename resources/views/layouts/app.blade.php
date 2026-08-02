@@ -587,9 +587,16 @@
 
             {{-- Flash Messages --}}
             @if(session('success'))
-            <div class="flash-success rounded-xl px-4 py-3 mb-5 flex items-center gap-3 text-sm font-semibold">
-                <i class="fas fa-circle-check text-emerald-500"></i>
-                {{ session('success') }}
+            <div class="flash-success rounded-xl px-4 py-3 mb-5 flex items-center justify-between gap-3 text-sm font-semibold">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-circle-check text-emerald-500"></i>
+                    <span>{{ session('success') }}</span>
+                </div>
+                @if(session('sync_log_id'))
+                <button type="button" onclick="openSyncReport({{ session('sync_log_id') }})" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition active:scale-95 shadow-sm">
+                    <i class="fas fa-list-alt mr-1"></i> View Sync Report
+                </button>
+                @endif
             </div>
             @endif
 
