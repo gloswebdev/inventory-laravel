@@ -13,6 +13,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule) {
+        // Auto Sync Product Master (daily at 01:00 AM)
+        $schedule->call(function () {
+            try {
+                app(\App\Http\Controllers\ProductController::class)->syncFromApiRaw('Scheduled Sync');
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Scheduled Product Master Sync Error: ' . $e->getMessage());
+            }
+        })->dailyAt('01:00');
+
         $autoSync = \App\Models\AppSetting::get('purchase_sync_auto') === 'enabled';
         if ($autoSync) {
             $frequency = \App\Models\AppSetting::get('purchase_sync_frequency', 'daily');

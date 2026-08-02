@@ -214,6 +214,22 @@ class ProductController extends Controller
      */
     public function syncFromApi()
     {
+        $syncedBy = Auth::user()->name ?? 'Unknown';
+        $result = $this->syncFromApiRaw($syncedBy);
+
+        if (!$result['success']) {
+            return redirect()->back()->with('error', 'API Sync failed: ' . $result['message']);
+        }
+
+        return redirect()->back()->with('success', "API Sync Complete! Created: {$result['created']}, Updated: {$result['updated']}, Skipped: {$result['skipped']}")
+                                  ->with('sync_log_id', $result['log_id']);
+    }
+
+    /**
+     * Common core method to sync products from ERP API
+     */
+    public function syncFromApiRaw($syncedBy = 'System')
+    {
         try {
             $baseUrl  = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
             $apiKey   = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
@@ -233,9 +249,9 @@ class ProductController extends Controller
                 \App\Models\ProductSyncLog::create([
                     'status' => 'failed',
                     'error_message' => 'HTTP ' . $response->status(),
-                    'synced_by' => Auth::user()->name ?? 'Unknown',
+                    'synced_by' => $syncedBy,
                 ]);
-                return redirect()->back()->with('error', 'API Sync failed: HTTP ' . $response->status());
+                return ['success' => false, 'message' => 'HTTP ' . $response->status()];
             }
 
             $data = $response->json();
@@ -244,9 +260,9 @@ class ProductController extends Controller
                 \App\Models\ProductSyncLog::create([
                     'status' => 'failed',
                     'error_message' => 'Invalid response from API',
-                    'synced_by' => Auth::user()->name ?? 'Unknown',
+                    'synced_by' => $syncedBy,
                 ]);
-                return redirect()->back()->with('error', 'API Sync failed: Invalid response from API.');
+                return ['success' => false, 'message' => 'Invalid response from API.'];
             }
 
             $items = $data['resultdata'];
@@ -372,11 +388,16 @@ class ProductController extends Controller
                 'created_items'  => $loggedCreatedItems,
                 'updated_items'  => $loggedUpdatedItems,
                 'status'         => 'success',
-                'synced_by'      => Auth::user()->name ?? 'Unknown',
+                'synced_by'      => $syncedBy,
             ]);
 
-            return redirect()->back()->with('success', "API Sync Complete! Created: {$created}, Updated: {$updated}, Skipped: {$skipped}")
-                                      ->with('sync_log_id', $syncLog->id);
+            return [
+                'success' => true,
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'log_id'  => $syncLog->id
+            ];
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -384,9 +405,9 @@ class ProductController extends Controller
             \App\Models\ProductSyncLog::create([
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
-                'synced_by' => Auth::user()->name ?? 'Unknown',
+                'synced_by' => $syncedBy,
             ]);
-            return redirect()->back()->with('error', 'API Sync failed: ' . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
