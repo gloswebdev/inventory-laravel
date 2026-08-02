@@ -521,12 +521,32 @@
                                                 Technical
                                             </label>
 
-                                            <template x-if="item.raw_material_id && getMaterialRate(item.raw_material_id) !== null">
+                                            <!-- If not technical and rate is fetched -->
+                                            <template x-if="item.raw_material_id && !item.is_technical && getMaterialRate(item.raw_material_id) !== null">
                                                 <div class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg text-[9px] font-black shadow-sm">
                                                     <i class="fas fa-tag"></i> Rate: <span x-text="'₹' + getMaterialRate(item.raw_material_id)"></span>
                                                 </div>
                                             </template>
-                                            <template x-if="item.raw_material_id && getMaterialRate(item.raw_material_id) === null">
+
+                                            <!-- If technical (show fetched rate if available, and input for manual override) -->
+                                            <template x-if="item.raw_material_id && item.is_technical">
+                                                <div class="flex flex-wrap items-center gap-2 bg-amber-500/5 border border-amber-200/50 p-1.5 rounded-xl">
+                                                    <template x-if="getMaterialRate(item.raw_material_id) !== null">
+                                                        <div class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg text-[9px] font-black shadow-sm">
+                                                            <i class="fas fa-tag"></i> Fetched: <span x-text="'₹' + getMaterialRate(item.raw_material_id)"></span>
+                                                        </div>
+                                                    </template>
+                                                    <div class="flex items-center gap-1">
+                                                        <label class="text-[9px] font-black text-rose-700 uppercase tracking-wider block bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">Manual Rate (₹):</label>
+                                                        <input type="number" step="0.01" min="0" x-model="item.rate"
+                                                               class="w-16 px-1.5 py-0.5 text-[10px] font-black border border-rose-200 rounded-lg outline-none focus:ring-1 focus:ring-rose-400 text-center text-rose-800 bg-rose-50/20"
+                                                               :placeholder="getMaterialRate(item.raw_material_id) || 'Rate'">
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            <!-- If not technical and rate is not fetched -->
+                                            <template x-if="item.raw_material_id && !item.is_technical && getMaterialRate(item.raw_material_id) === null">
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <div class="inline-flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg text-[9px] font-black">
                                                         <i class="fas fa-tag"></i> Rate: Not Available
@@ -554,13 +574,13 @@
                                             <template x-if="item.raw_material_id && item.quantity && (getMaterialRate(item.raw_material_id) !== null || item.rate)">
                                                 <div class="w-full mt-1 bg-slate-50 border border-slate-100 rounded-lg p-1.5 text-[9.5px] font-mono text-slate-600 font-bold">
                                                     <span class="text-blue-700 font-extrabold" x-text="item.quantity"></span> * 
-                                                    <span class="text-emerald-700 font-extrabold" x-text="getMaterialRate(item.raw_material_id) !== null ? getMaterialRate(item.raw_material_id) : (item.rate || 0)"></span> = 
-                                                    <span class="text-slate-800 font-extrabold" x-text="'₹' + (parseFloat(item.quantity) * (getMaterialRate(item.raw_material_id) !== null ? parseFloat(getMaterialRate(item.raw_material_id)) : (parseFloat(item.rate) || 0))).toFixed(2)"></span>
+                                                    <span class="text-emerald-700 font-extrabold" x-text="item.rate ? item.rate : getMaterialRate(item.raw_material_id)"></span> = 
+                                                    <span class="text-slate-800 font-extrabold" x-text="'₹' + (parseFloat(item.quantity) * (item.rate ? parseFloat(item.rate) : parseFloat(getMaterialRate(item.raw_material_id)))).toFixed(2)"></span>
                                                     <span class="text-slate-400 font-semibold"> + </span>
                                                     <span class="text-blue-700 font-extrabold" x-text="item.quantity"></span> * 
                                                     <span class="text-amber-700 font-extrabold" x-text="item.transportation_cost !== undefined && item.transportation_cost !== '' ? item.transportation_cost : 5"></span> = 
                                                     <span class="text-slate-800 font-extrabold" x-text="'₹' + (parseFloat(item.quantity) * (item.transportation_cost !== undefined && item.transportation_cost !== '' ? parseFloat(item.transportation_cost) : 5)).toFixed(2)"></span>
-                                                    <span class="text-indigo-600 font-black" x-text="' (Total: ₹' + ( (parseFloat(item.quantity) * (getMaterialRate(item.raw_material_id) !== null ? parseFloat(getMaterialRate(item.raw_material_id)) : (parseFloat(item.rate) || 0))) + (parseFloat(item.quantity) * (item.transportation_cost !== undefined && item.transportation_cost !== '' ? parseFloat(item.transportation_cost) : 5)) ).toFixed(2) + ')'"></span>
+                                                    <span class="text-indigo-600 font-black" x-text="' (Total: ₹' + ( (parseFloat(item.quantity) * (item.rate ? parseFloat(item.rate) : parseFloat(getMaterialRate(item.raw_material_id)))) + (parseFloat(item.quantity) * (item.transportation_cost !== undefined && item.transportation_cost !== '' ? parseFloat(item.transportation_cost) : 5)) ).toFixed(2) + ')'"></span>
                                                 </div>
                                             </template>
 
@@ -1202,7 +1222,7 @@ function bomApp() {
             let sum = 0;
             this.bomModal.form.items.forEach(i => {
                 if (!i.is_packing && i.raw_material_id && i.quantity) {
-                    const rate = parseFloat(this.getMaterialRate(i.raw_material_id)) || parseFloat(i.rate) || 0;
+                    const rate = parseFloat(i.rate) || parseFloat(this.getMaterialRate(i.raw_material_id)) || 0;
                     const tc = i.transportation_cost !== undefined && i.transportation_cost !== '' ? parseFloat(i.transportation_cost) : 5;
                     sum += parseFloat(i.quantity) * (rate + tc);
                 }
