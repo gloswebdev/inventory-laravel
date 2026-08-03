@@ -103,13 +103,15 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.purchase-report'        => 'mobile_purchase_report',
                     
                     // Collection Report & Targets
-                    'mobile.collection-report'      => 'mobile_collection',
-                    'mobile.agent-targets.index'    => 'mobile_collection',
-                    'mobile.agent-targets.store'    => 'mobile_collection',
-                    'mobile.team-targets.store'     => 'mobile_collection',
-                    'mobile.reports.collection.teams.store'   => 'mobile_collection',
-                    'mobile.reports.collection.teams.update'  => 'mobile_collection',
-                    'mobile.reports.collection.teams.destroy' => 'mobile_collection',
+                    'mobile.collection-report'                => 'mobile_collection',
+                    'mobile.teams.setup'                      => 'mobile_teams_setup',
+                    'mobile.reports.collection.teams.store'   => 'mobile_teams_setup',
+                    'mobile.reports.collection.teams.update'  => 'mobile_teams_setup',
+                    'mobile.reports.collection.teams.destroy' => 'mobile_teams_setup',
+                    'mobile.agent-targets.index'              => 'mobile_agent_targets',
+                    'mobile.agent-targets.store'              => 'mobile_agent_targets',
+                    'mobile.team-targets.store'               => 'mobile_agent_targets',
+                    'mobile.teams.setup'                      => 'mobile_teams_setup',
                 ];
 
                 if (isset($permissionMap[$route])) {
@@ -263,7 +265,14 @@ class MobileController extends Controller implements HasMiddleware
                 'icon'       => 'fas fa-bullseye',
                 'route'      => 'mobile.agent-targets.index',
                 'color'      => 'bg-indigo-600',
-                'permission' => 'mobile_collection'
+                'permission' => 'mobile_agent_targets'
+            ],
+            [
+                'name'       => 'Teams Setup',
+                'icon'       => 'fas fa-network-wired',
+                'route'      => 'mobile.teams.setup',
+                'color'      => 'bg-violet-600',
+                'permission' => 'mobile_teams_setup'
             ],
         ];
 
@@ -2809,6 +2818,17 @@ class MobileController extends Controller implements HasMiddleware
     /**
      * Mobile: Collection Report
      */
+    /**
+     * Mobile: Teams Hierarchy & Setup Manager
+     */
+    public function teamsSetup(Request $request)
+    {
+        $reportController = new ReportController();
+        $response = $reportController->teamsSetup();
+        $data = $response->getData();
+        return view('mobile.teams_setup', $data);
+    }
+
     public function collectionReport(Request $request)
     {
         // Re-use core ReportController's collection report calculations but render to a mobile blade view.

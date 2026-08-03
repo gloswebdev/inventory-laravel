@@ -108,6 +108,8 @@
                     'mobile_costing_pricelist_update' => ['bg' => 'bg-sky-500', 'text' => 'text-white', 'shadow' => 'shadow-sky-200'],
                     'mobile_purchase_report' => ['bg' => 'bg-red-500', 'text' => 'text-white', 'shadow' => 'shadow-red-200'],
                     'mobile_collection' => ['bg' => 'bg-emerald-600', 'text' => 'text-white', 'shadow' => 'shadow-emerald-200'],
+                    'mobile_agent_targets' => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
+                    'mobile_teams_setup' => ['bg' => 'bg-violet-600', 'text' => 'text-white', 'shadow' => 'shadow-violet-200'],
                 ];
 
                 $newFeatures = [
@@ -115,7 +117,8 @@
                     'mobile.collection-report',
                     'mobile.purchase-report',
                     'mobile.costing.pricelist',
-                    'mobile.costing.pricelist-update'
+                    'mobile.costing.pricelist-update',
+                    'mobile.teams.setup',
                 ];
             @endphp
 

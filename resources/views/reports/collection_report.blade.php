@@ -4,6 +4,328 @@
 @section('content')
 @php
     $parseAmt = fn($v) => is_numeric(str_replace(',', '', (string)$v)) ? (float)str_replace(',', '', (string)$v) : 0;
+
+    $formatIndian = function($num) {
+        $num = str_replace([',', ' '], '', (string)$num);
+        if (!is_numeric($num)) {
+            return $num;
+        }
+        $num = round((float)$num);
+        $numStr = (string)$num;
+        $isNegative = false;
+        if (str_starts_with($numStr, '-')) {
+            $isNegative = true;
+            $numStr = substr($numStr, 1);
+        }
+        $len = strlen($numStr);
+        if ($len <= 3) {
+            return ($isNegative ? '-' : '') . $numStr;
+        }
+        $lastThree = substr($numStr, -3);
+        $remaining = substr($numStr, 0, -3);
+        $remainingGroups = [];
+        while (strlen($remaining) > 0) {
+            if (strlen($remaining) > 2) {
+                $remainingGroups[] = substr($remaining, -2);
+                $remaining = substr($remaining, 0, -2);
+            } else {
+                $remainingGroups[] = $remaining;
+                $remaining = '';
+            }
+        }
+        $remainingGroups = array_reverse($remainingGroups);
+        return ($isNegative ? '-' : '') . implode(',', $remainingGroups) . ',' . $lastThree;
+    };
+
+    $renderTeamNode = function($team, $dbTeams, $grouped, $branchSummary, $teamTargets, $agentTargets, $crField, $drField, $partyNameKey, $parseAmt, $groupColors, $colorIndex) use (&$renderTeamNode, $formatIndian) {
+        $branchName = $team->name;
+        $branchSlug = 'grp_' . Str::slug($branchName) . '_' . $team->id;
+        $bSummary = $branchSummary[$branchName] ?? ['total'=>0,'parties'=>0,'agents'=>0];
+        
+        $tTargetAmt = $teamTargets[$team->id] ?? 0;
+        if ($tTargetAmt == 0) {
+            $sumTargets = function($tNode) use (&$sumTargets, $dbTeams, $agentTargets) {
+                $sum = 0;
+                foreach ($tNode->agents ?: [] as $ag) {
+                    $sum += ($agentTargets[$ag] ?? 0);
+                }
+                foreach ($dbTeams->where('parent_id', $tNode->id) as $chNode) {
+                    $sum += $sumTargets($chNode);
+                }
+                return $sum;
+            };
+            $tTargetAmt = $sumTargets($team);
+        }
+        $tPercent = $tTargetAmt > 0 ? min(999, round(($bSummary['total'] / $tTargetAmt) * 100)) : 0;
+        
+        $childrenTeams = $dbTeams->where('parent_id', $team->id);
+        $directAgentNames = $team->agents ?: [];
+
+        // Determine level styling
+        $level = $colorIndex; // 0 = Parent Region, 1 = Sub-Region, 2+ = Sub-Team
+        $headerBg = 'bg-slate-950';
+        $borderStyle = 'border-slate-800';
+        $levelBadge = '<span class="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Parent Region</span>';
+        $iconClass = 'fa-crown text-amber-400';
+
+        if ($level === 1) {
+            $headerBg = 'bg-slate-900';
+            $borderStyle = 'border-indigo-200';
+            $levelBadge = '<span class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Sub-Region</span>';
+            $iconClass = 'fa-sitemap text-indigo-400';
+        } elseif ($level >= 2) {
+            $headerBg = 'bg-slate-800';
+            $borderStyle = 'border-violet-200';
+            $levelBadge = '<span class="bg-violet-500/20 text-violet-300 border border-violet-500/30 text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Sub-Team</span>';
+            $iconClass = 'fa-users-rectangle text-violet-400';
+        }
+        
+        // Render current team card
+        ?>
+        <div class="bg-white rounded-3xl shadow-sm border <?php echo $borderStyle; ?> overflow-hidden mb-4 transition-all duration-200 hover:shadow-md" id="<?php echo $branchSlug; ?>">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between px-6 py-5 <?php echo $headerBg; ?> cursor-pointer select-none gap-4"
+                 onclick="toggleBranch('<?php echo $branchSlug; ?>')">
+                <div class="flex items-center gap-4 min-w-0">
+                    <div class="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0 shadow-inner">
+                        <i class="fas <?php echo $iconClass; ?> text-base"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <span class="text-white font-black text-base md:text-lg tracking-tight"><?php echo htmlspecialchars($branchName); ?></span>
+                            <?php echo $levelBadge; ?>
+                        </div>
+                        <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-1 flex items-center gap-2">
+                            <span><i class="fas fa-user-tie text-[9px] mr-1 text-slate-400"></i><?php echo $bSummary['agents']; ?> agents</span>
+                            <span>·</span>
+                            <span><i class="fas fa-building text-[9px] mr-1 text-slate-400"></i><?php echo number_format($bSummary['parties']); ?> parties / accounts</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between lg:justify-end gap-6 flex-wrap">
+                    <?php if($tTargetAmt > 0): ?>
+                    <div class="bg-white/5 border border-white/10 rounded-2xl px-4 py-2 flex flex-col items-end">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-black text-emerald-400"><?php echo $tPercent; ?>% Achieved</span>
+                            <span class="text-[9px] text-slate-400 font-bold">(Goal: ₹<?php echo $formatIndian($tTargetAmt); ?>)</span>
+                        </div>
+                        <div class="w-36 bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700 mt-1.5">
+                            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-1.5 rounded-full" style="width: <?php echo min(100, $tPercent); ?>%"></div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <div class="text-right">
+                        <div class="text-emerald-400 font-black text-xl tracking-tight">₹<?php echo $formatIndian($bSummary['total']); ?></div>
+                        <div class="text-slate-400 text-[8px] font-black uppercase tracking-widest">Team Collection</div>
+                    </div>
+
+                    <div class="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
+                        <i class="fas fa-chevron-down text-slate-300 text-xs transition-transform duration-200 branch-chevron" id="<?php echo $branchSlug; ?>_chev"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div id="<?php echo $branchSlug; ?>_body" class="branch-body hidden p-5 bg-slate-50/40 space-y-5">
+                <?php // Children teams nested ?>
+                <?php if($childrenTeams->count() > 0): ?>
+                    <div class="pl-4 md:pl-6 border-l-2 border-dashed border-indigo-200 space-y-4">
+                        <div class="text-[9px] font-black text-indigo-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                            <i class="fas fa-network-wired"></i> Sub-Regions & Sub-Teams under <?php echo htmlspecialchars($branchName); ?>
+                        </div>
+                        <?php foreach($childrenTeams as $childTeam):
+                            $renderTeamNode($childTeam, $dbTeams, $grouped, $branchSummary, $teamTargets, $agentTargets, $crField, $drField, $partyNameKey, $parseAmt, $groupColors, $colorIndex + 1);
+                        endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php // Direct Agents Table ?>
+                <?php
+                $hasDirectAgents = false;
+                foreach ($directAgentNames as $agentName) {
+                    if (isset($grouped[$branchName][$agentName])) {
+                        $hasDirectAgents = true;
+                        break;
+                    }
+                }
+                ?>
+
+                <?php if($hasDirectAgents): ?>
+                <div class="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <table class="min-w-full text-left border-collapse">
+                        <thead class="bg-slate-900 border-b border-slate-800 text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                            <tr>
+                                <th class="py-3 px-4 border-r border-slate-800 text-center w-12">#</th>
+                                <th class="py-3 px-4 border-r border-slate-800">Salesman / Agent Name</th>
+                                <th class="py-3 px-4 border-r border-slate-800 text-center w-20">Parties</th>
+                                <th class="py-3 px-4 border-r border-slate-800 text-right w-36">Actual Collection</th>
+                                <th class="py-3 px-4 border-r border-slate-800 text-right w-36">Monthly Target</th>
+                                <th class="py-3 px-4 border-r border-slate-800 text-center w-44">Achievement Progress</th>
+                                <th class="py-3 px-4 text-center w-24">Detail</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                        <?php $agentIdx = 0;
+                        foreach($directAgentNames as $agentName):
+                            if(!isset($grouped[$branchName][$agentName])) continue;
+                            $agentRows = $grouped[$branchName][$agentName];
+                            $agentTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $agentRows));
+                            $agentParties = count($agentRows);
+                            $agentSlug = $branchSlug . '_ag_' . Str::slug($agentName);
+                            $agentIdx++;
+
+                            $targetAmt = $agentTargets[$agentName] ?? 0;
+                            $percent = $targetAmt > 0 ? min(100, round(($agentTotal / $targetAmt) * 100)) : 0;
+                            $progressColor = 'bg-slate-300';
+                            if ($targetAmt > 0) {
+                                if ($percent >= 100) $progressColor = 'bg-emerald-500';
+                                elseif ($percent >= 50) $progressColor = 'bg-amber-500';
+                                else $progressColor = 'bg-rose-550';
+                            }
+                            ?>
+                            <tr class="hover:bg-slate-50 transition-colors cursor-pointer agent-row text-xs"
+                                onclick="toggleAgentDetail('<?php echo $agentSlug; ?>', this)">
+                                <td class="py-3 px-4 border-r border-gray-100 text-slate-400 font-bold text-center"><?php echo $agentIdx; ?></td>
+                                <td class="py-3 px-4 border-r border-gray-100">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0 text-violet-600">
+                                            <i class="fas fa-user-tie text-xs"></i>
+                                        </div>
+                                        <span class="font-black text-slate-800 text-[13px]"><?php echo htmlspecialchars($agentName); ?></span>
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 border-r border-gray-100 text-center">
+                                    <span class="bg-blue-50 text-blue-700 border border-blue-150 font-black text-[10px] px-2 py-0.5 rounded-lg">
+                                        <?php echo $agentParties; ?>
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 border-r border-gray-100 text-right font-black text-slate-800 text-sm">
+                                    ₹<?php echo $formatIndian($agentTotal); ?>
+                                </td>
+                                <td class="py-3 px-4 border-r border-gray-100 text-right font-bold text-slate-500">
+                                    <?php if($targetAmt > 0): ?>
+                                        ₹<?php echo $formatIndian($targetAmt); ?>
+                                    <?php else: ?>
+                                        <span class="text-gray-300 italic text-[10px]">Not Set</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-3 px-4 border-r border-gray-100">
+                                    <?php if($targetAmt > 0): ?>
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between text-[9px] font-black">
+                                                <span class="text-slate-600"><?php echo round(($agentTotal / $targetAmt) * 100); ?>%</span>
+                                                <span class="text-slate-400">₹<?php echo $formatIndian(max(0, $targetAmt - $agentTotal)); ?> left</span>
+                                            </div>
+                                            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div class="<?php echo $progressColor; ?> h-1.5 rounded-full" style="width: <?php echo $percent; ?>%"></div>
+                                            </div>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="text-gray-300 text-[10px] block text-center">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    <span class="inline-flex items-center gap-1.5 text-[10px] font-black text-indigo-600 hover:text-indigo-800 transition-colors">
+                                        <i class="fas fa-chevron-down text-[8px] agent-chev transition-transform duration-200" id="<?php echo $agentSlug; ?>_chev"></i>
+                                        <span class="agent-chev-text">Expand</span>
+                                    </span>
+                                </td>
+                            </tr>
+
+                            <tr id="<?php echo $agentSlug; ?>" class="agent-detail hidden">
+                                <td colspan="7" class="p-0 bg-slate-50/50">
+                                    <div class="px-6 py-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <div class="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                <i class="fas fa-building-user text-violet-500"></i> Account Listings under <?php echo htmlspecialchars($agentName); ?>
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 cursor-pointer select-none bg-white border border-gray-200 px-2.5 py-1 rounded-xl hover:bg-slate-50 transition">
+                                                    <input type="checkbox" onchange="toggleZeroCollectionParties(this, '<?php echo $agentSlug; ?>_tbody')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 text-xs">
+                                                    <span>Hide Zero Collection</span>
+                                                </label>
+                                                <input type="text"
+                                                    placeholder="Instant Filter..."
+                                                    oninput="filterAgentParties(this, '<?php echo $agentSlug; ?>_tbody')"
+                                                    class="border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-violet-300 outline-none w-44 bg-white">
+                                            </div>
+                                        </div>
+
+                                        <div class="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+                                            <table class="min-w-full text-left border-collapse">
+                                                <thead class="bg-indigo-50/60 text-[9px] font-black text-indigo-800 uppercase tracking-widest border-b border-indigo-100">
+                                                    <tr>
+                                                        <th class="py-2.5 px-3 border-r border-indigo-150/40 text-center w-10">#</th>
+                                                        <th class="py-2.5 px-3 border-r border-indigo-150/40 w-28">A/C Code</th>
+                                                        <th class="py-2.5 px-3 border-r border-indigo-150/40">Party Name</th>
+                                                        <th class="py-2.5 px-3 border-r border-indigo-150/40">Town / Location</th>
+                                                        <?php if($crField): ?>
+                                                        <th class="py-2.5 px-3 text-right w-36">Collection</th>
+                                                        <?php endif; ?>
+                                                        <?php if($drField): ?>
+                                                        <th class="py-2.5 px-3 text-right border-l border-indigo-150/40 w-36">Debit</th>
+                                                        <?php endif; ?>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-gray-100" id="<?php echo $agentSlug; ?>_tbody">
+                                                    <?php foreach($agentRows as $pi => $party):
+                                                        $pName  = trim($party[$partyNameKey ?? 'AC_Name'] ?? $party['AC_Name'] ?? $party['AcName'] ?? $party['PartyName'] ?? '—');
+                                                        $pCode  = trim($party['AC_Code'] ?? $party['ActCode'] ?? $party['Ac_Code'] ?? '');
+                                                        $pTown  = $party['_TownName'] ?? '—';
+                                                        $pCrAmt = $crField ? $parseAmt($party[$crField] ?? 0) : 0;
+                                                        $pDrAmt = $drField ? $parseAmt($party[$drField] ?? 0) : 0;
+                                                        ?>
+                                                        <tr class="hover:bg-slate-50 transition-colors party-row text-[11px]" data-collection-amount="<?php echo $pCrAmt; ?>">
+                                                            <td class="py-2 px-3 border-r border-gray-100 text-slate-400 font-bold text-center"><?php echo $pi + 1; ?></td>
+                                                            <td class="py-2 px-3 border-r border-gray-100 font-mono text-[10px] text-indigo-600 font-black">
+                                                                <?php echo $pCode ?: '—'; ?>
+                                                            </td>
+                                                            <td class="py-2 px-3 border-r border-gray-100 font-bold text-slate-800"><?php echo htmlspecialchars($pName); ?></td>
+                                                            <td class="py-2 px-3 border-r border-gray-100 text-slate-500">
+                                                                <?php if($pTown && $pTown !== '—'): ?>
+                                                                <span class="flex items-center gap-1"><i class="fas fa-location-dot text-rose-500 text-[8px]"></i><?php echo htmlspecialchars($pTown); ?></span>
+                                                                <?php else: ?><span class="text-gray-300">—</span><?php endif; ?>
+                                                            </td>
+                                                            <?php if($crField): ?>
+                                                            <td class="py-2 px-3 text-right font-black text-emerald-700">
+                                                                <?php echo $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '—'; ?>
+                                                            </td>
+                                                            <?php endif; ?>
+                                                            <?php if($drField): ?>
+                                                            <td class="py-2 px-3 text-right border-l border-gray-100 font-bold text-rose-600">
+                                                                <?php echo $pDrAmt > 0 ? '₹' . $formatIndian($pDrAmt) : '—'; ?>
+                                                            </td>
+                                                            <?php endif; ?>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                                <tfoot class="bg-indigo-50/80 border-t border-indigo-100 text-[11px] font-black text-indigo-950">
+                                                    <tr>
+                                                        <td colspan="4" class="py-2 px-3 text-right uppercase tracking-widest text-[9px] border-r border-indigo-100">Sub-total →</td>
+                                                        <?php if($crField): ?>
+                                                        <td class="py-2 px-3 text-right text-emerald-700">₹<?php echo $formatIndian($agentTotal); ?></td>
+                                                        <?php endif; ?>
+                                                        <?php if($drField):
+                                                            $agentDrTotal = array_sum(array_map(fn($r) => $parseAmt($r[$drField] ?? 0), $agentRows));
+                                                            ?>
+                                                            <td class="py-2 px-3 text-right border-l border-indigo-100 text-rose-700">₹<?php echo $formatIndian($agentDrTotal); ?></td>
+                                                        <?php endif; ?>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+    };
 @endphp
 
 <style>
@@ -39,11 +361,11 @@
                 <i class="fas fa-bullseye"></i>
                 <span>Set targets</span>
             </a>
-            <button onclick="toggleTeamCreatorModal(true)"
+            <a href="{{ route('reports.teams.setup') }}"
                class="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500 rounded-2xl px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition flex items-center gap-2">
-                <i class="fas fa-plus"></i>
-                <span>Create Custom Team</span>
-            </button>
+                <i class="fas fa-sitemap"></i>
+                <span>Configure Teams Hierarchy</span>
+            </a>
             @endif
             <a href="{{ route('reports.collection', array_merge(request()->except('refresh_party_master'), ['refresh_party_master' => 1])) }}"
                class="bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl px-5 py-2.5 text-xs font-bold tracking-wider uppercase transition">
@@ -65,7 +387,26 @@
     <form method="GET" action="{{ route('reports.collection') }}" id="collectionFilterForm" class="p-6 space-y-6">
         <input type="hidden" name="fetch" value="1">
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {{-- Month Filter --}}
+            <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">
+                    <i class="fas fa-calendar-days text-indigo-500 mr-1.5"></i>Select Month
+                </label>
+                <div class="relative">
+                    <select name="month_filter" id="month_filter_select" onchange="handleMonthChange(this.value)"
+                            class="w-full border border-gray-200 rounded-2xl py-3 px-4 pr-9 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-indigo-400 outline-none transition appearance-none bg-white">
+                        @foreach($monthOptions ?? [] as $mKey => $mLabel)
+                            <option value="{{ $mKey }}" {{ ($monthFilter ?? $defaults['month_filter']) === $mKey ? 'selected' : '' }}>{{ $mLabel }}</option>
+                        @endforeach
+                        <option value="custom" {{ ($monthFilter ?? '') === 'custom' ? 'selected' : '' }}>Custom Date Range...</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-indigo-500">
+                        <i class="fas fa-chevron-down text-xs"></i>
+                    </div>
+                </div>
+            </div>
+
             {{-- Date Ranges --}}
             <div>
                 <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">From Date</label>
@@ -122,11 +463,24 @@
             </div>
         </div>
 
+        {{-- Hide Zero Collection Toggle --}}
+        <div class="border-t border-slate-100 pt-4 flex items-center justify-between">
+            <label class="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-2xl hover:bg-slate-100 transition">
+                <input type="checkbox" name="hide_zero_collection" value="1" {{ request()->boolean('hide_zero_collection') ? 'checked' : '' }} class="rounded border-slate-350 text-blue-600 focus:ring-blue-500">
+                <span><i class="fas fa-eye-slash text-slate-400 mr-1"></i> Hide Parties with Zero Collection (Show Only Active Collections)</span>
+            </label>
+        </div>
+
         {{-- Team Maker row --}}
         <div class="border-t border-slate-100 pt-5">
-            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">
-                <i class="fas fa-users-gear text-emerald-500 mr-1.5"></i>Select Teams (Group Filters)
-            </label>
+            <div class="flex items-center justify-between mb-3 ml-1">
+                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <i class="fas fa-users-gear text-emerald-500 mr-1.5"></i>Select Teams (Group Filters)
+                </label>
+                <a href="{{ route('reports.teams.setup') }}" class="text-[11px] font-black text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1">
+                    <i class="fas fa-gear text-[10px]"></i> Manage Teams Hierarchy →
+                </a>
+            </div>
             <div class="flex flex-wrap gap-2.5 items-center">
                 @forelse($dbTeams ?? [] as $team)
                     @php $isActive = in_array($team->id, $selectedTeams ?? []); @endphp
@@ -134,22 +488,8 @@
                         <button type="button" 
                             onclick="toggleTeamFilter('{{ $team->id }}')"
                             id="btn_team_{{ $team->id }}"
-                            class="team-btn px-4 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition border-r border-gray-100 {{ $isActive ? 'active' : '' }}">
+                            class="team-btn px-4 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition {{ $isActive ? 'active' : '' }}">
                             <i class="fas fa-users mr-1.5"></i> {{ $team->name }}
-                        </button>
-                        
-                        {{-- Edit team button --}}
-                        <button type="button"
-                                onclick='openEditTeamModal(@json($team))'
-                                class="px-2.5 py-2 text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition border-r border-gray-100">
-                            <i class="fas fa-pencil text-[10px]"></i>
-                        </button>
-
-                        {{-- Delete team action --}}
-                        <button type="button" 
-                                onclick="deleteTeam('{{ $team->id }}', '{{ $team->name }}')"
-                                class="px-2.5 py-2 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 transition duration-150">
-                            <i class="fas fa-trash text-[10px]"></i>
                         </button>
                     </div>
 
@@ -158,7 +498,7 @@
                         <input type="hidden" name="teams[]" value="{{ $team->id }}" id="input_team_{{ $team->id }}">
                     @endif
                 @empty
-                    <p class="text-xs text-slate-400 italic">No custom teams created yet. Click "Create Custom Team" above to configure one.</p>
+                    <p class="text-xs text-slate-400 italic">No custom teams created yet. <a href="{{ route('reports.teams.setup') }}" class="text-indigo-600 font-bold underline">Click here to setup teams</a>.</p>
                 @endforelse
                 
                 @if(!empty($selectedTeams))
@@ -206,7 +546,7 @@
     <div class="bg-emerald-500 rounded-3xl p-5 text-white flex items-center justify-between shadow-lg shadow-emerald-100">
         <div>
             <div class="text-[9px] font-bold text-emerald-100 uppercase tracking-widest mb-1">Grand Collection</div>
-            <div class="text-2xl font-black">₹{{ number_format($grandTotal ?? 0, 0) }}</div>
+            <div class="text-2xl font-black">₹{{ $formatIndian($grandTotal ?? 0) }}</div>
         </div>
         <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white"><i class="fas fa-circle-dollar-to-slot"></i></div>
     </div>
@@ -235,20 +575,25 @@
     $colorIndex = 0;
 @endphp
 
+@foreach($dbTeams->whereNull('parent_id') as $team)
+@php
+    if (!isset($branchSummary[$team->name])) continue;
+    $renderTeamNode($team, $dbTeams, $grouped, $branchSummary, $teamTargets, $agentTargets, $crField, $drField, $partyNameKey, $parseAmt, $groupColors, 0);
+@endphp
+@endforeach
+
 @foreach($grouped as $branchName => $agents)
 @php
+    $isCustomTeam = $dbTeams->contains('name', $branchName);
+    if ($isCustomTeam) continue;
+
     $bColor = $groupColors[$colorIndex % count($groupColors)];
     $bSummary = $branchSummary[$branchName] ?? ['total'=>0,'parties'=>0,'agents'=>0];
     $colorIndex++;
     $branchSlug = 'grp_' . Str::slug($branchName);
-
-    // Find database Team ID if exists
-    $matchingDbTeam = $dbTeams->firstWhere('name', $branchName);
-    $tTargetAmt = $matchingDbTeam ? ($teamTargets[$matchingDbTeam->id] ?? 0) : 0;
-    $tPercent = $tTargetAmt > 0 ? min(100, round(($bSummary['total'] / $tTargetAmt) * 100)) : 0;
 @endphp
 
-<div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden" id="{{ $branchSlug }}">
+<div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-4" id="{{ $branchSlug }}">
     {{-- Group Header Bar --}}
     <div class="flex flex-col md:flex-row md:items-center justify-between px-6 py-5 bg-slate-900 cursor-pointer select-none gap-4"
          onclick="toggleBranch('{{ $branchSlug }}')">
@@ -264,22 +609,9 @@
             </div>
         </div>
         
-        {{-- Team Target Progress Bar --}}
-        @if($tTargetAmt > 0)
-        <div class="flex-1 max-w-md mx-0 md:mx-6">
-            <div class="flex items-center justify-between text-[10px] font-black text-slate-400 mb-1">
-                <span>Target Progress: {{ round(($bSummary['total'] / $tTargetAmt) * 100) }}%</span>
-                <span>Goal: ₹{{ number_format($tTargetAmt, 0) }}</span>
-            </div>
-            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
-                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full" style="width: {{ $tPercent }}%"></div>
-            </div>
-        </div>
-        @endif
-
         <div class="flex items-center gap-5">
             <div class="text-right">
-                <div class="text-emerald-400 font-black text-lg">₹{{ number_format($bSummary['total'], 0) }}</div>
+                <div class="text-emerald-400 font-black text-lg">₹{{ $formatIndian($bSummary['total']) }}</div>
                 <div class="text-slate-500 text-[9px] font-bold uppercase tracking-widest">Team Collection</div>
             </div>
             <i class="fas fa-chevron-down text-slate-400 text-xs transition-transform duration-200 branch-chevron" id="{{ $branchSlug }}_chev"></i>
@@ -287,7 +619,7 @@
     </div>
 
     {{-- Agent rows nested --}}
-    <div id="{{ $branchSlug }}_body" class="branch-body">
+    <div id="{{ $branchSlug }}_body" class="branch-body hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full text-left border-collapse">
                 <thead class="bg-slate-50 border-b border-gray-100 text-[9px] font-black text-slate-500 uppercase tracking-widest">
@@ -339,11 +671,11 @@
                         </span>
                     </td>
                     <td class="py-3 px-6 border-r border-gray-50 text-right font-black text-slate-800">
-                        ₹{{ number_format($agentTotal, 0) }}
+                        ₹{{ $formatIndian($agentTotal) }}
                     </td>
                     <td class="py-3 px-6 border-r border-gray-50 text-right font-bold text-slate-500">
                         @if($targetAmt > 0)
-                            ₹{{ number_format($targetAmt, 0) }}
+                            ₹{{ $formatIndian($targetAmt) }}
                         @else
                             <span class="text-gray-300 italic text-[11px]">Not Set</span>
                         @endif
@@ -353,7 +685,7 @@
                             <div class="space-y-1">
                                 <div class="flex items-center justify-between text-[10px] font-black">
                                     <span class="text-slate-500">{{ round(($agentTotal / $targetAmt) * 100) }}%</span>
-                                    <span class="text-slate-400">₹{{ number_format(max(0, $targetAmt - $agentTotal), 0) }} left</span>
+                                    <span class="text-slate-400">₹{{ $formatIndian(max(0, $targetAmt - $agentTotal)) }} left</span>
                                 </div>
                                 <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                     <div class="{{ $progressColor }} h-1.5 rounded-full" style="width: {{ $percent }}%"></div>
@@ -423,12 +755,12 @@
                                             </td>
                                             @if($crField)
                                             <td class="py-2 px-4 text-right font-black text-emerald-700">
-                                                {{ $pCrAmt > 0 ? '₹' . number_format($pCrAmt, 0) : '—' }}
+                                                {{ $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '—' }}
                                             </td>
                                             @endif
                                             @if($drField)
                                             <td class="py-2 px-4 text-right border-l border-gray-100 font-bold text-rose-600">
-                                                {{ $pDrAmt > 0 ? '₹' . number_format($pDrAmt, 0) : '—' }}
+                                                {{ $pDrAmt > 0 ? '₹' . $formatIndian($pDrAmt) : '—' }}
                                             </td>
                                             @endif
                                         </tr>
@@ -439,11 +771,11 @@
                                         <tr>
                                             <td colspan="4" class="py-2 px-4 text-right uppercase tracking-widest text-[9px] border-r border-indigo-100">Sub-total →</td>
                                             @if($crField)
-                                            <td class="py-2 px-4 text-right text-emerald-700">₹{{ number_format($agentTotal, 0) }}</td>
+                                            <td class="py-2 px-4 text-right text-emerald-700">₹{{ $formatIndian($agentTotal) }}</td>
                                             @endif
                                             @if($drField)
                                             @php $agentDrTotal = array_sum(array_map(fn($r) => $parseAmt($r[$drField] ?? 0), $agentRows)); @endphp
-                                            <td class="py-2 px-4 text-right border-l border-indigo-100 text-rose-700">₹{{ number_format($agentDrTotal, 0) }}</td>
+                                            <td class="py-2 px-4 text-right border-l border-indigo-100 text-rose-700">₹{{ $formatIndian($agentDrTotal) }}</td>
                                             @endif
                                         </tr>
                                     </tfoot>
@@ -460,7 +792,7 @@
                         Group Total ({{ $bSummary['agents'] }} Agents, {{ number_format($bSummary['parties']) }} Accounts) →
                     </td>
                     <td class="py-3 px-6 text-right font-black text-emerald-400 text-base">
-                        ₹{{ number_format($bSummary['total'], 0) }}
+                        ₹{{ $formatIndian($bSummary['total']) }}
                     </td>
                     <td></td>
                 </tr>
@@ -484,161 +816,13 @@
             </div>
         </div>
     </div>
-    <div class="text-emerald-400 font-black text-2xl">₹{{ number_format($grandTotal, 0) }}</div>
+    <div class="text-emerald-400 font-black text-2xl">₹{{ $formatIndian($grandTotal) }}</div>
 </div>
 
 @endif
 </div>
 
-{{-- ═══ CREATE TEAM MODAL (Overlay) ═══ --}}
-<div id="teamCreatorModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-    <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-2xl w-full mx-4 overflow-hidden transform transition duration-300">
-        <div class="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
-            <h3 class="font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                <i class="fas fa-users-gear text-emerald-400"></i>
-                Define New Custom Sales Team
-            </h3>
-            <button onclick="toggleTeamCreatorModal(false)" class="text-slate-400 hover:text-white transition">
-                <i class="fas fa-xmark text-lg"></i>
-            </button>
-        </div>
-
-        <form method="POST" action="{{ route('reports.collection.teams.store') }}" class="p-6 space-y-5">
-            @csrf
-            
-            {{-- Team Name --}}
-            <div>
-                <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Team Name</label>
-                <input type="text" name="name" required placeholder="e.g. Team West Coast"
-                    class="w-full border border-gray-200 rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-blue-400 outline-none transition">
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {{-- Select Agents --}}
-                <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                        Assign Agents (Hold Ctrl to select multiple)
-                    </label>
-                    <select name="agents[]" multiple size="6"
-                        class="w-full border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-400 outline-none transition">
-                        @foreach($agentOptions ?? [] as $opt)
-                            <option value="{{ $opt }}" class="p-1 rounded mb-0.5">{{ $opt }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                {{-- Select Group/Branches --}}
-                <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                        Assign Group Names (Hold Ctrl to select multiple)
-                    </label>
-                    <select name="branches[]" multiple size="6"
-                        class="w-full border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-400 outline-none transition">
-                        @foreach($branchOptions ?? [] as $opt)
-                            <option value="{{ $opt }}" class="p-1 rounded mb-0.5">{{ $opt }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            <div class="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                <button type="button" onclick="toggleTeamCreatorModal(false)"
-                    class="bg-slate-100 hover:bg-slate-200 text-slate-650 font-bold py-2.5 px-5 rounded-xl text-xs transition">
-                    Cancel
-                </button>
-                <button type="submit"
-                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow-md transition active:scale-95">
-                    Save Team
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- Hidden Form for Deleting Teams --}}
-<form id="deleteTeamForm" method="POST" action="" class="hidden">
-    @csrf
-    @method('DELETE')
-</form>
-
 <script>
-// Modal helpers
-function toggleTeamCreatorModal(show) {
-    const modal = document.getElementById('teamCreatorModal');
-    if (show) {
-        modal.classList.remove('hidden');
-    } else {
-        modal.classList.add('hidden');
-        // Reset modal to create mode
-        resetModalToCreateMode();
-    }
-}
-
-function resetModalToCreateMode() {
-    const modal = document.getElementById('teamCreatorModal');
-    modal.querySelector('h3').innerHTML = '<i class="fas fa-users-gear text-emerald-400"></i> Define New Custom Sales Team';
-    const form = modal.querySelector('form');
-    form.action = "{{ route('reports.collection.teams.store') }}";
-    
-    // Remove PUT method spoof if exists
-    const putInput = form.querySelector('input[name="_method"]');
-    if (putInput) putInput.remove();
-    
-    form.reset();
-    
-    // Clear selects selection
-    form.querySelectorAll('select').forEach(select => {
-        Array.from(select.options).forEach(opt => opt.selected = false);
-    });
-}
-
-function openEditTeamModal(team) {
-    const modal = document.getElementById('teamCreatorModal');
-    modal.querySelector('h3').innerHTML = '<i class="fas fa-pencil text-blue-400"></i> Edit Team: ' + team.name;
-    
-    const form = modal.querySelector('form');
-    form.action = "{{ url('reports/collection/teams') }}/" + team.id;
-    
-    // Insert PUT method spoof
-    let putInput = form.querySelector('input[name="_method"]');
-    if (!putInput) {
-        putInput = document.createElement('input');
-        putInput.type = 'hidden';
-        putInput.name = '_method';
-        putInput.value = 'PUT';
-        form.appendChild(putInput);
-    }
-    
-    // Populate Name
-    form.querySelector('input[name="name"]').value = team.name;
-    
-    // Populate Agents select
-    const agentSelect = form.querySelector('select[name="agents[]"]');
-    if (agentSelect && Array.isArray(team.agents)) {
-        Array.from(agentSelect.options).forEach(opt => {
-            opt.selected = team.agents.includes(opt.value);
-        });
-    }
-    
-    // Populate Branches select
-    const branchSelect = form.querySelector('select[name="branches[]"]');
-    if (branchSelect && Array.isArray(team.branches)) {
-        Array.from(branchSelect.options).forEach(opt => {
-            opt.selected = team.branches.includes(opt.value);
-        });
-    }
-    
-    modal.classList.remove('hidden');
-}
-
-// Delete custom team
-function deleteTeam(id, name) {
-    if (confirm('Are you sure you want to delete "' + name + '"?')) {
-        const form = document.getElementById('deleteTeamForm');
-        form.action = "{{ url('reports/collection/teams') }}/" + id;
-        form.submit();
-    }
-}
 
 // ── Team Maker interaction ──────────────────────────────────────────────────
 function toggleTeamFilter(teamId) {
@@ -677,10 +861,10 @@ function toggleBranch(branchId) {
     const isOpen = !body.classList.contains('hidden');
     if (isOpen) {
         body.classList.add('hidden');
-        chev.style.transform = 'rotate(-90deg)';
+        if (chev) chev.style.transform = 'rotate(0deg)';
     } else {
         body.classList.remove('hidden');
-        chev.style.transform = 'rotate(0deg)';
+        if (chev) chev.style.transform = 'rotate(180deg)';
     }
 }
 
@@ -719,14 +903,60 @@ function toggleAgentDetail(agentId, row) {
     }
 }
 
+// ── Zero Collection Party Filter ─────────────────────────────────────────────
+function toggleZeroCollectionParties(checkbox, tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    const hideZero = checkbox.checked;
+    const rows = tbody.querySelectorAll('.party-row');
+    rows.forEach(row => {
+        const amt = parseFloat(row.getAttribute('data-collection-amount') || 0);
+        if (hideZero && amt === 0) {
+            row.classList.add('hidden-by-zero-filter');
+            row.style.display = 'none';
+        } else {
+            row.classList.remove('hidden-by-zero-filter');
+            row.style.display = '';
+        }
+    });
+
+    const searchInput = checkbox.closest('.flex').querySelector('input[type="text"]');
+    if (searchInput && searchInput.value) {
+        filterAgentParties(searchInput, tbodyId);
+    }
+}
+
 // ── Local search filter ─────────────────────────────────────────────────────
 function filterAgentParties(input, tbodyId) {
     const q     = input.value.toLowerCase().trim();
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
     tbody.querySelectorAll('.party-row').forEach(row => {
+        if (row.classList.contains('hidden-by-zero-filter')) {
+            row.style.display = 'none';
+            return;
+        }
         row.style.display = q ? (row.textContent.toLowerCase().includes(q) ? '' : 'none') : '';
     });
+}
+
+// ── Month Selector Auto-Date Updater ─────────────────────────────────────────
+function handleMonthChange(val) {
+    if (val === 'custom') return;
+    const fromInput = document.querySelector('input[name="from_date"]');
+    const toInput   = document.querySelector('input[name="to_date"]');
+    if (fromInput && toInput && val) {
+        const parts = val.split('-');
+        const year  = parseInt(parts[0]);
+        const month = parseInt(parts[1]);
+        
+        const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDayObj = new Date(year, month, 0);
+        const lastDay  = `${year}-${String(month).padStart(2, '0')}-${String(lastDayObj.getDate()).padStart(2, '0')}`;
+        
+        fromInput.value = firstDay;
+        toInput.value   = lastDay;
+    }
 }
 </script>
 @endsection

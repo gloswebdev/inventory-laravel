@@ -488,6 +488,11 @@ class ReportController extends Controller
 
     public function collectionReport(Request $request)
     {
+        $user = Auth::user();
+        if ($user->role !== 'admin' && !$user->hasPermission('collection_report', 'view') && !$user->hasPermission('mobile_collection', 'view')) {
+            abort(403, 'Unauthorized access to Collection Report.');
+        }
+
         $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
         $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
 
@@ -505,10 +510,31 @@ class ReportController extends Controller
             ->pluck('AgentName')->filter(fn($v) => $v && $v !== '—')
             ->unique()->sort()->values()->toArray();
 
+        // --- Month Filter options (Past 12 months + Next 2 months) ---
+        $monthOptions = [];
+        $currentYm = date('Y-m');
+        for ($i = -12; $i <= 2; $i++) {
+            $time = strtotime("$i month");
+            $ym = date('Y-m', $time);
+            $label = date('F Y', $time);
+            if ($ym === $currentYm) {
+                $label .= ' (Current Month)';
+            }
+            $monthOptions[$ym] = $label;
+        }
+
         // --- Filters ---
-        $fromDate = $request->input('from_date', '2026-07-01');
-        $toDate   = $request->input('to_date',   '2027-07-31');
-        $finYear  = $request->input('fin_year',  '2627');
+        $monthFilter = $request->input('month_filter', $currentYm);
+
+        if ($monthFilter && $monthFilter !== 'custom') {
+            $fromDate = $monthFilter . '-01';
+            $toDate   = date('Y-m-t', strtotime($fromDate));
+        } else {
+            $fromDate = $request->input('from_date', date('Y-m-01'));
+            $toDate   = $request->input('to_date',   date('Y-m-t'));
+        }
+
+        $finYear = $request->input('fin_year', '2627');
 
         // Support array (multiple select) or string for branch_filter
         $branchFilter = $request->input('branch_filter', []);
@@ -522,36 +548,25 @@ class ReportController extends Controller
         // Load Teams from Database
         $dbTeams = \App\Models\Team::all();
 
-        // If a team is clicked/active, accumulate agents and branches from the selected teams
+        // If a team is clicked/active, accumulate agents and branches from the selected teams (and their child teams)
         $teamAgents = [];
         $teamBranches = [];
         if (!empty($selectedTeams)) {
             $activeTeamsData = $dbTeams->whereIn('id', $selectedTeams);
             foreach ($activeTeamsData as $team) {
-                if (is_array($team->agents)) {
-                    $teamAgents = array_merge($teamAgents, $team->agents);
-                }
-                if (is_array($team->branches)) {
-                    $teamBranches = array_merge($teamBranches, $team->branches);
-                }
+                $teamAgents = array_merge($teamAgents, $team->getEffectiveAgents($dbTeams));
+                $teamBranches = array_merge($teamBranches, $team->getEffectiveBranches($dbTeams));
             }
             $teamAgents   = array_unique(array_filter($teamAgents));
             $teamBranches = array_unique(array_filter($teamBranches));
         }
 
         $defaults = [
-            'fin_year'  => '2627',
-            'from_date' => '2026-07-01',
-            'to_date'   => '2027-07-31',
+            'fin_year'     => '2627',
+            'month_filter' => $currentYm,
+            'from_date'    => date('Y-m-01'),
+            'to_date'      => date('Y-m-t'),
         ];
-
-        // Only call Collection API when form is submitted
-        if (!$request->hasAny(['from_date', 'to_date', 'branch_filter', 'agent_filter', 'teams', 'fetch'])) {
-            return view('reports.collection_report', compact(
-                'defaults', 'finYear', 'fromDate', 'toDate',
-                'branchFilter', 'agentFilter', 'selectedTeams', 'dbTeams', 'branchOptions', 'agentOptions'
-            ));
-        }
 
         $payload = [
             'apikey'    => $apiKey,
@@ -716,16 +731,23 @@ class ReportController extends Controller
         // Helper to parse amount
         $parseAmt = fn($v) => is_numeric(str_replace([',',' '], '', (string)$v)) ? (float)str_replace(',', '', (string)$v) : 0;
 
+        // ── Apply Zero Collection Filter if requested ──
+        if ($request->boolean('hide_zero_collection')) {
+            $reportData = array_values(array_filter($reportData, function($r) use ($crField, $parseAmt) {
+                return $crField ? ($parseAmt($r[$crField] ?? 0) > 0) : true;
+            }));
+        }
+
         // ── Build grouped structure: Team Name -> Agent Name -> [rows] ──
         $grouped = [];
         
         foreach ($reportData as $row) {
             $agentName = $row['_AgentName'] ?: '(No Agent)';
             
-            // Find which team this agent belongs to
+            // Find which team this agent belongs to (including effective agents in child teams)
             $matchedTeams = [];
             foreach ($dbTeams as $team) {
-                if (is_array($team->agents) && in_array($agentName, $team->agents)) {
+                if (in_array($agentName, $team->getEffectiveAgents($dbTeams))) {
                     $matchedTeams[] = $team->name;
                 }
             }
@@ -758,8 +780,8 @@ class ReportController extends Controller
             $branchSummary[$teamName] = ['total' => $tTotal, 'parties' => $tParties, 'agents' => $tAgents];
         }
 
-        $grandTotal   = array_sum(array_column($branchSummary, 'total'));
-        $totalParties = array_sum(array_column($branchSummary, 'parties'));
+        $grandTotal   = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $reportData));
+        $totalParties = count($reportData);
         $totalAgents  = collect($reportData)->pluck('_AgentName')->filter(fn($v)=>$v&&$v!=='—')->unique()->count();
 
         // Party name key
@@ -779,10 +801,13 @@ class ReportController extends Controller
             ->pluck('target_amount', 'team_id')
             ->toArray();
 
+        // Compute grand target (sum of all team targets for visible teams)
+        $grandTarget = array_sum($teamTargets);
+
         return view('reports.collection_report', compact(
             'reportData', 'grouped', 'branchSummary',
-            'grandTotal', 'totalParties', 'totalAgents',
-            'error', 'defaults',
+            'grandTotal', 'grandTarget', 'totalParties', 'totalAgents',
+            'error', 'defaults', 'monthFilter', 'monthOptions',
             'finYear', 'fromDate', 'toDate', 'selectedTeams', 'dbTeams',
             'branchFilter', 'agentFilter', 'branchOptions', 'agentOptions',
             'crField', 'drField', 'partyNameKey', 'agentTargets', 'teamTargets'
@@ -933,15 +958,19 @@ class ReportController extends Controller
     public function storeTeam(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|unique:teams,name',
-            'agents'   => 'nullable|array',
-            'branches' => 'nullable|array',
+            'name'        => 'required|string|unique:teams,name',
+            'agents'      => 'nullable|array',
+            'branches'    => 'nullable|array',
+            'child_teams' => 'nullable|array',
+            'parent_id'   => 'nullable|integer|exists:teams,id',
         ]);
 
         \App\Models\Team::create([
-            'name'     => $request->input('name'),
-            'agents'   => $request->input('agents', []),
-            'branches' => $request->input('branches', []),
+            'name'        => $request->input('name'),
+            'agents'      => $request->input('agents', []),
+            'branches'    => $request->input('branches', []),
+            'child_teams' => $request->input('child_teams', []),
+            'parent_id'   => $request->input('parent_id'),
         ]);
 
         return redirect()->back()->with('success', 'Team created successfully!');
@@ -953,15 +982,19 @@ class ReportController extends Controller
     public function updateTeam(Request $request, \App\Models\Team $team)
     {
         $request->validate([
-            'name'     => 'required|string|unique:teams,name,' . $team->id,
-            'agents'   => 'nullable|array',
-            'branches' => 'nullable|array',
+            'name'        => 'required|string|unique:teams,name,' . $team->id,
+            'agents'      => 'nullable|array',
+            'branches'    => 'nullable|array',
+            'child_teams' => 'nullable|array',
+            'parent_id'   => 'nullable|integer|exists:teams,id|different:id',
         ]);
 
         $team->update([
-            'name'     => $request->input('name'),
-            'agents'   => $request->input('agents', []),
-            'branches' => $request->input('branches', []),
+            'name'        => $request->input('name'),
+            'agents'      => $request->input('agents', []),
+            'branches'    => $request->input('branches', []),
+            'child_teams' => $request->input('child_teams', []),
+            'parent_id'   => $request->input('parent_id'),
         ]);
 
         return redirect()->back()->with('success', 'Team updated successfully!');
@@ -1091,6 +1124,102 @@ class ReportController extends Controller
         }
 
         return redirect()->back()->with('success', 'Team and Member targets updated successfully!');
+    }
+
+    public function teamsSetup()
+    {
+        $user = Auth::user();
+        if ($user->role !== 'admin' && !$user->hasPermission('teams_setup', 'view') && !$user->hasPermission('mobile_teams_setup', 'view') && !$user->hasPermission('collection_report', 'view')) {
+            abort(403, 'Unauthorized access to Teams Setup.');
+        }
+
+        $dbTeams = \App\Models\Team::all();
+
+        $baseUrl = rtrim(\App\Models\AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = \App\Models\AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+        
+        $partyMasterMap = $this->getPartyMasterMap($baseUrl, $apiKey);
+
+        // All agents and branches/group names from Party Master
+        $allAgents = collect($partyMasterMap)
+            ->pluck('AgentName')->filter(fn($v) => $v && $v !== '—')
+            ->unique()->sort()->values()->toArray();
+        $allBranches = collect($partyMasterMap)
+            ->pluck('BranchName')->filter(fn($v) => $v && $v !== '—')
+            ->unique()->sort()->values()->toArray();
+
+        $agentToTeamMap = [];
+        $branchToTeamMap = [];
+        foreach ($dbTeams as $team) {
+            foreach ($team->agents ?: [] as $a) {
+                $agentToTeamMap[$a] = $team->name;
+            }
+            foreach ($team->branches ?: [] as $b) {
+                $branchToTeamMap[$b] = $team->name;
+            }
+        }
+
+        return view('reports.teams_setup', compact('dbTeams', 'allAgents', 'allBranches', 'agentToTeamMap', 'branchToTeamMap'));
+    }
+
+    public function saveTeamsSetup(Request $request)
+    {
+        $payload = $request->input('structure', []);
+        $deletedTeamIds = $request->input('deleted_team_ids', []);
+        
+        if (!empty($deletedTeamIds)) {
+            \App\Models\Team::whereIn('id', $deletedTeamIds)->delete();
+        }
+        
+        $teamIdMapping = [];
+        
+        // First pass: create/update team base info
+        foreach ($payload as $item) {
+            $id = $item['id'] ?? null;
+            $name = $item['name'] ?? '';
+            if (!$name) continue;
+            
+            if (str_starts_with((string)$id, 'new_')) {
+                $teamObj = \App\Models\Team::create([
+                    'name' => $name,
+                    'agents' => [],
+                    'branches' => [],
+                ]);
+                $teamIdMapping[$id] = $teamObj->id;
+            } else {
+                $teamObj = \App\Models\Team::find($id);
+                if ($teamObj) {
+                    $teamObj->update([
+                        'name' => $name,
+                    ]);
+                }
+            }
+        }
+        
+        // Second pass: update hierarchy & assignment arrays
+        foreach ($payload as $item) {
+            $id = $item['id'] ?? null;
+            $dbId = $teamIdMapping[$id] ?? $id;
+            
+            $teamObj = \App\Models\Team::find($dbId);
+            if ($teamObj) {
+                $parentId = $item['parent_id'] ?? null;
+                if ($parentId && isset($teamIdMapping[$parentId])) {
+                    $parentId = $teamIdMapping[$parentId];
+                }
+                
+                $teamObj->update([
+                    'parent_id' => $parentId ?: null,
+                    'agents' => $item['agents'] ?? [],
+                    'branches' => $item['branches'] ?? [],
+                ]);
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Team hierarchy structure saved successfully!'
+        ]);
     }
 }
 
