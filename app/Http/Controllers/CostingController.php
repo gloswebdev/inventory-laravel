@@ -584,7 +584,7 @@ class CostingController extends Controller
             ->unique('item_code')
             ->pluck('case_rate', 'item_code')
             ->toArray();
-        $pmRates = array_merge($localPrices, $prPrices);
+        $pmRates = array_merge($prPrices, $localPrices);
         $purities = $localPurities;
 
         return view('costing.pro', compact(

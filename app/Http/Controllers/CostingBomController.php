@@ -130,7 +130,7 @@ class CostingBomController extends Controller
             ->unique('item_code')
             ->pluck('case_rate', 'item_code')
             ->toArray();
-        $pmRates = array_merge($localPrices, $prPrices);
+        $pmRates = array_merge($prPrices, $localPrices);
 
         $allBomProducts = Product::whereHas('costingBoms')
             ->orderBy('name')
@@ -229,7 +229,11 @@ class CostingBomController extends Controller
                     if ($product && !empty($product->item_code)) {
                         \App\Models\ProductPrice::updateOrCreate(
                             ['item_code' => $product->item_code],
-                            ['price_per_unit' => $item['rate']]
+                            [
+                                'price_per_unit' => $item['rate'],
+                                'price_source'   => 'manual',
+                                'fetched_at'     => now(),
+                            ]
                         );
                     }
                 }
@@ -251,7 +255,11 @@ class CostingBomController extends Controller
                         if ($product && !empty($product->item_code)) {
                             \App\Models\ProductPrice::updateOrCreate(
                                 ['item_code' => $product->item_code],
-                                ['price_per_unit' => $pm['rate']]
+                                [
+                                    'price_per_unit' => $pm['rate'],
+                                    'price_source'   => 'manual',
+                                    'fetched_at'     => now(),
+                                ]
                             );
                         }
                     }
@@ -356,7 +364,11 @@ class CostingBomController extends Controller
                     if ($product && !empty($product->item_code)) {
                         \App\Models\ProductPrice::updateOrCreate(
                             ['item_code' => $product->item_code],
-                            ['price_per_unit' => $item['rate']]
+                            [
+                                'price_per_unit' => $item['rate'],
+                                'price_source'   => 'manual',
+                                'fetched_at'     => now(),
+                            ]
                         );
                     }
                 }
@@ -379,7 +391,11 @@ class CostingBomController extends Controller
                         if ($product && !empty($product->item_code)) {
                             \App\Models\ProductPrice::updateOrCreate(
                                 ['item_code' => $product->item_code],
-                                ['price_per_unit' => $pm['rate']]
+                                [
+                                    'price_per_unit' => $pm['rate'],
+                                    'price_source'   => 'manual',
+                                    'fetched_at'     => now(),
+                                ]
                             );
                         }
                     }
