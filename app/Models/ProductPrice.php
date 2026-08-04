@@ -28,12 +28,9 @@ class ProductPrice extends Model
         return (float) static::where('item_code', $itemCode)->value('price_per_unit') ?? 0.0;
     }
 
-    /**
-     * Bulk-load prices as an associative array [item_code => price_per_unit]
-     */
     public static function allAsMap(): array
     {
-        $localPrices = static::pluck('price_per_unit', 'item_code')->toArray();
+        $localPrices = static::where('price_per_unit', '>', 0)->pluck('price_per_unit', 'item_code')->toArray();
         $prPrices = \App\Models\PurchaseRegister::orderByDesc('vouch_date')
             ->orderByDesc('id')
             ->get()
