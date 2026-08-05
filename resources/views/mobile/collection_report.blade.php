@@ -401,8 +401,26 @@
     {{-- ===== REPORT CONTENT ===== --}}
     @if(isset($grouped) && count($grouped) > 0)
     
-    {{-- Quick Stats Row --}}
-    <div class="grid grid-cols-3 gap-3">
+    {{-- Breadcrumb Trail --}}
+    <div class="bg-white/90 backdrop-blur-xl border border-slate-100 rounded-3xl p-4 shadow-sm flex items-center justify-between" x-show="currentParentId !== 'root'" x-cloak>
+        <div class="flex items-center flex-wrap gap-2 text-xs font-bold text-slate-500">
+            <button type="button" @click="goToLevel('root')" class="text-indigo-600 hover:text-indigo-800 transition">All Groups</button>
+            <template x-for="(crumb, idx) in history" :key="idx">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-chevron-right text-[8px] text-slate-300"></i>
+                    <button type="button" @click="goToLevel(crumb.id, crumb.title)" class="text-indigo-600 hover:text-indigo-800 transition" x-text="crumb.title"></button>
+                </div>
+            </template>
+            <i class="fas fa-chevron-right text-[8px] text-slate-300"></i>
+            <span class="text-slate-800 font-black" x-text="currentTitle"></span>
+        </div>
+        <button type="button" @click="goBack()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black transition active:scale-95">
+            <i class="fas fa-arrow-left text-[8px]"></i> Back
+        </button>
+    </div>
+
+    {{-- Quick Stats Row (Only visible at root or when customized) --}}
+    <div class="grid grid-cols-3 gap-3" x-show="currentParentId === 'root'">
         <div class="bg-white/80 backdrop-blur-xl border border-white/60 rounded-2xl p-3.5 text-center shadow-sm">
             <div class="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</div>
             <div class="text-base font-black text-emerald-600">{{ $formatCr($grandTotal ?? 0) }}</div>
@@ -417,76 +435,113 @@
         </div>
     </div>
 
-    {{-- Team Hierarchy List --}}
+    {{-- Flat Drill-down List --}}
     <div class="space-y-3">
-        {{-- Custom teams (hierarchical) --}}
-        @foreach($dbTeams->whereNull('parent_id') as $team)
-            @if(isset($branchSummary[$team->name]))
-                @include('mobile.partials.collection_team_card', [
-                    'team' => $team,
-                    'dbTeams' => $dbTeams,
-                    'grouped' => $grouped,
-                    'branchSummary' => $branchSummary,
-                    'teamTargets' => $teamTargets,
-                    'agentTargets' => $agentTargets,
-                    'crField' => $crField,
-                    'drField' => $drField,
-                    'partyNameKey' => $partyNameKey,
-                    'parseAmt' => $parseAmt,
-                    'formatIndian' => $formatIndian,
-                    'formatCr' => $formatCr
-                ])
-            @endif
-        @endforeach
-
-        {{-- Non-team / ungrouped agents --}}
-        @foreach($grouped as $teamName => $agents)
+        {{-- 1. Database Teams (Root and Sub-Teams) --}}
+        @foreach($dbTeams as $team)
         @php
-            $isCustomTeam = $dbTeams->contains('name', $teamName);
-            if ($isCustomTeam) continue;
+            $teamName = $team->name;
             $bSummary = $branchSummary[$teamName] ?? ['total'=>0,'parties'=>0,'agents'=>0];
-            $tSlug = 'mob_t_' . Str::slug($teamName);
+            $tTargetAmt = $teamTargets[$team->id] ?? 0;
+            $tPercent = $tTargetAmt > 0 ? min(100, round(($bSummary['total'] / $tTargetAmt) * 100)) : 0;
+            $tBarColor = $tPercent >= 100 ? 'bg-emerald-400' : ($tPercent >= 60 ? 'bg-amber-400' : 'bg-rose-400');
+            $childrenTeams = $dbTeams->where('parent_id', $team->id);
+            $hasChildren = $childrenTeams->count() > 0;
+            $directAgentNames = $team->agents ?: [];
+            $hasAgents = false;
+            foreach ($directAgentNames as $agentName) {
+                if (isset($grouped[$teamName][$agentName])) {
+                    $hasAgents = true;
+                    break;
+                }
+            }
+            $isRoot = $team->parent_id === null;
+            $parentIdStr = $team->parent_id ? (string)$team->parent_id : 'root';
         @endphp
         
-        <div class="overflow-hidden rounded-[1.8rem] shadow-md border border-white/60 bg-white/80 backdrop-blur-xl">
-            <button type="button" onclick="toggleMobAccordion('{{ $tSlug }}')" class="w-full text-left">
-                <div class="bg-gradient-to-r from-slate-700 to-slate-800 p-4">
+        <div x-show="currentParentId === '{{ $parentIdStr }}'" x-transition x-cloak
+             class="overflow-hidden rounded-[1.8rem] shadow-md border border-white/60 bg-white/80 backdrop-blur-xl transition duration-200">
+            @if($hasChildren || $hasAgents)
+            <button type="button" @click="drillDown('{{ $team->id }}', '{{ $teamName }}')" class="w-full text-left">
+            @else
+            <div class="w-full text-left">
+            @endif
+                <div class="{{ $isRoot ? 'bg-gradient-to-r from-slate-800 to-slate-900' : 'bg-gradient-to-r from-slate-700 to-slate-800' }} p-4">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <div class="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center border border-white/20">
-                                <i class="fas fa-building text-white text-sm"></i>
+                            <div class="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center border border-white/20 flex-shrink-0">
+                                @if($isRoot)
+                                    <i class="fas fa-globe text-white text-sm"></i>
+                                @elseif($hasChildren)
+                                    <i class="fas fa-map-marker-alt text-white text-sm"></i>
+                                @else
+                                    <i class="fas fa-users text-white text-sm"></i>
+                                @endif
                             </div>
                             <div class="min-w-0">
-                                <div class="font-black text-white text-sm truncate uppercase">{{ $teamName }}</div>
+                                <div class="font-black text-white text-sm tracking-tight truncate uppercase">{{ $teamName }}</div>
                                 <div class="text-[9px] text-white/50 font-bold mt-0.5">
                                     {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
                         </div>
                         <div class="flex items-center gap-2 ml-2 flex-shrink-0">
-                            <div class="font-black text-emerald-400 text-sm">{{ $formatCr($bSummary['total']) }}</div>
-                            <div class="w-7 h-7 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-                                <i class="fas fa-chevron-down text-white/60 text-[10px] transition-transform" id="{{ $tSlug }}_chev"></i>
+                            <div class="text-right">
+                                <div class="text-emerald-400 font-black text-sm leading-none">{{ $formatCr($bSummary['total']) }}</div>
+                                @if($tTargetAmt > 0)
+                                <div class="text-[9px] text-white/50 font-bold mt-0.5">{{ $tPercent }}% of goal</div>
+                                @endif
                             </div>
+                            @if($hasChildren || $hasAgents)
+                            <div class="w-7 h-7 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
+                                <i class="fas fa-chevron-right text-white/60 text-[10px]"></i>
+                            </div>
+                            @endif
                         </div>
                     </div>
+                    
+                    @if($tTargetAmt > 0)
+                    <div class="mt-3">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[8px] text-white/40 font-bold uppercase tracking-widest">Progress</span>
+                            <span class="text-[8px] text-white/60 font-black">Target: {{ $formatCr($tTargetAmt) }}</span>
+                        </div>
+                        <div class="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                            <div class="{{ $tBarColor }} h-1.5 rounded-full transition-all" style="width: {{ $tPercent }}%"></div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
+            @if($hasChildren || $hasAgents)
             </button>
-            
-            <div id="{{ $tSlug }}" class="hidden divide-y divide-slate-50">
-                @foreach($agents as $agentName => $agentRows)
-                @php
-                    $agentTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $agentRows));
-                    $agentSlug = $tSlug . '_ag_' . Str::slug($agentName);
-                    $targetAmt = $agentTargets[$agentName] ?? 0;
-                    $percent = $targetAmt > 0 ? min(100, round(($agentTotal / $targetAmt) * 100)) : 0;
-                    $progressColor = $percent >= 100 ? 'bg-emerald-400' : ($percent >= 60 ? 'bg-amber-400' : 'bg-rose-400');
-                    $progressTextColor = $percent >= 100 ? 'text-emerald-600' : ($percent >= 60 ? 'text-amber-600' : 'text-rose-500');
-                @endphp
-                
-                <div class="px-3 py-2">
-                    <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-                        <button type="button" onclick="toggleMobAgentDetail('{{ $agentSlug }}')" class="w-full text-left px-4 py-3 flex items-center justify-between bg-white">
+            @else
+            </div>
+            @endif
+        </div>
+        @endforeach
+
+        {{-- Agents and Parties under database teams --}}
+        @foreach($dbTeams as $team)
+            @php
+                $teamName = $team->name;
+                $directAgentNames = $team->agents ?: [];
+            @endphp
+            @foreach($directAgentNames as $agentName)
+                @if(isset($grouped[$teamName][$agentName]))
+                    @php
+                        $agentRows = $grouped[$teamName][$agentName];
+                        $agentTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $agentRows));
+                        $agentId = 'agent_' . $team->id . '_' . Str::slug($agentName);
+                        $targetAmt = $agentTargets[$agentName] ?? 0;
+                        $percent = $targetAmt > 0 ? min(100, round(($agentTotal / $targetAmt) * 100)) : 0;
+                        $progressColor = $percent >= 100 ? 'bg-emerald-400' : ($percent >= 60 ? 'bg-amber-400' : 'bg-rose-400');
+                        $progressTextColor = $percent >= 100 ? 'text-emerald-600' : ($percent >= 60 ? 'text-amber-600' : 'text-rose-500');
+                    @endphp
+                    
+                    {{-- Agent card under its team --}}
+                    <div x-show="currentParentId === '{{ $team->id }}'" x-transition x-cloak
+                         class="overflow-hidden rounded-[1.8rem] shadow-sm border border-slate-100 bg-white hover:bg-slate-50/50 transition">
+                        <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left px-4 py-3 flex items-center justify-between">
                             <div class="flex items-center gap-2.5 min-w-0">
                                 <div class="w-8 h-8 bg-violet-50 border border-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
                                     <i class="fas fa-user-tie text-violet-500 text-[10px]"></i>
@@ -503,7 +558,9 @@
                                     <div class="text-[8px] {{ $progressTextColor }} font-black">{{ $percent }}% of goal</div>
                                     @endif
                                 </div>
-                                <i class="fas fa-chevron-down text-slate-300 text-[9px] transition-transform" id="{{ $agentSlug }}_chev"></i>
+                                <div class="w-7 h-7 bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200">
+                                    <i class="fas fa-chevron-right text-slate-400 text-[9px]"></i>
+                                </div>
                             </div>
                         </button>
                         
@@ -514,30 +571,130 @@
                             </div>
                         </div>
                         @endif
-                        
-                        <div id="{{ $agentSlug }}" class="hidden border-t border-slate-50 bg-slate-50/30 px-3 py-2 space-y-1.5">
-                            @foreach($agentRows as $party)
-                            @php
-                                $pName  = trim($party[$partyNameKey ?? 'AC_Name'] ?? $party['AC_Name'] ?? $party['AcName'] ?? $party['PartyName'] ?? '—');
-                                $pCode  = trim($party['AC_Code'] ?? $party['ActCode'] ?? $party['Ac_Code'] ?? '');
-                                $pCrAmt = $crField ? $parseAmt($party[$crField] ?? 0) : 0;
-                            @endphp
-                            <div class="bg-white border border-slate-100/80 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                                <div class="min-w-0 pr-2">
-                                    <div class="text-[8px] font-black text-indigo-500 font-mono tracking-tight">{{ $pCode }}</div>
-                                    <div class="text-[10px] font-bold text-slate-700 truncate mt-0.5">{{ $pName }}</div>
-                                </div>
-                                <div class="font-black text-emerald-600 text-[11px] flex-shrink-0">
-                                    {{ $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '—' }}
+                    </div>
+
+                    {{-- Parties under this agent --}}
+                    @foreach($agentRows as $party)
+                        @php
+                            $pName  = trim($party[$partyNameKey ?? 'AC_Name'] ?? $party['AC_Name'] ?? $party['AcName'] ?? $party['PartyName'] ?? '—');
+                            $pCode  = trim($party['AC_Code'] ?? $party['ActCode'] ?? $party['Ac_Code'] ?? '');
+                            $pCrAmt = $crField ? $parseAmt($party[$crField] ?? 0) : 0;
+                        @endphp
+                        <div x-show="currentParentId === '{{ $agentId }}'" x-transition x-cloak
+                             class="bg-white border border-slate-100 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm">
+                            <div class="min-w-0 pr-2">
+                                <div class="text-[8px] font-black text-indigo-500 font-mono tracking-tight">{{ $pCode }}</div>
+                                <div class="text-[10px] font-bold text-slate-700 truncate mt-0.5">{{ $pName }}</div>
+                            </div>
+                            <div class="font-black text-emerald-600 text-[11px] flex-shrink-0">
+                                {!! $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '<span class="text-slate-300">—</span>' !!}
+                            </div>
+                        </div>
+                    @endforeach
+                @endif
+            @endforeach
+        @endforeach
+
+        {{-- 2. Non-team / ungrouped branches --}}
+        @foreach($grouped as $teamName => $agents)
+        @php
+            $isCustomTeam = $dbTeams->contains('name', $teamName);
+            if ($isCustomTeam) continue;
+            $bSummary = $branchSummary[$teamName] ?? ['total'=>0,'parties'=>0,'agents'=>0];
+            $tSlug = 'ungrouped_' . Str::slug($teamName);
+        @endphp
+        
+        <div x-show="currentParentId === 'root'" x-transition x-cloak
+             class="overflow-hidden rounded-[1.8rem] shadow-md border border-white/60 bg-white/80 backdrop-blur-xl transition duration-200">
+            <button type="button" @click="drillDown('{{ $tSlug }}', '{{ $teamName }}')" class="w-full text-left">
+                <div class="bg-gradient-to-r from-slate-700 to-slate-800 p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <div class="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center border border-white/20">
+                                <i class="fas fa-building text-white text-sm"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="font-black text-white text-sm truncate uppercase">{{ $teamName }}</div>
+                                <div class="text-[9px] text-white/50 font-bold mt-0.5">
+                                    {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
-                            @endforeach
+                        </div>
+                        <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                            <div class="font-black text-emerald-400 text-sm">{{ $formatCr($bSummary['total']) }}</div>
+                            <div class="w-7 h-7 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
+                                <i class="fas fa-chevron-right text-white/60 text-[10px]"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
-                @endforeach
-            </div>
+            </button>
         </div>
+        
+        {{-- Agents under ungrouped branches --}}
+        @foreach($agents as $agentName => $agentRows)
+        @php
+            $agentTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $agentRows));
+            $agentId = 'agent_ungrouped_' . Str::slug($teamName) . '_' . Str::slug($agentName);
+            $targetAmt = $agentTargets[$agentName] ?? 0;
+            $percent = $targetAmt > 0 ? min(100, round(($agentTotal / $targetAmt) * 100)) : 0;
+            $progressColor = $percent >= 100 ? 'bg-emerald-400' : ($percent >= 60 ? 'bg-amber-400' : 'bg-rose-400');
+            $progressTextColor = $percent >= 100 ? 'text-emerald-600' : ($percent >= 60 ? 'text-amber-600' : 'text-rose-500');
+        @endphp
+        
+        <div x-show="currentParentId === '{{ $tSlug }}'" x-transition x-cloak
+             class="overflow-hidden rounded-[1.8rem] shadow-sm border border-slate-100 bg-white hover:bg-slate-50/50 transition">
+            <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-8 h-8 bg-violet-50 border border-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-user-tie text-violet-500 text-[10px]"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="font-black text-slate-800 text-xs truncate">{{ $agentName }}</div>
+                        <div class="text-[8px] text-slate-400 font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                    <div class="text-right">
+                        <div class="font-black text-slate-800 text-xs">{{ $formatCr($agentTotal) }}</div>
+                        @if($targetAmt > 0)
+                        <div class="text-[8px] {{ $progressTextColor }} font-black">{{ $percent }}% of goal</div>
+                        @endif
+                    </div>
+                    <div class="w-7 h-7 bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200">
+                        <i class="fas fa-chevron-right text-slate-400 text-[9px]"></i>
+                    </div>
+                </div>
+            </button>
+            
+            @if($targetAmt > 0)
+            <div class="px-4 pb-2">
+                <div class="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                    <div class="{{ $progressColor }} h-1 rounded-full" style="width: {{ $percent }}%"></div>
+                </div>
+            </div>
+            @endif
+        </div>
+        
+        {{-- Parties under ungrouped agents --}}
+        @foreach($agentRows as $party)
+            @php
+                $pName  = trim($party[$partyNameKey ?? 'AC_Name'] ?? $party['AC_Name'] ?? $party['AcName'] ?? $party['PartyName'] ?? '—');
+                $pCode  = trim($party['AC_Code'] ?? $party['ActCode'] ?? $party['Ac_Code'] ?? '');
+                $pCrAmt = $crField ? $parseAmt($party[$crField] ?? 0) : 0;
+            @endphp
+            <div x-show="currentParentId === '{{ $agentId }}'" x-transition x-cloak
+                 class="bg-white border border-slate-100 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm">
+                <div class="min-w-0 pr-2">
+                    <div class="text-[8px] font-black text-indigo-500 font-mono tracking-tight">{{ $pCode }}</div>
+                    <div class="text-[10px] font-bold text-slate-700 truncate mt-0.5">{{ $pName }}</div>
+                </div>
+                <div class="font-black text-emerald-600 text-[11px] flex-shrink-0">
+                    {!! $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '<span class="text-slate-300">—</span>' !!}
+                </div>
+            </div>
+        @endforeach
+        @endforeach
         @endforeach
     </div>
     
@@ -564,6 +721,41 @@
 function collectionApp() {
     return {
         showFilters: {{ request()->has('fetch') ? 'false' : 'true' }},
+        currentParentId: 'root',
+        currentTitle: 'All Groups',
+        history: [], // array of { id, title }
+        
+        drillDown(parentId, title) {
+            this.history.push({
+                id: this.currentParentId,
+                title: this.currentTitle
+            });
+            this.currentParentId = parentId;
+            this.currentTitle = title;
+        },
+        
+        goBack() {
+            if (this.history.length > 0) {
+                const prev = this.history.pop();
+                this.currentParentId = prev.id;
+                this.currentTitle = prev.title;
+            }
+        },
+        
+        goToLevel(id, title) {
+            if (id === 'root') {
+                this.currentParentId = 'root';
+                this.currentTitle = 'All Groups';
+                this.history = [];
+            } else {
+                const index = this.history.findIndex(h => h.id === id);
+                if (index !== -1) {
+                    this.currentParentId = id;
+                    this.currentTitle = title || 'Detail';
+                    this.history = this.history.slice(0, index);
+                }
+            }
+        }
     };
 }
 
@@ -608,32 +800,6 @@ function handleMobMonthChange(val) {
             if (fromInp) fromInp.value = from;
             if (toInp) toInp.value = to;
         }
-    }
-}
-
-function toggleMobAccordion(slug) {
-    const body = document.getElementById(slug);
-    const chev = document.getElementById(slug + '_chev');
-    if (!body) return;
-    if (body.classList.contains('hidden')) {
-        body.classList.remove('hidden');
-        if (chev) chev.style.transform = 'rotate(180deg)';
-    } else {
-        body.classList.add('hidden');
-        if (chev) chev.style.transform = '';
-    }
-}
-
-function toggleMobAgentDetail(slug) {
-    const body = document.getElementById(slug);
-    const chev = document.getElementById(slug + '_chev');
-    if (!body) return;
-    if (body.classList.contains('hidden')) {
-        body.classList.remove('hidden');
-        if (chev) chev.style.transform = 'rotate(180deg)';
-    } else {
-        body.classList.add('hidden');
-        if (chev) chev.style.transform = '';
     }
 }
 </script>
