@@ -190,6 +190,9 @@ class UserController extends Controller
         'mobile_costing_purchase' => [
             'date_filter' => 'Date Filter',
             'item_filter' => 'Item Filter',
+            'group_filter' => 'Group Filter',
+            'type_filter' => 'Type Filter',
+            'supplier_filter' => 'Supplier Filter',
             'sync'        => 'Sync ERP Register',
         ],
         'mobile_costing_pricelist' => [

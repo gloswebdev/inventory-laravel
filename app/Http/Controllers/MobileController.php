@@ -1621,11 +1621,25 @@ class MobileController extends Controller implements HasMiddleware
     /**
      * Mobile User Manager
      */
-    public function users()
+    public function users(Request $request)
     {
         if (!Auth::user()->hasFeature('mobile_users', 'view')) abort(403);
 
-        $users = \App\Models\User::with(['permissions', 'branches', 'productTypes'])->orderBy('name')->get();
+        $query = \App\Models\User::with(['permissions', 'branches', 'productTypes', 'permittedAttributes'])->orderBy('name');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('type')) {
+            $query->where('interface_type', $request->type);
+        }
+
+        $users = $query->get();
         $branches = \App\Models\Branch::orderBy('name')->get();
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
         $rmTypes = \App\Models\ProductAttribute::where('type', 'rm_type')->orderBy('value')->get();
@@ -1668,6 +1682,12 @@ class MobileController extends Controller implements HasMiddleware
             if ($request->has('branches') && is_array($request->branches) && count($request->branches) > 0) {
                 $user->branches()->sync($request->branches);
             }
+            if ($request->has('product_types') && is_array($request->product_types) && count($request->product_types) > 0) {
+                $user->productTypes()->sync($request->product_types);
+            }
+            if ($request->has('rm_types') && is_array($request->rm_types) && count($request->rm_types) > 0) {
+                $user->permittedAttributes()->sync($request->rm_types);
+            }
 
             return response()->json(['success' => true, 'message' => 'User created successfully!']);
         } catch (\Exception $e) {
@@ -1689,11 +1709,22 @@ class MobileController extends Controller implements HasMiddleware
                 // Sync Branches
                 if ($request->has('branches')) {
                     $user->branches()->sync($request->branches);
+                } else {
+                    $user->branches()->sync([]);
                 }
 
                 // Sync Product Types
                 if ($request->has('product_types')) {
                     $user->productTypes()->sync($request->product_types);
+                } else {
+                    $user->productTypes()->sync([]);
+                }
+
+                // Sync RM Types (permitted attributes)
+                if ($request->has('rm_types')) {
+                    $user->permittedAttributes()->sync($request->rm_types);
+                } else {
+                    $user->permittedAttributes()->sync([]);
                 }
 
                 // Sync Features (via UserPermission model)
@@ -2628,6 +2659,7 @@ class MobileController extends Controller implements HasMiddleware
      */
     public function costingPurchaseRegister(\Illuminate\Http\Request $request)
     {
+        $user = Auth::user();
         $query = PurchaseRegister::orderByDesc('vouch_date')->orderByDesc('id');
 
         if ($request->filled('search')) {
@@ -2640,21 +2672,77 @@ class MobileController extends Controller implements HasMiddleware
             });
         }
 
-        if ($request->filled('from_date')) {
+        if ($request->filled('from_date') && $user->hasFeature('mobile_costing_purchase', 'date_filter')) {
             $query->whereDate('vouch_date', '>=', $request->from_date);
         }
 
-        if ($request->filled('to_date')) {
+        if ($request->filled('to_date') && $user->hasFeature('mobile_costing_purchase', 'date_filter')) {
             $query->whereDate('vouch_date', '<=', $request->to_date);
         }
 
+        if ($request->filled('item_name') && $user->hasFeature('mobile_costing_purchase', 'item_filter')) {
+            $query->where('item_name', $request->item_name);
+        }
+
+        if ($request->filled('group_name4') && $user->hasFeature('mobile_costing_purchase', 'group_filter')) {
+            $query->where('group_name4', $request->group_name4);
+        }
+
+        if ($request->filled('group_name5') && $user->hasFeature('mobile_costing_purchase', 'type_filter')) {
+            $query->where('group_name5', $request->group_name5);
+        }
+
+        if ($request->filled('supplier_name') && $user->hasFeature('mobile_costing_purchase', 'supplier_filter')) {
+            $query->where('supplier_name', $request->supplier_name);
+        }
+
+        // Dynamic KPI calculation based on filtered results
+        $kpiQuery = clone $query;
+        $totalBills  = $kpiQuery->distinct('vouch_no')->count('vouch_no');
+        $totalItems  = $kpiQuery->count();
+        $totalAmount = (float) $kpiQuery->sum(DB::raw('qty * case_rate'));
+
         $purchases = $query->paginate(20)->withQueryString();
 
-        $totalBills  = PurchaseRegister::distinct('vouch_no')->count('vouch_no');
-        $totalItems  = PurchaseRegister::count();
-        $totalAmount = PurchaseRegister::sum(DB::raw('qty * case_rate'));
+        // Unique filter values list
+        $supplierList = PurchaseRegister::whereNotNull('supplier_name')
+            ->where('supplier_name', '!=', '')
+            ->distinct()
+            ->pluck('supplier_name')
+            ->sort()
+            ->values();
 
-        return view('mobile.purchase_register', compact('purchases', 'totalBills', 'totalItems', 'totalAmount'));
+        $productList = PurchaseRegister::whereNotNull('item_name')
+            ->where('item_name', '!=', '')
+            ->distinct()
+            ->pluck('item_name')
+            ->sort()
+            ->values();
+
+        $groupList = PurchaseRegister::whereNotNull('group_name4')
+            ->where('group_name4', '!=', '')
+            ->distinct()
+            ->pluck('group_name4')
+            ->sort()
+            ->values();
+
+        $typeList = PurchaseRegister::whereNotNull('group_name5')
+            ->where('group_name5', '!=', '')
+            ->distinct()
+            ->pluck('group_name5')
+            ->sort()
+            ->values();
+
+        return view('mobile.purchase_register', compact(
+            'purchases', 
+            'totalBills', 
+            'totalItems', 
+            'totalAmount', 
+            'supplierList', 
+            'productList', 
+            'groupList', 
+            'typeList'
+        ));
     }
 
     public function syncCostingPurchaseRegister(\Illuminate\Http\Request $request)

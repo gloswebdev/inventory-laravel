@@ -44,7 +44,7 @@
 
     {{-- Search & Filters --}}
     <div class="mb-4 animate-in fade-in slide-in-from-bottom duration-500 delay-200">
-        <form method="GET" action="{{ route('mobile.costing.purchase') }}" class="space-y-2">
+        <form method="GET" action="{{ route('mobile.costing.purchase') }}" class="space-y-3">
             <div class="relative">
                 <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                 <input type="text" name="search" value="{{ request('search') }}"
@@ -57,15 +57,76 @@
                 @endif
             </div>
 
+            {{-- Dropdown Filters in Grid --}}
+            <div class="grid grid-cols-2 gap-3">
+                @if(Auth::user()->hasFeature('mobile_costing_purchase', 'item_filter'))
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Item</label>
+                    <select name="item_name" onchange="this.form.submit()" class="w-full bg-white/70 border border-white/80 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-400 transition-all">
+                        <option value="">All Items</option>
+                        @foreach($productList as $pName)
+                        <option value="{{ $pName }}" {{ request('item_name') == $pName ? 'selected' : '' }}>{{ $pName }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+
+                @if(Auth::user()->hasFeature('mobile_costing_purchase', 'supplier_filter'))
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Supplier</label>
+                    <select name="supplier_name" onchange="this.form.submit()" class="w-full bg-white/70 border border-white/80 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-400 transition-all">
+                        <option value="">All Suppliers</option>
+                        @foreach($supplierList as $sName)
+                        <option value="{{ $sName }}" {{ request('supplier_name') == $sName ? 'selected' : '' }}>{{ $sName }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+
+                @if(Auth::user()->hasFeature('mobile_costing_purchase', 'group_filter'))
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Group</label>
+                    <select name="group_name4" onchange="this.form.submit()" class="w-full bg-white/70 border border-white/80 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-400 transition-all">
+                        <option value="">All Groups</option>
+                        @foreach($groupList as $gName)
+                        <option value="{{ $gName }}" {{ request('group_name4') == $gName ? 'selected' : '' }}>{{ $gName }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+
+                @if(Auth::user()->hasFeature('mobile_costing_purchase', 'type_filter'))
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Type</label>
+                    <select name="group_name5" onchange="this.form.submit()" class="w-full bg-white/70 border border-white/80 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-400 transition-all">
+                        <option value="">All Types</option>
+                        @foreach($typeList as $tName)
+                        <option value="{{ $tName }}" {{ request('group_name5') == $tName ? 'selected' : '' }}>{{ $tName }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+            </div>
+
+            @if(Auth::user()->hasFeature('mobile_costing_purchase', 'date_filter'))
             <div class="grid grid-cols-2 gap-2">
                 <input type="date" name="from_date" value="{{ request('from_date') }}"
                        class="py-2.5 px-3 bg-white/70 border border-white/80 rounded-xl text-xs font-bold text-slate-700 outline-none">
                 <input type="date" name="to_date" value="{{ request('to_date') }}"
                        class="py-2.5 px-3 bg-white/70 border border-white/80 rounded-xl text-xs font-bold text-slate-700 outline-none">
             </div>
-            <button type="submit" class="w-full py-2.5 bg-slate-800 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm">
+            <button type="submit" class="w-full py-2.5 bg-slate-800 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm hover:bg-slate-900 transition-colors">
                 Apply Date Filters
             </button>
+            @endif
+
+            @if(request()->anyFilled(['search', 'from_date', 'to_date', 'item_name', 'supplier_name', 'group_name4', 'group_name5']))
+            <div class="flex justify-end pt-1">
+                <a href="{{ route('mobile.costing.purchase') }}" class="text-[10px] font-black uppercase text-orange-600 tracking-wider flex items-center gap-1.5 active:scale-95 transition-transform">
+                    <i class="fas fa-times-circle"></i> Clear Filters
+                </a>
+            </div>
+            @endif
         </form>
     </div>
 

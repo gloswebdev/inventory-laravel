@@ -18,6 +18,41 @@
     </div>
 </div>
 
+    <!-- Search & Type Filters -->
+    <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 hover:shadow-xl transition-all p-6 rounded-[2.5rem] border border-white/50 space-y-4 mb-6">
+        <form method="GET" action="{{ route('mobile.users') }}" class="space-y-4">
+            <div class="relative">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" name="search" value="{{ request('search') }}"
+                       placeholder="Search name or username..."
+                       class="w-full pl-11 pr-10 py-3.5 bg-white/70 backdrop-blur-xl border border-white/80 rounded-2xl text-sm font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm">
+                @if(request('search'))
+                <a href="{{ route('mobile.users', request()->except('search')) }}" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-times text-sm"></i>
+                </a>
+                @endif
+            </div>
+
+            <div>
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-3 mb-2 block">Interface Type</label>
+                <div class="flex bg-white/50 backdrop-blur-md p-1.5 rounded-2xl border border-white/50">
+                    <a href="{{ route('mobile.users', request()->except('type')) }}"
+                       class="flex-1 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider text-center {{ !request('type') ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400' }}">
+                        All
+                    </a>
+                    <a href="{{ route('mobile.users', array_merge(request()->except('type'), ['type' => 'desktop'])) }}"
+                       class="flex-1 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider text-center {{ request('type') === 'desktop' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400' }}">
+                        Desktop
+                    </a>
+                    <a href="{{ route('mobile.users', array_merge(request()->except('type'), ['type' => 'mobile'])) }}"
+                       class="flex-1 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-wider text-center {{ request('type') === 'mobile' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400' }}">
+                        Mobile
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
     <!-- User List -->
     <div class="space-y-4">
         @foreach($users as $user)
@@ -85,6 +120,42 @@
                         @endforeach
                     </div>
                 </div>
+
+                <!-- Product Type Access -->
+                <div class="space-y-3">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Type Access</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach($productTypes as $type)
+                        <label class="flex items-center gap-3 p-3 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all cursor-pointer"
+                               :class="form.product_types.includes({{ $type->id }}) ? 'border-indigo-500 bg-white shadow-sm' : 'border-slate-100'">
+                            <input type="checkbox" value="{{ $type->id }}" x-model="form.product_types" class="hidden">
+                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0"
+                                 :class="form.product_types.includes({{ $type->id }}) ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'">
+                                <i class="fas fa-check text-[7px] text-white"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ $type->type_name }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- RM Type Access Control -->
+                <div class="space-y-3">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">RM Type Access Control</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach($rmTypes as $rm)
+                        <label class="flex items-center gap-3 p-3 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all cursor-pointer"
+                               :class="form.rm_types.includes({{ $rm->id }}) ? 'border-teal-500 bg-white shadow-sm' : 'border-slate-100'">
+                            <input type="checkbox" value="{{ $rm->id }}" x-model="form.rm_types" class="hidden">
+                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0"
+                                 :class="form.rm_types.includes({{ $rm->id }}) ? 'border-teal-500 bg-teal-500' : 'border-slate-300'">
+                                <i class="fas fa-check text-[7px] text-white"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ $rm->value }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
             </div>
             <button @click="saveUser" class="w-full grad-indigo p-5 rounded-2xl text-white font-900 uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">Create User</button>
         </div>
@@ -110,12 +181,44 @@
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Location Access</label>
                     <div class="grid grid-cols-2 gap-3">
                         @foreach($branches as $branch)
-                        <label class="flex items-center gap-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all" :class="permForm.branches.includes({{ $branch->id }}) ? 'border-indigo-500 bg-white' : ''">
+                        <label class="flex items-center gap-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all cursor-pointer" :class="permForm.branches.includes({{ $branch->id }}) ? 'border-indigo-500 bg-white shadow-sm' : 'border-slate-100'">
                             <input type="checkbox" value="{{ $branch->id }}" x-model="permForm.branches" class="hidden">
-                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all" :class="permForm.branches.includes({{ $branch->id }}) ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'">
+                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0" :class="permForm.branches.includes({{ $branch->id }}) ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'">
                                 <i class="fas fa-check text-[8px] text-white"></i>
                             </div>
                             <span class="text-[10px] font-bold text-slate-700">{{ $branch->name }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Product Type Permissions -->
+                <div class="space-y-4">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Product Type Access</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach($productTypes as $type)
+                        <label class="flex items-center gap-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all cursor-pointer" :class="permForm.product_types.includes({{ $type->id }}) ? 'border-indigo-500 bg-white shadow-sm' : 'border-slate-100'">
+                            <input type="checkbox" value="{{ $type->id }}" x-model="permForm.product_types" class="hidden">
+                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0" :class="permForm.product_types.includes({{ $type->id }}) ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'">
+                                <i class="fas fa-check text-[8px] text-white"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ $type->type_name }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- RM Type Permissions -->
+                <div class="space-y-4">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">RM Type Access Control</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach($rmTypes as $rm)
+                        <label class="flex items-center gap-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-transparent transition-all cursor-pointer" :class="permForm.rm_types.includes({{ $rm->id }}) ? 'border-teal-500 bg-white shadow-sm' : 'border-slate-100'">
+                            <input type="checkbox" value="{{ $rm->id }}" x-model="permForm.rm_types" class="hidden">
+                            <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0" :class="permForm.rm_types.includes({{ $rm->id }}) ? 'border-teal-500 bg-teal-500' : 'border-slate-300'">
+                                <i class="fas fa-check text-[8px] text-white"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ $rm->value }}</span>
                         </label>
                         @endforeach
                     </div>
@@ -165,10 +268,14 @@ function usersApp() {
             role: 'user',
             interface_type: 'mobile',
             password: '',
-            branches: []
+            branches: [],
+            product_types: [],
+            rm_types: []
         },
         permForm: {
             branches: [],
+            product_types: [],
+            rm_types: [],
             features: {}
         },
         init() {
@@ -194,7 +301,7 @@ function usersApp() {
             const data = await res.json();
             if (data.success) {
                 this.showAddUser = false;
-                this.form = { name: '', username: '', role: 'user', interface_type: 'mobile', password: '', branches: [] };
+                this.form = { name: '', username: '', role: 'user', interface_type: 'mobile', password: '', branches: [], product_types: [], rm_types: [] };
                 window.location.reload();
             } else {
                 alert(data.message);
@@ -203,6 +310,8 @@ function usersApp() {
         editUser(user) {
             this.currentUser = user;
             this.permForm.branches = user.branches.map(b => b.id);
+            this.permForm.product_types = user.product_types ? user.product_types.map(t => t.id) : [];
+            this.permForm.rm_types = user.permitted_attributes ? user.permitted_attributes.map(a => a.id) : [];
             
             // Reset features
             Object.keys(this.permForm.features).forEach(key => {
