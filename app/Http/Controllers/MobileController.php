@@ -2697,10 +2697,14 @@ class MobileController extends Controller implements HasMiddleware
         }
 
         // Dynamic KPI calculation based on filtered results
-        $kpiQuery = clone $query;
-        $totalBills  = $kpiQuery->distinct('vouch_no')->count('vouch_no');
-        $totalItems  = $kpiQuery->count();
-        $totalAmount = (float) $kpiQuery->sum(DB::raw('qty * case_rate'));
+        $totalBillsQuery = clone $query;
+        $totalBills  = $totalBillsQuery->distinct('vouch_no')->count('vouch_no');
+
+        $totalItemsQuery = clone $query;
+        $totalItems  = $totalItemsQuery->count();
+
+        $totalAmountQuery = clone $query;
+        $totalAmount = (float) $totalAmountQuery->sum(DB::raw('qty * case_rate'));
 
         $purchases = $query->paginate(20)->withQueryString();
 
