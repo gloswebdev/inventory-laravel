@@ -62,15 +62,24 @@
         // Calculate dynamic grand target based on fallback logic (since team targets might be set under individual agents)
         $dynGrandTarget = 0;
         foreach($dbTeams ?? [] as $team) {
+            // Sum ONLY root level teams (parent_id is null) to prevent double counting of child teams/sub-teams!
+            if ($team->parent_id !== null) {
+                continue;
+            }
             $tTargetAmt = $teamTargets[$team->id] ?? 0;
             if ($tTargetAmt == 0) {
-                $sumTargets = function($tNode) use (&$sumTargets, $dbTeams, $agentTargets) {
+                $sumTargets = function($tNode) use (&$sumTargets, $dbTeams, $agentTargets, $teamTargets) {
                     $sum = 0;
                     foreach ($tNode->agents ?? [] as $ag) {
                         $sum += ($agentTargets[$ag] ?? 0);
                     }
                     foreach ($dbTeams->where('parent_id', $tNode->id) as $chNode) {
-                        $sum += $sumTargets($chNode);
+                        $chTeamTarget = (float)($teamTargets[$chNode->id] ?? 0);
+                        if ($chTeamTarget > 0) {
+                            $sum += $chTeamTarget; // Child team has its own target set
+                        } else {
+                            $sum += $sumTargets($chNode); // Recurse further
+                        }
                     }
                     return $sum;
                 };
@@ -122,6 +131,66 @@
         $hParties = 0;
         foreach ($branchSummary ?? [] as $s) { $hParties += $s['parties']; }
         $hGroups  = count($grouped ?? []);
+
+        // Mascot setup based on achievement level
+        if ($hPercent >= 100) {
+            // Happy, celebrating bug
+            $mascotBodyClass = 'body-happy';
+            $mascotAnimClass = 'anim-happy';
+            $mascotEyes = '
+                <div class="mascot-eye"><div class="pupil"></div></div>
+                <div class="mascot-eye"><div class="pupil"></div></div>
+            ';
+            $mascotMouth = '<div class="mascot-mouth mouth-happy"></div>';
+            $mascotDecorations = '
+                <div class="decor-item decor-1">🎉</div>
+                <div class="decor-item decor-2">✨</div>
+                <div class="decor-item decor-3">👑</div>
+            ';
+            $mascotAntennaColor = '#064e3b';
+        } elseif ($hPercent >= 75) {
+            // Smart, smiling bug
+            $mascotBodyClass = 'body-smart';
+            $mascotAnimClass = 'anim-smart';
+            $mascotEyes = '
+                <div class="mascot-eye"><div class="pupil" style="transform: scaleY(0.2); top: 5px;"></div></div>
+                <div class="mascot-eye"><div class="pupil"></div></div>
+            ';
+            $mascotMouth = '<div class="mascot-mouth"></div>'; // Smile arc
+            $mascotDecorations = '
+                <div class="decor-item decor-1">⭐</div>
+                <div class="decor-item decor-2">👍</div>
+            ';
+            $mascotAntennaColor = '#115e59';
+        } elseif ($hPercent >= 50) {
+            // Working hard, determined bug
+            $mascotBodyClass = 'body-determined';
+            $mascotAnimClass = 'anim-determined';
+            $mascotEyes = '
+                <div class="mascot-eye"><div class="pupil" style="width: 5px; height: 5px;"></div></div>
+                <div class="mascot-eye"><div class="pupil" style="width: 5px; height: 5px;"></div></div>
+            ';
+            $mascotMouth = '<div class="mascot-mouth mouth-determined"></div>';
+            $mascotDecorations = '
+                <div class="decor-item decor-1">🔥</div>
+                <div class="decor-item decor-2">⚡</div>
+            ';
+            $mascotAntennaColor = '#78350f';
+        } else {
+            // Sad, shivering bug (needs push)
+            $mascotBodyClass = 'body-sad';
+            $mascotAnimClass = 'anim-sad';
+            $mascotEyes = '
+                <div class="mascot-eye"><div class="pupil" style="top: 5px;"><div class="tear-drop"></div></div></div>
+                <div class="mascot-eye"><div class="pupil" style="top: 5px;"></div></div>
+            ';
+            $mascotMouth = '<div class="mascot-mouth mouth-sad"></div>';
+            $mascotDecorations = '
+                <div class="decor-item decor-1">🥺</div>
+                <div class="decor-item decor-2">☁️</div>
+            ';
+            $mascotAntennaColor = '#881337';
+        }
     @endphp
     <div class="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br {{ $hGradFrom }} {{ $hGradVia }} {{ $hGradTo }} p-6 shadow-xl {{ $hGlow }}">
         <div class="absolute -top-10 -right-10 w-52 h-52 bg-white/10 rounded-full blur-3xl"></div>
@@ -162,13 +231,13 @@
 
             {{-- Achievement Progress Block --}}
             @if(isset($grandTotal) && $grandTotal > 0)
-            <div class="bg-black/20 backdrop-blur-sm border border-white/15 rounded-3xl p-4">
+            <div class="bg-black/20 backdrop-blur-sm border border-white/15 rounded-3xl p-4 relative overflow-hidden">
                 
                 {{-- Row: Circular progress + Amount info --}}
                 <div class="flex items-center gap-4">
                     
                     {{-- SVG Circular Progress Ring --}}
-                    <div class="relative flex-shrink-0 w-20 h-20">
+                    <div class="relative flex-shrink-0 w-20 h-20 relative z-10">
                         <svg class="w-20 h-20 -rotate-90" viewBox="0 0 60 60">
                             {{-- Track ring --}}
                             <circle cx="30" cy="30" r="26"
@@ -192,7 +261,7 @@
                     </div>
                     
                     {{-- Right: Collection amount + target + badge --}}
-                    <div class="flex-1 min-w-0">
+                    <div class="flex-1 min-w-0 pr-[85px] relative z-10">
                         <div class="text-[8px] font-black text-white/50 uppercase tracking-widest mb-0.5">Total Collected</div>
                         <div class="text-3xl font-black text-white leading-none tracking-tight">{{ $formatCr($grandTotal) }}</div>
                         @if(isset($grandTarget) && $grandTarget > 0)
@@ -211,7 +280,7 @@
                 
                 {{-- Progress Bar (linear, below) --}}
                 @if(isset($grandTarget) && $grandTarget > 0)
-                <div class="mt-4">
+                <div class="mt-4 relative z-10">
                     <div class="flex items-center justify-between mb-1.5">
                         <span class="text-[8px] text-white/40 font-bold uppercase tracking-widest">Achievement</span>
                         <span class="text-[8px] font-black text-white/70">
@@ -248,7 +317,7 @@
                 @endif
                 
                 {{-- Stat pills row --}}
-                <div class="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
+                <div class="flex items-center gap-2 mt-3 pt-3 border-t border-white/10 relative z-10">
                     <div class="flex-1 bg-white/10 rounded-2xl py-2 px-3 text-center">
                         <div class="text-sm font-black text-white">{{ $hGroups }}</div>
                         <div class="text-[7px] font-black text-white/50 uppercase tracking-widest mt-0.5">Groups</div>
@@ -261,6 +330,30 @@
                         <div class="text-sm font-black text-white">{{ $hPercent }}%</div>
                         <div class="text-[7px] font-black text-white/50 uppercase tracking-widest mt-0.5">Achieved</div>
                     </div>
+                </div>
+
+                {{-- 3D Mascot bug/cartoon --}}
+                <div class="mascot-wrapper {{ $mascotAnimClass }}">
+                    <div class="worm-container">
+                        {{-- Segments (tail to head, so head is on top) --}}
+                        <div class="worm-segment segment-4 {{ $mascotBodyClass }}"></div>
+                        <div class="worm-segment segment-3 {{ $mascotBodyClass }}"></div>
+                        <div class="worm-segment segment-2 {{ $mascotBodyClass }}"></div>
+                        <div class="worm-segment segment-1 {{ $mascotBodyClass }}"></div>
+                        
+                        {{-- Main Head --}}
+                        <div class="worm-head {{ $mascotBodyClass }}">
+                            <div class="antenna-left" style="color: {{ $mascotAntennaColor }}"><div class="antenna-tip"></div></div>
+                            <div class="antenna-right" style="color: {{ $mascotAntennaColor }}"><div class="antenna-tip"></div></div>
+                            <div class="mascot-face">
+                                <div class="eye-container">
+                                    {!! $mascotEyes !!}
+                                </div>
+                                {!! $mascotMouth !!}
+                            </div>
+                        </div>
+                    </div>
+                    {!! $mascotDecorations !!}
                 </div>
             </div>
             @else
@@ -327,6 +420,290 @@
     }
     .hover-scale:hover {
         transform: scale(1.02);
+    }
+
+    /* Wiggling Caterpillar/Worm Mascot Styles */
+    .mascot-wrapper {
+        position: absolute;
+        right: 14px;
+        top: 24px;
+        width: 100px;
+        height: 60px;
+        z-index: 5;
+        pointer-events: none;
+    }
+    .worm-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+    }
+    .worm-head {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        position: absolute;
+        left: 0;
+        z-index: 10;
+        box-shadow: 
+            inset -3px -3px 6px rgba(0,0,0,0.4),
+            inset 3px 3px 6px rgba(255,255,255,0.3),
+            0 4px 8px rgba(0,0,0,0.2);
+        animation: wormSlither 1.6s infinite ease-in-out;
+    }
+    .worm-segment {
+        border-radius: 50%;
+        position: absolute;
+        box-shadow: 
+            inset -2px -2px 4px rgba(0,0,0,0.4),
+            inset 2px 2px 4px rgba(255,255,255,0.3),
+            0 3px 6px rgba(0,0,0,0.15);
+        animation: wormSlither 1.6s infinite ease-in-out;
+    }
+    /* Segments positioning & scaling to taper off to the tail */
+    .segment-1 {
+        width: 30px;
+        height: 30px;
+        left: 28px;
+        z-index: 9;
+        animation-delay: -0.2s;
+    }
+    .segment-2 {
+        width: 24px;
+        height: 24px;
+        left: 48px;
+        z-index: 8;
+        animation-delay: -0.4s;
+    }
+    .segment-3 {
+        width: 18px;
+        height: 18px;
+        left: 64px;
+        z-index: 7;
+        animation-delay: -0.6s;
+    }
+    .segment-4 {
+        width: 12px;
+        height: 12px;
+        left: 76px;
+        z-index: 6;
+        animation-delay: -0.8s;
+    }
+
+    /* Mascot body gradient coloring */
+    .body-happy {
+        background: radial-gradient(circle at 30% 30%, #34d399, #059669 65%, #064e3b);
+    }
+    .body-smart {
+        background: radial-gradient(circle at 30% 30%, #2dd4bf, #0d9488 65%, #115e59);
+    }
+    .body-determined {
+        background: radial-gradient(circle at 30% 30%, #fbbf24, #d97706 65%, #78350f);
+    }
+    .body-sad {
+        background: radial-gradient(circle at 30% 30%, #fb7185, #e11d48 65%, #881337);
+    }
+
+    /* 3D Antennae */
+    .antenna-left, .antenna-right {
+        position: absolute;
+        width: 3px;
+        height: 10px;
+        background: currentColor;
+        bottom: 85%;
+        border-radius: 3px;
+        transform-origin: bottom center;
+    }
+    .antenna-left {
+        left: 12px;
+        transform: rotate(-25deg);
+    }
+    .antenna-right {
+        right: 12px;
+        transform: rotate(25deg);
+    }
+    .antenna-tip {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        background: currentColor;
+        border-radius: 50%;
+        top: -4px;
+        left: -1px;
+        box-shadow: inset -1px -1px 2px rgba(0,0,0,0.3);
+    }
+
+    /* Mascot Face */
+    .mascot-face {
+        width: 100%;
+        height: 100%;
+        position: relative;
+    }
+
+    /* 3D Eyes */
+    .eye-container {
+        display: flex;
+        gap: 6px;
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    .mascot-eye {
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+        position: relative;
+        box-shadow: inset 1px 1px 2px rgba(0,0,0,0.6);
+        animation: blinkEye 4s infinite;
+    }
+    .pupil {
+        width: 4px;
+        height: 4px;
+        background: #0f172a;
+        border-radius: 50%;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+    }
+    .pupil::after {
+        content: '';
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        background: white;
+        border-radius: 50%;
+        top: 0.5px;
+        left: 0.5px;
+    }
+
+    /* Tears for Sad Emotion */
+    .tear-drop {
+        position: absolute;
+        width: 2.5px;
+        height: 4px;
+        background: #38bdf8;
+        border-radius: 0 50% 50% 50%;
+        transform: rotate(45deg);
+        top: 6px;
+        left: 2.5px;
+        animation: fallTear 1.5s infinite linear;
+    }
+
+    /* Dynamic Mouth shapes */
+    .mascot-mouth {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 5px;
+        border-bottom: 2px solid #0f172a;
+        border-radius: 0 0 6px 6px;
+    }
+    .mouth-sad {
+        width: 8px;
+        height: 3px;
+        border-bottom: none;
+        border-top: 2px solid #0f172a;
+        border-radius: 6px 6px 0 0;
+        bottom: 8px;
+    }
+    .mouth-determined {
+        width: 7px;
+        height: 2px;
+        background: #0f172a;
+        border-radius: 1px;
+        border: none;
+        bottom: 10px;
+    }
+    .mouth-happy {
+        width: 14px;
+        height: 7px;
+        background: #e11d48;
+        border-bottom: 1.5px solid #0f172a;
+        border-radius: 0 0 14px 14px;
+        overflow: hidden;
+        position: absolute;
+    }
+    .mouth-happy::before {
+        content: '';
+        position: absolute;
+        width: 8px;
+        height: 3px;
+        background: #fda4af;
+        border-radius: 50%;
+        bottom: -1px;
+        left: 3px;
+    }
+
+    /* Floating Decor Items */
+    .decor-item {
+        position: absolute;
+        font-size: 11px;
+        opacity: 0;
+        animation: floatDecor 3s infinite ease-out;
+    }
+    .decor-1 { top: -8px; left: -8px; animation-delay: 0s; }
+    .decor-2 { top: -12px; right: -4px; animation-delay: 1s; }
+    .decor-3 { bottom: 8px; right: -15px; animation-delay: 0.5s; }
+
+    /* Mascot Animations */
+    @keyframes blinkEye {
+        0%, 90%, 100% { transform: scaleY(1); }
+        95% { transform: scaleY(0.1); }
+    }
+    @keyframes fallTear {
+        0% { transform: translateY(0) rotate(45deg); opacity: 1; }
+        100% { transform: translateY(9px) rotate(45deg); opacity: 0; }
+    }
+    @keyframes floatDecor {
+        0% { transform: translateY(8px) scale(0.5); opacity: 0; }
+        50% { opacity: 1; }
+        100% { transform: translateY(-16px) scale(1.1); opacity: 0; }
+    }
+
+    /* Mascot motion based on status */
+    .worm-head, .worm-segment {
+        animation-iteration-count: infinite;
+        animation-timing-function: ease-in-out;
+    }
+    .anim-happy .worm-head, .anim-happy .worm-segment {
+        animation-name: wormSlither, mascotHappyBounce;
+        animation-duration: 1.2s, 1.2s;
+    }
+    .anim-smart .worm-head, .anim-smart .worm-segment {
+        animation-name: wormSlither;
+        animation-duration: 1.8s;
+    }
+    .anim-determined .worm-head, .anim-determined .worm-segment {
+        animation-name: wormSlither;
+        animation-duration: 0.9s;
+    }
+    .anim-sad .worm-head, .anim-sad .worm-segment {
+        animation-name: wormSlitherSad, wormShiver;
+        animation-duration: 2.2s, 0.12s;
+        animation-timing-function: ease-in-out, linear;
+    }
+
+    @keyframes wormSlither {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+    }
+    @keyframes wormSlitherSad {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(3px); }
+    }
+    @keyframes mascotHappyBounce {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+    }
+    @keyframes wormShiver {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-0.8px); }
+        75% { transform: translateX(0.8px); }
     }
     </style>
 
@@ -499,13 +876,18 @@
             
             // Recurse to sum agent targets if team target is 0
             if ($tTargetAmt == 0) {
-                $sumTargets = function($tNode) use (&$sumTargets, $dbTeams, $agentTargets) {
+                $sumTargets = function($tNode) use (&$sumTargets, $dbTeams, $agentTargets, $teamTargets) {
                     $sum = 0;
                     foreach ($tNode->agents ?? [] as $ag) {
                         $sum += ($agentTargets[$ag] ?? 0);
                     }
                     foreach ($dbTeams->where('parent_id', $tNode->id) as $chNode) {
-                        $sum += $sumTargets($chNode);
+                        $chTeamTarget = (float)($teamTargets[$chNode->id] ?? 0);
+                        if ($chTeamTarget > 0) {
+                            $sum += $chTeamTarget;
+                        } else {
+                            $sum += $sumTargets($chNode);
+                        }
                     }
                     return $sum;
                 };
@@ -780,7 +1162,7 @@
                                 </div>
                             </div>
                         </button>
-                    </div>      </div>
+                    </div>
 
                     {{-- Parties under this agent --}}
                     @foreach($agentRows as $party)
@@ -791,13 +1173,13 @@
                         @endphp
                         <div x-show="currentParentId === '{{ $agentId }}'" x-transition x-cloak
                              style="animation-delay: {{ $loop->index * 0.03 }}s;"
-                             class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm animate-card-entry transition duration-200">
+                             class="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm animate-card-entry transition duration-200">
                             <div class="min-w-0 pr-2">
-                                <div class="text-[8px] font-black text-indigo-400 font-mono tracking-tight">{{ $pCode }}</div>
-                                <div class="text-[10px] font-bold text-slate-100 truncate mt-0.5">{{ $pName }}</div>
+                                <div class="text-[8px] font-black text-indigo-500 font-mono tracking-tight">{{ $pCode }}</div>
+                                <div class="text-[10px] font-bold text-slate-800 truncate mt-0.5">{{ $pName }}</div>
                             </div>
-                            <div class="font-black text-emerald-450 text-[11px] flex-shrink-0">
-                                {!! $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '<span class="text-slate-650">—</span>' !!}
+                            <div class="font-black text-emerald-600 text-[11px] flex-shrink-0">
+                                {!! $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '<span class="text-slate-300">—</span>' !!}
                             </div>
                         </div>
                     @endforeach
@@ -820,95 +1202,120 @@
             }
             $tPercent = $tTargetAmt > 0 ? min(100, round(($bSummary['total'] / $tTargetAmt) * 100)) : 0;
             
-            // Choose color variables dynamically
+            // Choose color variables dynamically (light theme)
             if ($tTargetAmt == 0) {
-                $cardBg = 'bg-gradient-to-br from-slate-900 via-slate-850 to-slate-955';
-                $cardBorder = 'border-slate-800/80';
+                $cardBg = 'bg-gradient-to-br from-slate-50 to-white';
+                $cardBorder = 'border-slate-150';
                 $percentText = 'No Target';
-                $percentColor = 'text-slate-400';
-                $progressColor = 'bg-slate-700';
-                $iconClass = 'fa-building text-slate-400';
+                $percentColor = 'text-slate-500';
+                $progressColor = 'bg-slate-200';
+                $iconClass = 'fa-building';
+                $iconBg = 'bg-slate-100 text-slate-500 border-slate-200';
+                $nameColor = 'text-slate-800';
+                $infoColor = 'text-slate-400';
+                $chevBg = 'bg-slate-50 border-slate-150 text-slate-400';
+                $progressBg = 'bg-slate-100';
             } elseif ($tPercent >= 100) {
-                $cardBg = 'bg-gradient-to-br from-emerald-950/80 via-slate-900 to-slate-950';
-                $cardBorder = 'border-emerald-500/30';
+                $cardBg = 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50/20';
+                $cardBorder = 'border-emerald-200/80';
                 $percentText = $tPercent . '%';
-                $percentColor = 'text-emerald-400';
+                $percentColor = 'text-emerald-600';
                 $progressColor = 'bg-emerald-400';
-                $iconClass = 'fa-trophy text-emerald-400';
+                $iconClass = 'fa-trophy';
+                $iconBg = 'bg-emerald-100/80 text-emerald-600 border-emerald-200/50';
+                $nameColor = 'text-emerald-950';
+                $infoColor = 'text-emerald-700/80';
+                $chevBg = 'bg-emerald-100/30 border-emerald-200/30 text-emerald-600';
+                $progressBg = 'bg-emerald-100/50';
             } elseif ($tPercent >= 75) {
-                $cardBg = 'bg-gradient-to-br from-teal-950/80 via-slate-900 to-slate-950';
-                $cardBorder = 'border-teal-500/30';
+                $cardBg = 'bg-gradient-to-br from-teal-50 via-white to-teal-50/20';
+                $cardBorder = 'border-teal-200/80';
                 $percentText = $tPercent . '%';
-                $percentColor = 'text-teal-400';
+                $percentColor = 'text-teal-600';
                 $progressColor = 'bg-teal-400';
-                $iconClass = 'fa-circle-check text-teal-400';
+                $iconClass = 'fa-circle-check';
+                $iconBg = 'bg-teal-100/80 text-teal-600 border-teal-200/50';
+                $nameColor = 'text-teal-950';
+                $infoColor = 'text-teal-700/80';
+                $chevBg = 'bg-teal-100/30 border-teal-200/30 text-teal-600';
+                $progressBg = 'bg-teal-100/50';
             } elseif ($tPercent >= 50) {
-                $cardBg = 'bg-gradient-to-br from-amber-955/80 via-slate-900 to-slate-950';
-                $cardBorder = 'border-amber-500/30';
+                $cardBg = 'bg-gradient-to-br from-amber-50 via-white to-amber-50/20';
+                $cardBorder = 'border-amber-200/80';
                 $percentText = $tPercent . '%';
-                $percentColor = 'text-amber-400';
+                $percentColor = 'text-amber-600';
                 $progressColor = 'bg-amber-400';
-                $iconClass = 'fa-fire text-amber-400';
+                $iconClass = 'fa-fire';
+                $iconBg = 'bg-amber-100/80 text-amber-600 border-amber-200/50';
+                $nameColor = 'text-amber-955';
+                $infoColor = 'text-amber-700/80';
+                $chevBg = 'bg-amber-100/30 border-amber-200/30 text-teal-600';
+                $progressBg = 'bg-amber-100/50';
             } else {
-                $cardBg = 'bg-gradient-to-br from-rose-955/80 via-slate-900 to-slate-950';
-                $cardBorder = 'border-rose-500/25';
+                $cardBg = 'bg-gradient-to-br from-rose-50 via-white to-rose-50/20';
+                $cardBorder = 'border-rose-200/60';
                 $percentText = $tPercent . '%';
-                $percentColor = 'text-rose-400';
+                $percentColor = 'text-rose-600';
                 $progressColor = 'bg-rose-500';
-                $iconClass = 'fa-bolt text-rose-450';
+                $iconClass = 'fa-bolt';
+                $iconBg = 'bg-rose-100/80 text-rose-500 border-rose-200/40';
+                $nameColor = 'text-rose-955';
+                $infoColor = 'text-rose-700/80';
+                $chevBg = 'bg-rose-100/30 border-rose-200/30 text-rose-600';
+                $progressBg = 'bg-rose-100/50';
             }
         @endphp
         
         <div x-show="currentParentId === 'root'" x-transition x-cloak
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
-             class="overflow-hidden rounded-[1.8rem] shadow-lg border {{ $cardBorder }} {{ $cardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
+             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $cardBorder }} {{ $cardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
             <button type="button" @click="drillDown('{{ $tSlug }}', '{{ $teamName }}')" class="w-full text-left p-4">
                 <div class="relative">
                     {{-- Soft glow overlay --}}
                     @if($tTargetAmt > 0)
-                    <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full blur-xl opacity-20 {{ $tPercent >= 100 ? 'bg-emerald-400' : ($tPercent >= 75 ? 'bg-teal-400' : ($tPercent >= 50 ? 'bg-amber-400' : 'bg-rose-400')) }}"></div>
+                    <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full blur-xl opacity-10 {{ $tPercent >= 100 ? 'bg-emerald-400' : ($tPercent >= 75 ? 'bg-teal-400' : ($tPercent >= 50 ? 'bg-amber-400' : 'bg-rose-400')) }}"></div>
                     @endif
                     
                     <div class="flex items-center justify-between relative z-10">
                         <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 {{ $tTargetAmt > 0 ? ($tPercent >= 100 ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : ($tPercent >= 75 ? 'bg-teal-500/20 border-teal-500/30 text-teal-400' : ($tPercent >= 50 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' : 'bg-rose-500/20 border-rose-500/30 text-rose-450'))) : 'bg-slate-800 border-slate-700 text-slate-400' }}">
-                                <i class="fas {{ $tTargetAmt > 0 ? $iconClass : 'fa-building text-slate-400' }} text-sm"></i>
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-transform duration-300 {{ $iconBg }}">
+                                <i class="fas {{ $tTargetAmt > 0 ? $iconClass : 'fa-building' }} text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="font-black text-white text-sm tracking-tight truncate uppercase flex items-center gap-1.5">
+                                <div class="font-black {{ $nameColor }} text-sm tracking-tight truncate uppercase flex items-center gap-1.5">
                                     {{ $teamName }}
                                     @if($tTargetAmt > 0)
-                                    <span class="text-[8px] font-black tracking-widest px-2 py-0.5 rounded-lg {{ $tPercent >= 100 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : ($tPercent >= 75 ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : ($tPercent >= 50 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/25')) }}">
+                                    <span class="text-[8px] font-black tracking-widest px-2 py-0.5 rounded-lg {{ $tPercent >= 100 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : ($tPercent >= 75 ? 'bg-teal-500/10 text-teal-700 border border-teal-500/20' : ($tPercent >= 50 ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rose-500/10 text-rose-700 border border-rose-500/15')) }}">
                                         {{ $percentText }}
                                     </span>
                                     @endif
                                 </div>
-                                <div class="text-[9px] text-slate-400 font-bold mt-0.5">
+                                <div class="text-[9px] {{ $infoColor }} font-bold mt-0.5">
                                     {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
                         </div>
                         <div class="flex items-center gap-2 ml-2 flex-shrink-0 relative z-10">
                             <div class="text-right">
-                                <div class="text-slate-450 font-bold text-[8px] uppercase tracking-wider">Collected</div>
-                                <div class="text-emerald-400 font-black text-base leading-none mt-0.5">{{ $formatCr($bSummary['total']) }}</div>
+                                <div class="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Collected</div>
+                                <div class="text-emerald-600 font-black text-base leading-none mt-0.5">{{ $formatCr($bSummary['total']) }}</div>
                             </div>
-                            <div class="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 {{ $tTargetAmt > 0 ? ($tPercent >= 100 ? 'bg-emerald-500/20 border border-emerald-400/20 text-emerald-400' : ($tPercent >= 75 ? 'bg-teal-500/20 border border-teal-400/20 text-teal-400' : ($tPercent >= 50 ? 'bg-amber-500/20 border border-amber-400/20 text-amber-400' : 'bg-rose-500/20 border border-rose-450/20 text-rose-450'))) : 'bg-slate-800 border-slate-700 text-slate-400' }}">
+                            <div class="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }}">
                                 <i class="fas fa-chevron-right text-[10px]"></i>
                             </div>
                         </div>
                     </div>
                     
                     {{-- Progress Details --}}
-                    <div class="mt-3.5 pt-3 border-t border-white/5 relative z-10">
-                        <div class="flex items-center justify-between mb-1.5 text-[8px] font-bold uppercase tracking-widest text-slate-400">
-                            <span>Target: <strong class="text-slate-200">{{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '₹0' }}</strong></span>
-                            <span>Achieved: <strong class="{{ $tTargetAmt > 0 ? $percentColor : 'text-slate-350' }}">{{ $tTargetAmt > 0 ? $tPercent . '%' : '0%' }}</strong></span>
+                    <div class="mt-3.5 pt-3 border-t border-slate-100 relative z-10">
+                        <div class="flex items-center justify-between mb-1.5 text-[8px] font-bold uppercase tracking-widest {{ $infoColor }}">
+                            <span>Target: <strong class="{{ $nameColor }}">{{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '₹0' }}</strong></span>
+                            <span>Achieved: <strong class="{{ $percentColor }}">{{ $tTargetAmt > 0 ? $tPercent . '%' : '0%' }}</strong></span>
                         </div>
-                        <div class="w-full bg-slate-850 rounded-full h-2 overflow-hidden relative border border-white/5">
+                        <div class="w-full {{ $progressBg }} rounded-full h-2 overflow-hidden relative border border-slate-100">
                             <div class="h-2 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $progressColor }}"
                                  style="width: {{ $tPercent > 0 ? $tPercent : 0 }}%">
-                                <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%); background-size: 150px 100%;"></div>
+                                <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
                     </div>
@@ -924,87 +1331,107 @@
             $targetAmt = $agentTargets[$agentName] ?? 0;
             $percent = $targetAmt > 0 ? min(100, round(($agentTotal / $targetAmt) * 100)) : 0;
             
-            // Choose styling dynamically for ungrouped agent cards
+            // Choose styling dynamically for ungrouped agent cards (light theme)
             if ($targetAmt == 0) {
-                $agentCardBg = 'bg-gradient-to-br from-slate-900 via-slate-855 to-slate-950';
-                $agentCardBorder = 'border-slate-800';
+                $agentCardBg = 'bg-gradient-to-br from-slate-50 to-white';
+                $agentCardBorder = 'border-slate-150';
                 $agentPercentText = 'No Target';
-                $agentPercentColor = 'text-slate-400';
-                $agentProgressColor = 'bg-slate-700';
-                $agentIconClass = 'fa-user-tie';
+                $agentPercentColor = 'text-slate-500';
+                $agentProgressColor = 'bg-slate-200';
+                $agentIconBg = 'bg-slate-100 text-slate-500 border-slate-200';
+                $agentNameColor = 'text-slate-800';
+                $agentInfoColor = 'text-slate-400';
+                $agentChevBg = 'bg-slate-50 border-slate-155 text-slate-400';
+                $agentProgressBg = 'bg-slate-100';
             } elseif ($percent >= 100) {
-                $agentCardBg = 'bg-gradient-to-br from-emerald-950/80 via-slate-900 to-slate-950';
-                $agentCardBorder = 'border-emerald-500/30';
+                $agentCardBg = 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50/20';
+                $agentCardBorder = 'border-emerald-200/80';
                 $agentPercentText = $percent . '%';
-                $agentPercentColor = 'text-emerald-400';
+                $agentPercentColor = 'text-emerald-600';
                 $agentProgressColor = 'bg-emerald-400';
-                $agentIconClass = 'fa-trophy';
+                $agentIconBg = 'bg-emerald-100/80 text-emerald-600 border-emerald-200/50';
+                $agentNameColor = 'text-emerald-950';
+                $agentInfoColor = 'text-emerald-700/80';
+                $agentChevBg = 'bg-emerald-100/30 border-emerald-200/30 text-emerald-600';
+                $agentProgressBg = 'bg-emerald-100/50';
             } elseif ($percent >= 75) {
-                $agentCardBg = 'bg-gradient-to-br from-teal-950/80 via-slate-900 to-slate-955';
-                $agentCardBorder = 'border-teal-500/30';
+                $agentCardBg = 'bg-gradient-to-br from-teal-50 via-white to-teal-50/20';
+                $agentCardBorder = 'border-teal-200/80';
                 $agentPercentText = $percent . '%';
-                $agentPercentColor = 'text-teal-400';
+                $agentPercentColor = 'text-teal-600';
                 $agentProgressColor = 'bg-teal-400';
-                $agentIconClass = 'fa-circle-check';
+                $agentIconBg = 'bg-teal-100/80 text-teal-600 border-teal-200/50';
+                $agentNameColor = 'text-teal-950';
+                $agentInfoColor = 'text-teal-700/80';
+                $agentChevBg = 'bg-teal-100/30 border-teal-200/30 text-teal-600';
+                $agentProgressBg = 'bg-teal-100/50';
             } elseif ($percent >= 50) {
-                $agentCardBg = 'bg-gradient-to-br from-amber-955/80 via-slate-900 to-slate-950';
-                $agentCardBorder = 'border-amber-500/30';
+                $agentCardBg = 'bg-gradient-to-br from-amber-50 via-white to-amber-50/20';
+                $agentCardBorder = 'border-amber-200/80';
                 $agentPercentText = $percent . '%';
-                $agentPercentColor = 'text-amber-400';
+                $agentPercentColor = 'text-amber-600';
                 $agentProgressColor = 'bg-amber-400';
-                $agentIconClass = 'fa-fire';
+                $agentIconBg = 'bg-amber-100/80 text-amber-600 border-amber-200/50';
+                $agentNameColor = 'text-amber-955';
+                $agentInfoColor = 'text-amber-700/80';
+                $agentChevBg = 'bg-amber-100/30 border-amber-200/30 text-teal-600';
+                $agentProgressBg = 'bg-amber-100/50';
             } else {
-                $agentCardBg = 'bg-gradient-to-br from-rose-955/80 via-slate-900 to-slate-950';
-                $agentCardBorder = 'border-rose-500/20';
+                $agentCardBg = 'bg-gradient-to-br from-rose-50 via-white to-rose-50/20';
+                $agentCardBorder = 'border-rose-200/60';
                 $agentPercentText = $percent . '%';
-                $agentPercentColor = 'text-rose-400';
+                $agentPercentColor = 'text-rose-600';
                 $agentProgressColor = 'bg-rose-500';
-                $agentIconClass = 'fa-bolt';
+                $agentIconBg = 'bg-rose-100/80 text-rose-500 border-rose-200/40';
+                $agentNameColor = 'text-rose-955';
+                $agentInfoColor = 'text-rose-700/80';
+                $agentChevBg = 'bg-rose-100/30 border-rose-200/30 text-rose-600';
+                $agentProgressBg = 'bg-rose-100/50';
             }
         @endphp
         
         <div x-show="currentParentId === '{{ $tSlug }}'" x-transition x-cloak
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
-             class="overflow-hidden rounded-[1.8rem] shadow-md border {{ $agentCardBorder }} {{ $agentCardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
+             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
             <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                        <div class="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 {{ $targetAmt > 0 ? ($percent >= 100 ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : ($percent >= 75 ? 'bg-teal-500/20 border-teal-500/30 text-teal-400' : ($percent >= 50 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' : 'bg-rose-500/20 border-rose-500/30 text-rose-455'))) : 'bg-slate-800 border-slate-700 text-slate-400' }}">
-                            <i class="fas {{ $targetAmt > 0 ? $agentIconClass : 'fa-user-tie text-slate-400' }} text-xs"></i>
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 {{ $agentIconBg }}">
+                            <i class="fas fa-user-tie text-xs"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="font-black text-white text-xs truncate uppercase flex items-center gap-1.5">
+                            <div class="font-black {{ $agentNameColor }} text-xs truncate uppercase flex items-center gap-1.5">
                                 {{ $agentName }}
                                 @if($targetAmt > 0)
-                                <span class="text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-md {{ $percent >= 100 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : ($percent >= 75 ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : ($percent >= 50 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/25')) }}">
+                                <span class="text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-md {{ $percent >= 100 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : ($percent >= 75 ? 'bg-teal-500/10 text-teal-700 border border-teal-500/20' : ($percent >= 50 ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rose-500/10 text-rose-700 border border-rose-500/15')) }}">
                                     {{ $agentPercentText }}
                                 </span>
                                 @endif
                             </div>
-                            <div class="text-[8px] text-slate-450 font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
+                            <div class="text-[8px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 ml-2 flex-shrink-0">
                         <div class="text-right">
-                            <div class="text-slate-450 font-bold text-[8px] uppercase tracking-wider">Collected</div>
-                            <div class="font-black text-emerald-400 text-sm leading-none mt-0.5">{{ $formatCr($agentTotal) }}</div>
+                            <div class="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Collected</div>
+                            <div class="font-black text-emerald-600 text-sm leading-none mt-0.5">{{ $formatCr($agentTotal) }}</div>
                         </div>
-                        <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $targetAmt > 0 ? ($percent >= 100 ? 'bg-emerald-500/20 border border-emerald-400/20 text-emerald-400' : ($percent >= 75 ? 'bg-teal-500/20 border border-teal-400/20 text-teal-400' : ($percent >= 50 ? 'bg-amber-500/20 border border-amber-400/20 text-amber-400' : 'bg-rose-500/20 border border-rose-450/20 text-rose-455'))) : 'bg-slate-800 border-slate-700 text-slate-400' }}">
+                        <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }}">
                             <i class="fas fa-chevron-right text-[9px]"></i>
                         </div>
                     </div>
                 </div>
                 
                 {{-- Target detail bar --}}
-                <div class="mt-3.5 pt-2.5 border-t border-white/5">
-                    <div class="flex items-center justify-between mb-1 text-[7px] font-bold uppercase tracking-widest text-slate-400">
-                        <span>Target: <strong class="text-slate-200">{{ $targetAmt > 0 ? $formatCr($targetAmt) : '₹0' }}</strong></span>
-                        <span>Achieved: <strong class="{{ $targetAmt > 0 ? $agentPercentColor : 'text-slate-350' }}">{{ $targetAmt > 0 ? $percent . '%' : '0%' }}</strong></span>
+                <div class="mt-3.5 pt-2.5 border-t border-slate-100">
+                    <div class="flex items-center justify-between mb-1 text-[7px] font-bold uppercase tracking-widest {{ $agentInfoColor }}">
+                        <span>Target: <strong class="{{ $agentNameColor }}">{{ $targetAmt > 0 ? $formatCr($targetAmt) : '₹0' }}</strong></span>
+                        <span>Achieved: <strong class="{{ $agentPercentColor }}">{{ $targetAmt > 0 ? $percent . '%' : '0%' }}</strong></span>
                     </div>
-                    <div class="w-full bg-slate-850 rounded-full h-1 overflow-hidden relative border border-white/5">
+                    <div class="w-full {{ $agentProgressBg }} rounded-full h-1 overflow-hidden relative border border-slate-100">
                         <div class="h-1 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $agentProgressColor }}"
                              style="width: {{ $percent > 0 ? $percent : 0 }}%">
-                            <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%); background-size: 150px 100%;"></div>
+                            <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                         </div>
                     </div>
                 </div>
@@ -1020,13 +1447,13 @@
             @endphp
             <div x-show="currentParentId === '{{ $agentId }}'" x-transition x-cloak
                  style="animation-delay: {{ $loop->index * 0.03 }}s;"
-                 class="bg-gradient-to-br from-slate-900 to-slate-955 border border-slate-800 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm animate-card-entry transition duration-200">
+                 class="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm animate-card-entry transition duration-200">
                 <div class="min-w-0 pr-2">
-                    <div class="text-[8px] font-black text-indigo-400 font-mono tracking-tight">{{ $pCode }}</div>
-                    <div class="text-[10px] font-bold text-slate-100 truncate mt-0.5">{{ $pName }}</div>
+                    <div class="text-[8px] font-black text-indigo-500 font-mono tracking-tight">{{ $pCode }}</div>
+                    <div class="text-[10px] font-bold text-slate-800 truncate mt-0.5">{{ $pName }}</div>
                 </div>
-                <div class="font-black text-emerald-450 text-[11px] flex-shrink-0">
-                    {!! $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '<span class="text-slate-650">—</span>' !!}
+                <div class="font-black text-emerald-600 text-[11px] flex-shrink-0">
+                    {!! $pCrAmt > 0 ? '₹' . $formatIndian($pCrAmt) : '<span class="text-slate-300">—</span>' !!}
                 </div>
             </div>
         @endforeach
