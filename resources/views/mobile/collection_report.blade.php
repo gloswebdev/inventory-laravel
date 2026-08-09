@@ -57,6 +57,20 @@
     </div>
     @endif
 
+    {{-- API Error from Controller --}}
+    @if(!empty($error))
+    <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-3xl p-4 flex items-start gap-3 text-xs font-bold">
+        <div class="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fas fa-triangle-exclamation text-white text-xs"></i>
+        </div>
+        <div>
+            <div class="font-black text-amber-900 mb-0.5">⚠️ ERP API Error</div>
+            <div class="text-amber-700 font-semibold">{{ $error }}</div>
+            <div class="text-amber-500 text-[10px] mt-1">Logic ERP server se data nahi aa raha. Thodi der baad retry karein.</div>
+        </div>
+    </div>
+    @endif
+
     {{-- ===== HERO HEADER CARD ===== --}}
     @php
         // Calculate dynamic grand target based on fallback logic (since team targets might be set under individual agents)
@@ -359,8 +373,15 @@
             @else
             {{-- No data yet - simple placeholder --}}
             <div class="bg-black/20 border border-white/10 rounded-3xl py-5 px-4 text-center">
+                @if(!empty($error))
+                <i class="fas fa-server text-white/30 text-2xl mb-2"></i>
+                <div class="text-white/80 text-xs font-bold mb-1">ERP Server Unavailable</div>
+                <div class="text-white/50 text-[10px] font-semibold">{{ $error }}</div>
+                <div class="text-white/40 text-[9px] mt-2">Algebra ERP SQL Server se connection nahi ho pa raha. Thodi der baad try karein.</div>
+                @else
                 <i class="fas fa-chart-bar text-white/30 text-2xl mb-2"></i>
                 <div class="text-white/60 text-xs font-bold">Apply filters to view collection data</div>
+                @endif
             </div>
             @endif
         </div>
