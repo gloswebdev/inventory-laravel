@@ -69,13 +69,24 @@
 
             <div class="space-y-3">
                 @forelse($dbTeams ?? [] as $team)
-                @php $tSlug = 'mob_t_target_acc_' . $team->id; @endphp
+                @php 
+                    $tSlug = 'mob_t_target_acc_' . $team->id; 
+                    $teamAgentsTotal = 0;
+                    foreach($team->agents ?? [] as $member) {
+                        $teamAgentsTotal += (float)($targets[$member] ?? 0);
+                    }
+                @endphp
                 <div class="bg-white rounded-3xl border border-gray-150 overflow-hidden shadow-sm">
                     {{-- Accordion Header --}}
                     <div class="flex justify-between items-center p-4 bg-slate-50 cursor-pointer" onclick="toggleMobAccordion('{{ $tSlug }}')">
                         <div class="overflow-hidden pr-3">
                             <span class="font-bold text-xs text-slate-800 block truncate">{{ $team->name }}</span>
-                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{{ count($team->agents ?? []) }} Members</span>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                {{ count($team->agents ?? []) }} Members
+                                <span id="total-agents-target-{{ $team->id }}">
+                                    • Total: ₹{{ fmod($teamAgentsTotal, 1) == 0 ? number_format($teamAgentsTotal, 0) : number_format($teamAgentsTotal, 2) }}
+                                </span>
+                            </span>
                         </div>
                         <div class="flex items-center gap-3" onclick="event.stopPropagation()">
                             <input type="number" 
@@ -99,7 +110,8 @@
                                        value="{{ $targets[$member] ?? '' }}" 
                                        step="0.01" 
                                        placeholder="₹ Member Target"
-                                       class="w-36 border border-gray-200 rounded-lg py-1.5 px-2.5 text-xs font-semibold text-slate-850 text-right outline-none bg-slate-50/50">
+                                       oninput="updateTeamAgentsTotal({{ $team->id }})"
+                                       class="w-36 border border-gray-200 rounded-lg py-1.5 px-2.5 text-xs font-semibold text-slate-850 text-right outline-none bg-slate-50/50 agent-target-input-{{ $team->id }}">
                             </div>
                         </div>
                         @empty
@@ -179,6 +191,22 @@ function toggleMobAccordion(slug) {
     } else {
         body.classList.add('hidden');
         if (chev) chev.style.transform = '';
+    }
+}
+
+function updateTeamAgentsTotal(teamId) {
+    const inputs = document.querySelectorAll(`.agent-target-input-${teamId}`);
+    let total = 0;
+    inputs.forEach(input => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val)) {
+            total += val;
+        }
+    });
+    const badge = document.getElementById(`total-agents-target-${teamId}`);
+    if (badge) {
+        const formattedTotal = total % 1 === 0 ? total.toLocaleString('en-IN') : total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        badge.innerHTML = ` • Total: ₹${formattedTotal}`;
     }
 }
 </script>

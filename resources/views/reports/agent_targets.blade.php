@@ -74,7 +74,13 @@
 
                 <div class="space-y-4">
                     @forelse($dbTeams ?? [] as $tIdx => $team)
-                    @php $tSlug = 'team_acc_' . $team->id; @endphp
+                    @php 
+                        $tSlug = 'team_acc_' . $team->id; 
+                        $teamAgentsTotal = 0;
+                        foreach($team->agents ?? [] as $member) {
+                            $teamAgentsTotal += (float)($targets[$member] ?? 0);
+                        }
+                    @endphp
                     <div class="border border-gray-150 rounded-2xl overflow-hidden shadow-sm">
                         {{-- Accordion Header --}}
                         <div class="flex flex-col md:flex-row md:items-center justify-between px-6 py-4 bg-slate-50 hover:bg-slate-100/70 transition cursor-pointer select-none gap-4"
@@ -87,6 +93,9 @@
                                     <span class="font-bold text-slate-800 text-sm block">{{ $team->name }}</span>
                                     <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                         👉 Click to view & edit targets for {{ count($team->agents ?? []) }} Members
+                                        <span id="desktop-total-agents-target-{{ $team->id }}">
+                                            • Total Agent Targets: ₹{{ fmod($teamAgentsTotal, 1) == 0 ? number_format($teamAgentsTotal, 0) : number_format($teamAgentsTotal, 2) }}
+                                        </span>
                                     </span>
                                 </div>
                             </div>
@@ -137,7 +146,8 @@
                                                            value="{{ $targets[$member] ?? '' }}" 
                                                            step="0.01" 
                                                            placeholder="Set member target..."
-                                                           class="block w-full rounded-xl border border-gray-200 py-1.5 pl-6 pr-3 text-xs font-semibold text-slate-800 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-150 outline-none transition bg-white">
+                                                           oninput="updateDesktopTeamAgentsTotal({{ $team->id }})"
+                                                           class="block w-full rounded-xl border border-gray-200 py-1.5 pl-6 pr-3 text-xs font-semibold text-slate-800 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-150 outline-none transition bg-white desktop-agent-target-input-{{ $team->id }}">
                                                 </div>
                                             </td>
                                         </tr>
@@ -260,6 +270,22 @@ function toggleAccordion(slug) {
     } else {
         el.classList.add('hidden');
         if (chev) chev.style.transform = '';
+    }
+}
+
+function updateDesktopTeamAgentsTotal(teamId) {
+    const inputs = document.querySelectorAll(`.desktop-agent-target-input-${teamId}`);
+    let total = 0;
+    inputs.forEach(input => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val)) {
+            total += val;
+        }
+    });
+    const badge = document.getElementById(`desktop-total-agents-target-${teamId}`);
+    if (badge) {
+        const formattedTotal = total % 1 === 0 ? total.toLocaleString('en-IN') : total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        badge.innerHTML = ` • Total Agent Targets: ₹${formattedTotal}`;
     }
 }
 </script>
