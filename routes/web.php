@@ -64,6 +64,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     // User Management
     Route::resource('users', UserController::class);
     Route::post('users/{user}/toggle-permission', [UserController::class, 'togglePermission'])->name('users.toggle-permission');
+    Route::post('users/{user}/clone', [UserController::class, 'cloneUser'])->name('users.clone');
 
     // Production Planning (MRP Calculator)
     Route::prefix('planning')->name('planning.')->group(function() {

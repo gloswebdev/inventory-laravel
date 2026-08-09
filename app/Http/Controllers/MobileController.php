@@ -1727,8 +1727,26 @@ class MobileController extends Controller implements HasMiddleware
                     $user->permittedAttributes()->sync([]);
                 }
 
-                // Sync Features (via UserPermission model)
-                if ($request->has('features')) {
+                // Sync Full Permissions (new format with view/create/edit/delete/print/excel/pdf + features)
+                if ($request->has('permissions')) {
+                    \App\Models\UserPermission::where('user_id', $user->id)->delete();
+                    foreach ($request->permissions as $pageKey => $rights) {
+                        \App\Models\UserPermission::create([
+                            'user_id' => $user->id,
+                            'page_key' => $pageKey,
+                            'can_view' => !empty($rights['view']),
+                            'can_create' => !empty($rights['create']),
+                            'can_edit' => !empty($rights['edit']),
+                            'can_delete' => !empty($rights['delete']),
+                            'can_print' => !empty($rights['print']),
+                            'can_export_excel' => !empty($rights['excel']),
+                            'can_export_pdf' => !empty($rights['pdf']),
+                            'features' => $rights['features'] ?? null,
+                        ]);
+                    }
+                }
+                // Backward compatibility: old features-only format
+                elseif ($request->has('features')) {
                     \App\Models\UserPermission::where('user_id', $user->id)->delete();
                     foreach ($request->features as $pageKey => $features) {
                         $hasAnyEnabled = false;

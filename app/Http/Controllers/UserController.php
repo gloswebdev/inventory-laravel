@@ -392,4 +392,64 @@ class UserController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    public function cloneUser(Request $request, User $user)
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'unique:users'],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'interface_type' => ['required', 'in:desktop,mobile'],
+        ]);
+
+        $newUser = null;
+
+        DB::transaction(function () use ($request, $user, &$newUser) {
+            // Create the new user with cloned basic info
+            $newUser = User::create([
+                'name' => $request->name,
+                'username' => $request->username,
+                'role' => $user->role,
+                'interface_type' => $request->interface_type,
+                'password' => Hash::make($request->password),
+            ]);
+
+            // Clone branch access
+            $branchIds = $user->branches()->pluck('branches.id')->toArray();
+            if (!empty($branchIds)) {
+                $newUser->branches()->sync($branchIds);
+            }
+
+            // Clone product type access
+            $productTypeIds = $user->productTypes()->pluck('product_types.id')->toArray();
+            if (!empty($productTypeIds)) {
+                $newUser->productTypes()->sync($productTypeIds);
+            }
+
+            // Clone RM type access
+            $rmTypeIds = $user->permittedAttributes()->pluck('product_attributes.id')->toArray();
+            if (!empty($rmTypeIds)) {
+                $newUser->permittedAttributes()->sync($rmTypeIds);
+            }
+
+            // Clone all permissions
+            foreach ($user->permissions as $permission) {
+                UserPermission::create([
+                    'user_id' => $newUser->id,
+                    'page_key' => $permission->page_key,
+                    'can_view' => $permission->can_view,
+                    'can_create' => $permission->can_create,
+                    'can_edit' => $permission->can_edit,
+                    'can_delete' => $permission->can_delete,
+                    'can_print' => $permission->can_print,
+                    'can_export_excel' => $permission->can_export_excel,
+                    'can_export_pdf' => $permission->can_export_pdf,
+                    'features' => $permission->features,
+                ]);
+            }
+        });
+
+        return redirect()->route('users.index', ['type' => $request->interface_type])
+            ->with('success', "User '{$newUser->name}' cloned successfully from '{$user->name}' with all permissions.");
+    }
 }

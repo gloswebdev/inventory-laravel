@@ -86,6 +86,7 @@
                             <td class="px-8 py-5 text-right">
                                 <div class="flex justify-end gap-2">
                                     <button @click.stop="editUser({{ $user->id }})" title="Edit Permissions" class="bg-blue-100 text-blue-600 p-2.5 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm"><i class="fas fa-shield-halved text-xs"></i></button>
+                                    <button @click.stop="cloneUser({{ $user->id }})" title="Clone User" class="bg-violet-100 text-violet-600 p-2.5 rounded-xl hover:bg-violet-600 hover:text-white transition shadow-sm"><i class="fas fa-copy text-xs"></i></button>
                                     @if($user->id !== auth()->id())
                                     <button @click="deleteUser({{ $user->id }})" title="Delete User" class="bg-red-100 text-red-600 p-2.5 rounded-xl hover:bg-red-600 hover:text-white transition shadow-sm"><i class="fas fa-trash-alt text-xs"></i></button>
                                     @endif
@@ -296,37 +297,49 @@
                                         @foreach($modules as $key => $name)
                                         @if(str_starts_with($key, 'mobile_'))
                                         <tr x-show="userData.interface_type === 'mobile'" class="hover:bg-white transition-colors group">
-                                            <td class="px-8 py-4 italic text-indigo-900 bg-indigo-50/10">
-                                                <div class="font-bold text-sm">{{ $name }}</div>
-                                                <div class="text-[9px] font-bold uppercase tracking-widest opacity-60">{{ $key }}</div>
+                                            <td class="px-8 py-4">
+                                                <div class="font-bold text-gray-700 italic text-sm">{{ $name }}</div>
+                                                <div class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{{ $key }}</div>
                                             </td>
-                                            <td class="px-2 py-4 text-center bg-indigo-50/10">
-                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.view" class="w-4 h-4 rounded border-2 border-indigo-200 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.view" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all checked:animate-bounce-short">
                                             </td>
-                                            <td colspan="4" class="bg-indigo-50/5 p-4 text-center border-x border-white/50">
-                                                @if(isset($moduleFeatures[$key]))
-                                                <div class="flex flex-wrap justify-center gap-4">
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.create" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            </td>
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.edit" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            </td>
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.delete" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            </td>
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.print" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            </td>
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.excel" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            </td>
+                                            <td class="px-2 py-4 text-center">
+                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.pdf" class="w-4 h-4 rounded border-2 border-indigo-100 text-indigo-600 focus:ring-indigo-500/20 transition-all">
+                                            </td>
+                                        </tr>
+                                        @if(isset($moduleFeatures[$key]))
+                                        <tr x-show="userData.interface_type === 'mobile'" class="bg-indigo-50/10">
+                                            <td colspan="8" class="px-8 py-2 border-t border-indigo-100/50">
+                                                <div class="flex flex-wrap gap-4">
                                                     @foreach($moduleFeatures[$key] as $fKey => $fLabel)
                                                     <label class="flex items-center gap-2 cursor-pointer group">
                                                         <div class="relative inline-flex items-center cursor-pointer">
                                                             <input type="checkbox" x-model="userData.permissions.{{ $key }}.features.{{ $fKey }}" class="sr-only peer">
                                                             <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-teal-500"></div>
                                                         </div>
-                                                        <span class="text-[8px] font-black italic uppercase text-gray-400 group-hover:text-teal-600 transition tracking-tighter">{{ $fLabel }}</span>
+                                                        <span class="text-[9px] font-black italic uppercase text-gray-400 group-hover:text-teal-600 transition tracking-tighter">{{ $fLabel }}</span>
                                                     </label>
                                                     @endforeach
                                                 </div>
-                                                @else
-                                                <span class="text-[8px] font-bold text-gray-400 uppercase italic">Basic module access</span>
-                                                @endif
-                                            </td>
-                                            <td class="px-2 py-4 text-center bg-indigo-50/10">
-                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.excel" class="w-4 h-4 rounded border-2 border-indigo-200 text-indigo-600 focus:ring-indigo-500/20 transition-all">
-                                            </td>
-                                            <td class="px-2 py-4 text-center bg-indigo-100/10">
-                                                <input type="checkbox" x-model="userData.permissions.{{ $key }}.pdf" class="w-4 h-4 rounded border-2 border-indigo-200 text-indigo-600 focus:ring-indigo-500/20 transition-all">
                                             </td>
                                         </tr>
+                                        @endif
                                         @endif
                                         @endforeach
                                     </tbody>
@@ -378,6 +391,102 @@
         @csrf
         @method('DELETE')
     </form>
+
+    <!-- Clone User Modal -->
+    <template x-if="showCloneModal">
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100">
+            
+            <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+                 @click.outside="showCloneModal = false">
+                
+                <!-- Clone Modal Header -->
+                <div class="bg-gradient-to-r from-violet-600 to-purple-600 p-8 text-white relative">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                    <div class="flex items-center gap-4 relative z-10">
+                        <div class="bg-white/20 p-3 rounded-2xl">
+                            <i class="fas fa-copy text-2xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-black italic tracking-tighter uppercase">Clone User</h2>
+                            <p class="text-violet-100 font-bold text-[10px] uppercase tracking-widest mt-1">Duplicate user with all permissions</p>
+                        </div>
+                    </div>
+                    <button @click="showCloneModal = false" class="absolute top-8 right-8 text-white/50 hover:text-white transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <!-- Clone Modal Body -->
+                <div class="p-8 space-y-5">
+                    <div class="bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-black italic text-sm flex-shrink-0" x-text="cloneSourceName.charAt(0)"></div>
+                        <div>
+                            <div class="text-[9px] font-black text-violet-400 uppercase tracking-widest">Cloning From</div>
+                            <div class="text-sm font-black text-violet-800 italic" x-text="cloneSourceName"></div>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="bg-violet-200 text-violet-700 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest" x-text="cloneSourceType"></span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New User Name</label>
+                        <input type="text" x-model="cloneData.name" class="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-3.5 font-bold text-gray-900 focus:border-violet-500 focus:ring-0 transition" placeholder="e.g. Rahul Sharma">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Username</label>
+                        <input type="text" x-model="cloneData.username" class="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-3.5 font-bold text-gray-900 focus:border-violet-500 focus:ring-0 transition" placeholder="e.g. rahul.user">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Interface Type</label>
+                        <div class="flex gap-4">
+                            <button type="button" @click="cloneData.interface_type = 'desktop'" :class="cloneData.interface_type === 'desktop' ? 'bg-violet-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400'" class="flex-1 py-3 px-4 rounded-xl font-black italic text-xs uppercase transition tracking-tight">Desktop</button>
+                            <button type="button" @click="cloneData.interface_type = 'mobile'" :class="cloneData.interface_type === 'mobile' ? 'bg-violet-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400'" class="flex-1 py-3 px-4 rounded-xl font-black italic text-xs uppercase transition tracking-tight">Mobile PWA</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                            <input type="password" x-model="cloneData.password" class="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-3.5 font-bold text-gray-900 focus:border-violet-500 focus:ring-0 transition" placeholder="Set password">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Confirm</label>
+                            <input type="password" x-model="cloneData.password_confirmation" class="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-3.5 font-bold text-gray-900 focus:border-violet-500 focus:ring-0 transition" placeholder="Confirm">
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                        <i class="fas fa-info-circle text-amber-500 mt-0.5"></i>
+                        <p class="text-[10px] font-bold text-amber-700 leading-relaxed">All permissions, branch access, product type access, and RM type access will be copied from the source user.</p>
+                    </div>
+                </div>
+
+                <!-- Clone Modal Footer -->
+                <div class="p-8 border-t bg-gray-50 flex items-center justify-between gap-4">
+                    <button @click="showCloneModal = false" class="px-8 py-3.5 bg-white border-2 border-gray-100 text-gray-500 rounded-2xl font-black italic tracking-tighter hover:bg-gray-200 transition uppercase text-sm">
+                        Cancel
+                    </button>
+                    <button @click="submitClone()" class="px-10 py-3.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl font-black italic tracking-tighter hover:from-violet-700 hover:to-purple-700 transition shadow-xl shadow-violet-100 uppercase flex items-center gap-3 text-sm">
+                        <i class="fas fa-copy"></i>
+                        Clone User
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Hidden Clone Submit Form -->
+    <form id="cloneUserForm" action="" method="POST" style="display: none;">
+        @csrf
+        <input type="hidden" name="name" id="clone_form_name">
+        <input type="hidden" name="username" id="clone_form_username">
+        <input type="hidden" name="interface_type" id="clone_form_interface_type">
+        <input type="hidden" name="password" id="clone_form_password">
+        <input type="hidden" name="password_confirmation" id="clone_form_password_confirmation">
+    </form>
 </div>
 
 <script>
@@ -386,6 +495,17 @@ function userManager() {
         showModal: false,
         isEditing: false,
         editId: null,
+        showCloneModal: false,
+        cloneSourceId: null,
+        cloneSourceName: '',
+        cloneSourceType: '',
+        cloneData: {
+            name: '',
+            username: '',
+            interface_type: 'desktop',
+            password: '',
+            password_confirmation: ''
+        },
         userData: {
             name: '',
             username: '',
@@ -437,6 +557,51 @@ function userManager() {
             if (force || confirm('Discard changes and close?')) {
                 this.showModal = false;
             }
+        },
+
+        cloneUser(id) {
+            const user = @json($users).find(u => u.id == id);
+            if (user) {
+                this.cloneSourceId = user.id;
+                this.cloneSourceName = user.name;
+                this.cloneSourceType = user.interface_type || 'desktop';
+                this.cloneData = {
+                    name: user.name + ' (Copy)',
+                    username: user.username + '_copy',
+                    interface_type: user.interface_type || 'desktop',
+                    password: '',
+                    password_confirmation: ''
+                };
+                this.showCloneModal = true;
+            }
+        },
+
+        submitClone() {
+            if (!this.cloneData.name.trim()) {
+                alert('Please enter a name for the new user.');
+                return;
+            }
+            if (!this.cloneData.username.trim()) {
+                alert('Please enter a username for the new user.');
+                return;
+            }
+            if (!this.cloneData.password) {
+                alert('Please set a password for the new user.');
+                return;
+            }
+            if (this.cloneData.password !== this.cloneData.password_confirmation) {
+                alert('Passwords do not match.');
+                return;
+            }
+
+            const form = document.getElementById('cloneUserForm');
+            form.action = `{{ url('users') }}/${this.cloneSourceId}/clone`;
+            document.getElementById('clone_form_name').value = this.cloneData.name;
+            document.getElementById('clone_form_username').value = this.cloneData.username;
+            document.getElementById('clone_form_interface_type').value = this.cloneData.interface_type;
+            document.getElementById('clone_form_password').value = this.cloneData.password;
+            document.getElementById('clone_form_password_confirmation').value = this.cloneData.password_confirmation;
+            form.submit();
         },
 
         editUser(id) {
