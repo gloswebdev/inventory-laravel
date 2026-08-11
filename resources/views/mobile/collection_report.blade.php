@@ -336,30 +336,41 @@
                     </div>
                 </div>
 
-                {{-- 3D Mascot bug/cartoon --}}
-                <div class="mascot-wrapper {{ $mascotAnimClass }}">
-                    <div class="worm-container">
-                        {{-- Segments (tail to head, so head is on top) --}}
-                        <div class="worm-segment segment-4 {{ $mascotBodyClass }}"></div>
-                        <div class="worm-segment segment-3 {{ $mascotBodyClass }}"></div>
-                        <div class="worm-segment segment-2 {{ $mascotBodyClass }}"></div>
-                        <div class="worm-segment segment-1 {{ $mascotBodyClass }}"></div>
-                        
-                        {{-- Main Head --}}
-                        <div class="worm-head {{ $mascotBodyClass }}">
-                            <div class="antenna-left" style="color: {{ $mascotAntennaColor }}"><div class="antenna-tip"></div></div>
-                            <div class="antenna-right" style="color: {{ $mascotAntennaColor }}"><div class="antenna-tip"></div></div>
-                            <div class="mascot-face">
-                                <div class="eye-container">
-                                    {!! $mascotEyes !!}
+                <!-- 3D Mascot: Interactive Glowing Vault -->
+                <div class="mascot-wrapper">
+                    <div class="vault-container" :class="hero ? hero.mascotMood : '{{ $hPercent >= 100 ? 'overflow' : ($hPercent >= 75 ? 'open' : ($hPercent >= 50 ? 'cracked' : 'closed')) }}'">
+                        <div class="vault-box">
+                            <!-- Interior / Glow reveal -->
+                            <div class="vault-interior">
+                                <div class="vault-glow"></div>
+                            </div>
+                            
+                            <!-- Gold Coins & Sparkles Spilling Out -->
+                            <div class="vault-coins">
+                                <div class="coin-particle coin-1"></div>
+                                <div class="coin-particle coin-2"></div>
+                                <div class="coin-particle coin-3"></div>
+                                <div class="coin-particle coin-4"></div>
+                                <span class="sparkle-particle sparkle-1">✨</span>
+                                <span class="sparkle-particle sparkle-2">⭐</span>
+                            </div>
+
+                            <!-- Door with Combination Wheel & Led -->
+                            <div class="vault-door-hinge">
+                                <div class="vault-door">
+                                    <div class="vault-led"></div>
+                                    <div class="vault-wheel">
+                                        <div class="wheel-handle handle-1"></div>
+                                        <div class="wheel-handle handle-2"></div>
+                                        <div class="wheel-handle handle-3"></div>
+                                    </div>
                                 </div>
-                                {!! $mascotMouth !!}
                             </div>
                         </div>
                     </div>
-                    {!! $mascotDecorations !!}
                 </div>
             </div>
+
             @else
             {{-- No data yet - simple placeholder --}}
             <div class="bg-black/20 border border-white/10 rounded-3xl py-5 px-4 text-center">
@@ -433,290 +444,304 @@
         transform: scale(1.02);
     }
 
-    /* Wiggling Caterpillar/Worm Mascot Styles */
+    /* Loop animations for cards based on target achievements/gaps */
+    @keyframes gapPulse {
+        0%, 100% {
+            box-shadow: 0 2px 4px rgba(244, 63, 94, 0.04);
+            border-color: rgba(244, 63, 94, 0.2);
+        }
+        50% {
+            box-shadow: 0 0 14px rgba(244, 63, 94, 0.22);
+            border-color: rgba(244, 63, 94, 0.6);
+        }
+    }
+    .animate-gap-pulse {
+        animation: gapPulse 3s infinite ease-in-out;
+    }
+
+    @keyframes achievedPulse {
+        0%, 100% {
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.04);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        50% {
+            box-shadow: 0 0 14px rgba(16, 185, 129, 0.22);
+            border-color: rgba(16, 185, 129, 0.6);
+        }
+    }
+    .animate-achieved-pulse {
+        animation: achievedPulse 3s infinite ease-in-out;
+    }
+
+    /* Modern 3D Vault/Safe Mascot Styles */
     .mascot-wrapper {
         position: absolute;
-        right: 14px;
+        right: 12px;
         top: 24px;
-        width: 100px;
-        height: 60px;
+        width: 82px;
+        height: 82px;
         z-index: 5;
+        perspective: 600px;
+    }
+    .vault-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
+        transform: rotateY(-24deg) rotateX(12deg);
+        transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* Vault Outer Shell Box */
+    .vault-box {
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 35% 35%, #475569 20%, #1e293b 80%, #0f172a);
+        border: 2px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        position: relative;
+        transform-style: preserve-3d;
+        box-shadow: 
+            0 10px 25px -5px rgba(0,0,0,0.5),
+            inset 2px 2px 4px rgba(255,255,255,0.1),
+            inset -3px -3px 8px rgba(0,0,0,0.6);
+    }
+    /* Vault Frame Outer Bezel */
+    .vault-box::after {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border: 1.5px solid rgba(255,255,255,0.04);
+        border-radius: 14px;
         pointer-events: none;
     }
-    .worm-container {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-    }
-    .worm-head {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
+    /* Vault Door Hinge & Door container */
+    .vault-door-hinge {
         position: absolute;
-        left: 0;
-        z-index: 10;
-        box-shadow: 
-            inset -3px -3px 6px rgba(0,0,0,0.4),
-            inset 3px 3px 6px rgba(255,255,255,0.3),
-            0 4px 8px rgba(0,0,0,0.2);
-        animation: wormSlither 1.6s infinite ease-in-out;
+        inset: 6px;
+        transform-style: preserve-3d;
     }
-    .worm-segment {
-        border-radius: 50%;
+    /* Vault Door with metal plates & wheel */
+    .vault-door {
         position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, #64748b, #334155, #1e293b);
+        border-radius: 10px;
+        transform-origin: left center;
+        transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.8s;
+        transform-style: preserve-3d;
         box-shadow: 
-            inset -2px -2px 4px rgba(0,0,0,0.4),
-            inset 2px 2px 4px rgba(255,255,255,0.3),
-            0 3px 6px rgba(0,0,0,0.15);
-        animation: wormSlither 1.6s infinite ease-in-out;
+            2px 0 5px rgba(0,0,0,0.4),
+            inset 1.5px 1.5px 3px rgba(255,255,255,0.15),
+            inset -1.5px -1.5px 3px rgba(0,0,0,0.5);
     }
-    /* Segments positioning & scaling to taper off to the tail */
-    .segment-1 {
-        width: 30px;
-        height: 30px;
-        left: 28px;
-        z-index: 9;
-        animation-delay: -0.2s;
+    /* Combination Locking Wheel */
+    .vault-wheel {
+        position: absolute;
+        top: 50%;
+        left: 55%;
+        width: 32px;
+        height: 32px;
+        margin-top: -16px;
+        margin-left: -16px;
+        background: radial-gradient(circle, #e2e8f0 30%, #94a3b8 70%, #475569);
+        border: 2px solid #1e293b;
+        border-radius: 50%;
+        box-shadow: 
+            0 2px 4px rgba(0,0,0,0.3),
+            inset 1px 1px 2px rgba(255,255,255,0.3);
+        transform: translateZ(5px);
+        transform-style: preserve-3d;
+        transition: transform 0.8s ease;
     }
-    .segment-2 {
-        width: 24px;
-        height: 24px;
-        left: 48px;
-        z-index: 8;
-        animation-delay: -0.4s;
+    /* Wheel Spokes and Details */
+    .vault-wheel::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        border: 2px dashed #475569;
+        border-radius: 50%;
     }
-    .segment-3 {
-        width: 18px;
-        height: 18px;
-        left: 64px;
-        z-index: 7;
-        animation-delay: -0.6s;
+    .vault-wheel::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 6px;
+        height: 6px;
+        margin-top: -3px;
+        margin-left: -3px;
+        background: #0f172a;
+        border-radius: 50%;
+        box-shadow: inset 1px 1px 1px rgba(255,255,255,0.4);
     }
-    .segment-4 {
-        width: 12px;
+    /* Wheel handle knobs */
+    .wheel-handle {
+        position: absolute;
+        width: 4px;
         height: 12px;
-        left: 76px;
-        z-index: 6;
-        animation-delay: -0.8s;
+        background: #cbd5e1;
+        left: 50%;
+        margin-left: -2px;
+        transform-origin: center 16px;
+        border-radius: 2px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
     }
+    .handle-1 { transform: rotate(0deg); }
+    .handle-2 { transform: rotate(120deg); }
+    .handle-3 { transform: rotate(240deg); }
 
-    /* Mascot body gradient coloring */
-    .body-happy {
-        background: radial-gradient(circle at 30% 30%, #34d399, #059669 65%, #064e3b);
-    }
-    .body-smart {
-        background: radial-gradient(circle at 30% 30%, #2dd4bf, #0d9488 65%, #115e59);
-    }
-    .body-determined {
-        background: radial-gradient(circle at 30% 30%, #fbbf24, #d97706 65%, #78350f);
-    }
-    .body-sad {
-        background: radial-gradient(circle at 30% 30%, #fb7185, #e11d48 65%, #881337);
-    }
-
-    /* 3D Antennae */
-    .antenna-left, .antenna-right {
+    /* Vault LED Indicator */
+    .vault-led {
         position: absolute;
-        width: 3px;
-        height: 10px;
-        background: currentColor;
-        bottom: 85%;
-        border-radius: 3px;
-        transform-origin: bottom center;
-    }
-    .antenna-left {
-        left: 12px;
-        transform: rotate(-25deg);
-    }
-    .antenna-right {
-        right: 12px;
-        transform: rotate(25deg);
-    }
-    .antenna-tip {
-        position: absolute;
+        top: 8px;
+        right: 8px;
         width: 5px;
         height: 5px;
-        background: currentColor;
         border-radius: 50%;
-        top: -4px;
-        left: -1px;
-        box-shadow: inset -1px -1px 2px rgba(0,0,0,0.3);
+        transform: translateZ(3px);
+        box-shadow: 0 0 6px currentColor;
+        transition: color 0.5s ease;
     }
 
-    /* Mascot Face */
-    .mascot-face {
-        width: 100%;
-        height: 100%;
-        position: relative;
-    }
-
-    /* 3D Eyes */
-    .eye-container {
-        display: flex;
-        gap: 6px;
+    /* Inside Wall of Vault (revealed when door opens) */
+    .vault-interior {
         position: absolute;
-        top: 12px;
-        left: 50%;
-        transform: translateX(-50%);
-    }
-    .mascot-eye {
-        width: 8px;
-        height: 8px;
-        background: white;
-        border-radius: 50%;
-        position: relative;
-        box-shadow: inset 1px 1px 2px rgba(0,0,0,0.6);
-        animation: blinkEye 4s infinite;
-    }
-    .pupil {
-        width: 4px;
-        height: 4px;
-        background: #0f172a;
-        border-radius: 50%;
-        position: absolute;
-        top: 2px;
-        left: 2px;
-    }
-    .pupil::after {
-        content: '';
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        background: white;
-        border-radius: 50%;
-        top: 0.5px;
-        left: 0.5px;
-    }
-
-    /* Tears for Sad Emotion */
-    .tear-drop {
-        position: absolute;
-        width: 2.5px;
-        height: 4px;
-        background: #38bdf8;
-        border-radius: 0 50% 50% 50%;
-        transform: rotate(45deg);
-        top: 6px;
-        left: 2.5px;
-        animation: fallTear 1.5s infinite linear;
-    }
-
-    /* Dynamic Mouth shapes */
-    .mascot-mouth {
-        position: absolute;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 10px;
-        height: 5px;
-        border-bottom: 2px solid #0f172a;
-        border-radius: 0 0 6px 6px;
-    }
-    .mouth-sad {
-        width: 8px;
-        height: 3px;
-        border-bottom: none;
-        border-top: 2px solid #0f172a;
-        border-radius: 6px 6px 0 0;
-        bottom: 8px;
-    }
-    .mouth-determined {
-        width: 7px;
-        height: 2px;
-        background: #0f172a;
-        border-radius: 1px;
-        border: none;
-        bottom: 10px;
-    }
-    .mouth-happy {
-        width: 14px;
-        height: 7px;
-        background: #e11d48;
-        border-bottom: 1.5px solid #0f172a;
-        border-radius: 0 0 14px 14px;
+        inset: 4px;
+        background: #090d16;
+        border-radius: 14px;
+        transform: translateZ(-2px);
         overflow: hidden;
-        position: absolute;
     }
-    .mouth-happy::before {
-        content: '';
+    /* Glowing inner gold light */
+    .vault-glow {
         position: absolute;
-        width: 8px;
-        height: 3px;
-        background: #fda4af;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(245,158,11,0) 0%, transparent 80%);
+        border-radius: 14px;
+        transition: background 0.8s ease;
+        mix-blend-mode: screen;
+    }
+
+    /* Floating Gold Coins */
+    .vault-coins {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        transform-style: preserve-3d;
+        z-index: 4;
+    }
+    .coin-particle {
+        position: absolute;
+        background: radial-gradient(circle at 35% 35%, #fef08a 10%, #eab308 70%, #ca8a04);
+        border: 0.5px solid #854d0e;
         border-radius: 50%;
-        bottom: -1px;
-        left: 3px;
-    }
-
-    /* Floating Decor Items */
-    .decor-item {
-        position: absolute;
-        font-size: 11px;
         opacity: 0;
-        animation: floatDecor 3s infinite ease-out;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.6s ease;
     }
-    .decor-1 { top: -8px; left: -8px; animation-delay: 0s; }
-    .decor-2 { top: -12px; right: -4px; animation-delay: 1s; }
-    .decor-3 { bottom: 8px; right: -15px; animation-delay: 0.5s; }
+    .coin-1 { width: 9px; height: 9px; left: 60%; top: 50%; transition-delay: 0.1s; }
+    .coin-2 { width: 7px; height: 7px; left: 55%; top: 40%; transition-delay: 0.2s; }
+    .coin-3 { width: 8px; height: 8px; left: 70%; top: 60%; transition-delay: 0.05s; }
+    .coin-4 { width: 6px; height: 6px; left: 45%; top: 55%; transition-delay: 0.15s; }
 
-    /* Mascot Animations */
-    @keyframes blinkEye {
-        0%, 90%, 100% { transform: scaleY(1); }
-        95% { transform: scaleY(0.1); }
+    /* Sparkles */
+    .sparkle-particle {
+        position: absolute;
+        font-size: 8px;
+        opacity: 0;
+        transition: transform 0.8s ease, opacity 0.6s ease;
     }
-    @keyframes fallTear {
-        0% { transform: translateY(0) rotate(45deg); opacity: 1; }
-        100% { transform: translateY(9px) rotate(45deg); opacity: 0; }
-    }
-    @keyframes floatDecor {
-        0% { transform: translateY(8px) scale(0.5); opacity: 0; }
-        50% { opacity: 1; }
-        100% { transform: translateY(-16px) scale(1.1); opacity: 0; }
-    }
+    .sparkle-1 { left: 45%; top: 30%; transition-delay: 0.25s; }
+    .sparkle-2 { left: 75%; top: 45%; transition-delay: 0.1s; }
 
-    /* Mascot motion based on status */
-    .worm-head, .worm-segment {
-        animation-iteration-count: infinite;
-        animation-timing-function: ease-in-out;
+    /* Mascot Reactions/States */
+    /* State 1: Closed (Needs Push < 50%) */
+    .closed .vault-door {
+        transform: rotateY(0deg);
     }
-    .anim-happy .worm-head, .anim-happy .worm-segment {
-        animation-name: wormSlither, mascotHappyBounce;
-        animation-duration: 1.2s, 1.2s;
+    .closed .vault-led {
+        color: #f43f5e; /* Rose / Red LED */
+        animation: blinkLed 1s infinite alternate;
     }
-    .anim-smart .worm-head, .anim-smart .worm-segment {
-        animation-name: wormSlither;
-        animation-duration: 1.8s;
-    }
-    .anim-determined .worm-head, .anim-determined .worm-segment {
-        animation-name: wormSlither;
-        animation-duration: 0.9s;
-    }
-    .anim-sad .worm-head, .anim-sad .worm-segment {
-        animation-name: wormSlitherSad, wormShiver;
-        animation-duration: 2.2s, 0.12s;
-        animation-timing-function: ease-in-out, linear;
+    .closed .vault-wheel {
+        transform: translateZ(5px) rotate(0deg);
     }
 
-    @keyframes wormSlither {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-8px); }
+    /* State 2: Cracked (In Progress 50% - 74%) */
+    .cracked .vault-door {
+        transform: rotateY(-30deg);
+        box-shadow: 5px 0 10px rgba(0,0,0,0.6);
     }
-    @keyframes wormSlitherSad {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(3px); }
+    .cracked .vault-led {
+        color: #f59e0b; /* Amber LED */
+        animation: blinkLed 0.6s infinite alternate;
     }
-    @keyframes mascotHappyBounce {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.08); }
+    .cracked .vault-glow {
+        background: radial-gradient(circle at center, rgba(245,158,11,0.5) 20%, rgba(245,158,11,0.1) 60%, transparent 80%);
     }
-    @keyframes wormShiver {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-0.8px); }
-        75% { transform: translateX(0.8px); }
+    .cracked .vault-wheel {
+        transform: translateZ(5px) rotate(90deg);
+    }
+
+    /* State 3: Open (On Track 75% - 99%) */
+    .open .vault-door {
+        transform: rotateY(-75deg);
+        box-shadow: 10px 0 15px rgba(0,0,0,0.7);
+    }
+    .open .vault-led {
+        color: #10b981; /* Emerald LED */
+    }
+    .open .vault-glow {
+        background: radial-gradient(circle at center, rgba(52,211,153,0.7) 20%, rgba(52,211,153,0.2) 60%, transparent 80%);
+    }
+    .open .vault-wheel {
+        transform: translateZ(5px) rotate(180deg);
+    }
+    .open .coin-1 { opacity: 1; transform: translate(14px, -10px) rotate(25deg) scale(1.2); }
+    .open .coin-2 { opacity: 1; transform: translate(12px, -20px) rotate(-15deg) scale(1.2); }
+    .open .coin-3 { opacity: 1; transform: translate(20px, 5px) rotate(45deg) scale(1.1); }
+    .open .coin-4 { opacity: 1; transform: translate(8px, 12px) rotate(10deg) scale(1.2); }
+    .open .sparkle-1 { opacity: 1; transform: translate(15px, -15px) scale(1.3); }
+
+    /* State 4: Overflow (Target Hit 100%+) */
+    .overflow .vault-door {
+        transform: rotateY(-115deg);
+        box-shadow: 15px 0 25px rgba(0,0,0,0.8);
+    }
+    .overflow .vault-led {
+        color: #34d399; /* Bright Emerald */
+        animation: blinkLed 0.3s infinite alternate;
+    }
+    .overflow .vault-glow {
+        background: radial-gradient(circle at center, rgba(52,211,153,0.95) 15%, rgba(16,185,129,0.3) 55%, transparent 80%);
+    }
+    .overflow .vault-wheel {
+        transform: translateZ(5px) rotate(360deg);
+        animation: spinWheel 2.5s infinite linear;
+    }
+    /* Coins spilling completely out */
+    .overflow .coin-1 { opacity: 1; transform: translate(25px, -12px) rotate(45deg) scale(1.4); }
+    .overflow .coin-2 { opacity: 1; transform: translate(20px, -28px) rotate(-35deg) scale(1.3); }
+    .overflow .coin-3 { opacity: 1; transform: translate(32px, 8px) rotate(65deg) scale(1.3); }
+    .overflow .coin-4 { opacity: 1; transform: translate(18px, 22px) rotate(25deg) scale(1.4); }
+    .overflow .sparkle-1 { opacity: 1; transform: translate(22px, -22px) scale(1.5); animation: floatSparkle 1.2s infinite ease-in-out alternate; }
+    .overflow .sparkle-2 { opacity: 1; transform: translate(28px, 12px) scale(1.5); animation: floatSparkle 1s infinite ease-in-out alternate-reverse; }
+
+    /* LED blink animation */
+    @keyframes blinkLed {
+        0% { opacity: 0.3; }
+        100% { opacity: 1; }
+    }
+    @keyframes spinWheel {
+        0% { transform: translateZ(5px) rotate(0deg); }
+        100% { transform: translateZ(5px) rotate(360deg); }
+    }
+    @keyframes floatSparkle {
+        0% { transform: translate(22px, -22px) scale(1.2); opacity: 0.8; }
+        100% { transform: translate(22px, -26px) scale(1.6); opacity: 1; }
     }
     </style>
+
 
 
     {{-- ===== FILTER PANEL (collapsible) ===== --}}
@@ -985,7 +1010,7 @@
         
         <div x-show="currentParentId === '{{ $parentIdStr }}'" x-transition x-cloak
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
-             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $cardBorder }} {{ $cardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
+             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $cardBorder }} {{ $cardBg }} {{ $tTargetAmt > 0 ? ($bSummary['total'] >= $tTargetAmt ? 'animate-achieved-pulse' : 'animate-gap-pulse') : '' }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
             @if($hasChildren || $hasAgents)
             <button type="button" @click="drillDown('{{ $team->id }}', '{{ $teamName }}')" class="w-full text-left">
             @else
@@ -1004,10 +1029,10 @@
                                 <i class="fas {{ $tTargetAmt > 0 ? $iconClass : ($isRoot ? 'fa-globe' : ($hasChildren ? 'fa-map-marker-alt' : 'fa-users')) }} text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="font-black {{ $nameColor }} text-base tracking-tight truncate uppercase flex items-center gap-1.5">
+                                <div class="font-black {{ $nameColor }} text-xl tracking-tight truncate uppercase flex items-center gap-1.5">
                                     {{ $teamName }}
                                 </div>
-                                <div class="text-[11px] {{ $infoColor }} font-bold mt-0.5">
+                                <div class="text-sm {{ $infoColor }} font-bold mt-0.5">
                                     {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
@@ -1022,25 +1047,25 @@
                     {{-- Metrics Comparison Grid --}}
                     <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 relative z-10">
                         <div>
-                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                            <span class="block text-sm font-black text-slate-800 tracking-tight">
+                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                            <span class="block text-lg font-black text-slate-800 tracking-tight">
                                 {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
                             </span>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                            <span class="block text-lg font-black text-emerald-600 tracking-tight">
                                 {{ $formatCr($bSummary['total']) }}
                             </span>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                             @if($tTargetAmt > 0)
-                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            <span class="block text-lg font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                 {{ $tPercent }}%
                             </span>
                             @else
-                            <span class="block text-[10px] font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                            <span class="block text-sm font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
                             @endif
                         </div>
                     </div>
@@ -1054,16 +1079,16 @@
                                 <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                        <div class="flex items-center justify-between text-sm font-black uppercase tracking-wider">
                             @if($bSummary['total'] >= $tTargetAmt)
-                            <span class="text-emerald-650 flex items-center gap-1">
-                                <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                            <span class="text-emerald-650 flex items-center gap-1.5">
+                                <i class="fas fa-check-circle text-sm"></i> Target Achieved
                             </span>
                             <span class="text-emerald-650">0 Left</span>
                             @else
                             @php $gapAmt = $tTargetAmt - $bSummary['total']; @endphp
-                            <span class="text-rose-605 flex items-center gap-1">
-                                <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                            <span class="text-rose-605 flex items-center gap-1.5">
+                                <i class="fas fa-exclamation-triangle text-sm"></i> Target Gap
                             </span>
                             <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
                             @endif
@@ -1156,7 +1181,7 @@
                     {{-- Agent card under its team --}}
                     <div x-show="currentParentId === '{{ $team->id }}'" x-transition x-cloak
                          style="animation-delay: {{ $loop->index * 0.05 }}s;"
-                         class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
+                         class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} {{ $targetAmt > 0 ? ($agentTotal >= $targetAmt ? 'animate-achieved-pulse' : 'animate-gap-pulse') : '' }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
                         <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
                             {{-- Agent Title Row --}}
                             <div class="flex items-center justify-between relative z-10 mb-3">
@@ -1165,10 +1190,10 @@
                                         <i class="fas fa-user-tie text-xs"></i>
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="font-black {{ $agentNameColor }} text-sm truncate uppercase flex items-center gap-1.5">
+                                        <div class="font-black {{ $agentNameColor }} text-lg truncate uppercase flex items-center gap-1.5">
                                             {{ $agentName }}
                                         </div>
-                                        <div class="text-[10px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
+                                        <div class="text-sm {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                                     </div>
                                 </div>
                                 <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }} flex-shrink-0">
@@ -1179,25 +1204,25 @@
                             {{-- Metrics Comparison Grid --}}
                             <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 mb-3 relative z-10">
                                 <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                                    <span class="block text-sm font-black text-slate-800 tracking-tight">
+                                    <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                                    <span class="block text-lg font-black text-slate-800 tracking-tight">
                                         {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
                                     </span>
                                 </div>
                                 <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                                    <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                                    <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                                    <span class="block text-lg font-black text-emerald-600 tracking-tight">
                                         {{ $formatCr($agentTotal) }}
                                     </span>
                                 </div>
                                 <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                                    <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                                     @if($targetAmt > 0)
-                                    <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                                    <span class="block text-lg font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                         {{ $percent }}%
                                     </span>
                                     @else
-                                    <span class="block text-[10px] font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                                    <span class="block text-sm font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
                                     @endif
                                 </div>
                             </div>
@@ -1211,16 +1236,16 @@
                                         <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                                <div class="flex items-center justify-between text-sm font-black uppercase tracking-wider">
                                     @if($agentTotal >= $targetAmt)
-                                    <span class="text-emerald-650 flex items-center gap-1">
-                                        <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                                    <span class="text-emerald-650 flex items-center gap-1.5">
+                                        <i class="fas fa-check-circle text-sm"></i> Target Achieved
                                     </span>
                                     <span class="text-emerald-650">0 Left</span>
                                     @else
                                     @php $gapAmt = $targetAmt - $agentTotal; @endphp
-                                    <span class="text-rose-605 flex items-center gap-1">
-                                        <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                                    <span class="text-rose-605 flex items-center gap-1.5">
+                                        <i class="fas fa-exclamation-triangle text-sm"></i> Target Gap
                                     </span>
                                     <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
                                     @endif
@@ -1334,7 +1359,7 @@
         
         <div x-show="currentParentId === 'root'" x-transition x-cloak
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
-             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $cardBorder }} {{ $cardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
+             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $cardBorder }} {{ $cardBg }} {{ $tTargetAmt > 0 ? ($bSummary['total'] >= $tTargetAmt ? 'animate-achieved-pulse' : 'animate-gap-pulse') : '' }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
             <button type="button" @click="drillDown('{{ $tSlug }}', '{{ $teamName }}')" class="w-full text-left p-4">
                 <div class="relative">
                     {{-- Soft glow overlay --}}
@@ -1349,10 +1374,10 @@
                                 <i class="fas {{ $tTargetAmt > 0 ? $iconClass : 'fa-building' }} text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="font-black {{ $nameColor }} text-base tracking-tight truncate uppercase flex items-center gap-1.5">
+                                <div class="font-black {{ $nameColor }} text-xl tracking-tight truncate uppercase flex items-center gap-1.5">
                                     {{ $teamName }}
                                 </div>
-                                <div class="text-[11px] {{ $infoColor }} font-bold mt-0.5">
+                                <div class="text-sm {{ $infoColor }} font-bold mt-0.5">
                                     {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
@@ -1365,25 +1390,25 @@
                     {{-- Metrics Comparison Grid --}}
                     <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 relative z-10">
                         <div>
-                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                            <span class="block text-sm font-black text-slate-800 tracking-tight">
+                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                            <span class="block text-lg font-black text-slate-800 tracking-tight">
                                 {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
                             </span>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                            <span class="block text-lg font-black text-emerald-600 tracking-tight">
                                 {{ $formatCr($bSummary['total']) }}
                             </span>
                         </div>
                         <div>
-                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                             @if($tTargetAmt > 0)
-                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            <span class="block text-lg font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                 {{ $tPercent }}%
                             </span>
                             @else
-                            <span class="block text-[10px] font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                            <span class="block text-sm font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
                             @endif
                         </div>
                     </div>
@@ -1397,16 +1422,16 @@
                                 <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                        <div class="flex items-center justify-between text-sm font-black uppercase tracking-wider">
                             @if($bSummary['total'] >= $tTargetAmt)
-                            <span class="text-emerald-650 flex items-center gap-1">
-                                <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                            <span class="text-emerald-650 flex items-center gap-1.5">
+                                <i class="fas fa-check-circle text-sm"></i> Target Achieved
                             </span>
                             <span class="text-emerald-650">0 Left</span>
                             @else
                             @php $gapAmt = $tTargetAmt - $bSummary['total']; @endphp
-                            <span class="text-rose-605 flex items-center gap-1">
-                                <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                            <span class="text-rose-605 flex items-center gap-1.5">
+                                <i class="fas fa-exclamation-triangle text-sm"></i> Target Gap
                             </span>
                             <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
                             @endif
@@ -1486,7 +1511,7 @@
         
         <div x-show="currentParentId === '{{ $tSlug }}'" x-transition x-cloak
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
-             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
+             class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} {{ $targetAmt > 0 ? ($agentTotal >= $targetAmt ? 'animate-achieved-pulse' : 'animate-gap-pulse') : '' }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
             <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
                 {{-- Agent Title Row --}}
                 <div class="flex items-center justify-between relative z-10 mb-3">
@@ -1495,10 +1520,10 @@
                             <i class="fas fa-user-tie text-xs"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="font-black {{ $agentNameColor }} text-sm truncate uppercase flex items-center gap-1.5">
+                            <div class="font-black {{ $agentNameColor }} text-base truncate uppercase flex items-center gap-1.5">
                                 {{ $agentName }}
                             </div>
-                            <div class="text-[10px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
+                            <div class="text-xs {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                         </div>
                     </div>
                     <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }} flex-shrink-0">
@@ -1509,25 +1534,25 @@
                 {{-- Metrics Comparison Grid --}}
                 <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 mb-3 relative z-10">
                     <div>
-                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                        <span class="block text-sm font-black text-slate-800 tracking-tight">
+                        <span class="block text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                        <span class="block text-base font-black text-slate-800 tracking-tight">
                             {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
                         </span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                        <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                        <span class="block text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                        <span class="block text-base font-black text-emerald-600 tracking-tight">
                             {{ $formatCr($agentTotal) }}
                         </span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                        <span class="block text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                         @if($targetAmt > 0)
-                        <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                        <span class="block text-base font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                             {{ $percent }}%
                         </span>
                         @else
-                        <span class="block text-[10px] font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                        <span class="block text-xs font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
                         @endif
                     </div>
                 </div>
@@ -1541,16 +1566,16 @@
                             <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                         </div>
                     </div>
-                    <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                    <div class="flex items-center justify-between text-[13px] font-black uppercase tracking-wider">
                         @if($agentTotal >= $targetAmt)
-                        <span class="text-emerald-650 flex items-center gap-1">
-                            <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                        <span class="text-emerald-650 flex items-center gap-1.5">
+                            <i class="fas fa-check-circle text-xs"></i> Target Achieved
                         </span>
                         <span class="text-emerald-650">0 Left</span>
                         @else
                         @php $gapAmt = $targetAmt - $agentTotal; @endphp
-                        <span class="text-rose-605 flex items-center gap-1">
-                            <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                        <span class="text-rose-605 flex items-center gap-1.5">
+                            <i class="fas fa-exclamation-triangle text-xs"></i> Target Gap
                         </span>
                         <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
                         @endif
@@ -1710,7 +1735,7 @@ window.crStats = @json($crStatsMap);
 
 function collectionApp() {
     return {
-        showFilters: {{ request()->has('fetch') ? 'false' : 'true' }},
+        showFilters: false,
         currentParentId: 'root',
         currentTitle: 'All Groups',
         history: [],
@@ -1769,7 +1794,7 @@ function collectionApp() {
                 isRoot: s.isRoot,
                 gradient, barColor, badgeBg, badgeText, badgeBorder, label, icon,
                 milestone, dashOffset, circ,
-                mascotMood: pct >= 100 ? 'happy' : pct >= 75 ? 'good' : pct >= 50 ? 'mid' : 'sad',
+                mascotMood: pct >= 100 ? 'overflow' : pct >= 75 ? 'open' : pct >= 50 ? 'cracked' : 'closed',
             };
         },
 
