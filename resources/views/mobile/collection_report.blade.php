@@ -206,7 +206,9 @@
             $mascotAntennaColor = '#881337';
         }
     @endphp
-    <div class="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br {{ $hGradFrom }} {{ $hGradVia }} {{ $hGradTo }} p-6 shadow-xl {{ $hGlow }}">
+    <div class="relative overflow-hidden rounded-[2.5rem] p-6 shadow-xl transition-all duration-700"
+         :style="hero ? 'background: ' + hero.gradient : null"
+         style="background: linear-gradient(135deg, {{ $hPercent >= 100 ? '#10b981,#059669,#0d9488' : ($hPercent >= 75 ? '#10b981,#059669,#0f766e' : ($hPercent >= 50 ? '#f59e0b,#f97316,#d97706' : '#f43f5e,#e11d48,#b91c1c')) }})">
         <div class="absolute -top-10 -right-10 w-52 h-52 bg-white/10 rounded-full blur-3xl"></div>
         <div class="absolute bottom-0 left-0 w-36 h-36 bg-black/10 rounded-full blur-2xl"></div>
         
@@ -252,66 +254,55 @@
                     
                     {{-- SVG Circular Progress Ring --}}
                     <div class="relative flex-shrink-0 w-20 h-20 relative z-10">
+                        <!-- Circular progress SVG - reactive -->
                         <svg class="w-20 h-20 -rotate-90" viewBox="0 0 60 60">
-                            {{-- Track ring --}}
                             <circle cx="30" cy="30" r="26"
                                     fill="none"
                                     stroke="rgba(255,255,255,0.15)"
                                     stroke-width="5"/>
-                            {{-- Progress arc --}}
                             <circle cx="30" cy="30" r="26"
                                     class="ring-anim"
                                     fill="none"
-                                    stroke="{{ $hBarColor }}"
+                                    :stroke="hero ? hero.barColor : '{{ $hBarColor }}'"
                                     stroke-width="5"
                                     stroke-linecap="round"
-                                    stroke-dasharray="{{ $circ }}"
-                                    stroke-dashoffset="{{ $dashOffset }}"/>
+                                    :stroke-dasharray="hero ? hero.circ : {{ $circ }}"
+                                    :stroke-dashoffset="hero ? hero.dashOffset : {{ $dashOffset }}"/>
                         </svg>
                         {{-- Center % label --}}
                         <div class="absolute inset-0 flex flex-col items-center justify-center float-anim">
-                            <span class="text-base font-black text-white leading-none">{{ $hPercent }}<span class="text-[9px]">%</span></span>
+                            <span class="text-base font-black text-white leading-none" x-text="hero ? hero.percent + '%' : '{{ $hPercent }}%'"></span>
                         </div>
                     </div>
                     
                     {{-- Right: Collection amount + target + badge --}}
                     <div class="flex-1 min-w-0 pr-[85px] relative z-10">
-                        <div class="text-[8px] font-black text-white/50 uppercase tracking-widest mb-0.5">Total Collected</div>
-                        <div class="text-3xl font-black text-white leading-none tracking-tight">{{ $formatCr($grandTotal) }}</div>
-                        @if(isset($grandTarget) && $grandTarget > 0)
-                        <div class="text-[9px] text-white/60 font-bold mt-1">
-                            of <span class="text-white font-black">{{ $formatCr($grandTarget) }}</span> target
+                        <div class="text-[8px] font-black text-white/50 uppercase tracking-widest mb-0.5"
+                             x-text="hero && !hero.isRoot ? hero.title + ' — Collected' : 'Total Collected'">Total Collected</div>
+                        <div class="text-3xl font-black text-white leading-none tracking-tight"
+                             x-text="hero ? hero.total : '{{ $formatCr($grandTotal) }}'">{{ $formatCr($grandTotal) }}</div>
+                        <div class="text-[9px] text-white/60 font-bold mt-1" x-show="hero ? hero.hasTarget : {{ $grandTarget > 0 ? 'true' : 'false' }}">
+                            of <span class="text-white font-black" x-text="hero ? hero.target : '{{ $formatCr($grandTarget) }}'">{{ $formatCr($grandTarget ?? 0) }}</span> target
                         </div>
-                        @endif
                         
                         {{-- Status Badge --}}
-                        <div class="mt-2 inline-flex items-center gap-1.5 {{ $hBadgeBg }} border {{ $hBadgeBorder }} px-2.5 py-1 rounded-xl badge-pulse">
-                            <i class="fas {{ $hIcon }} {{ $hBadgeText }} text-[8px] float-anim"></i>
-                            <span class="text-[8px] font-black {{ $hBadgeText }} tracking-widest">{{ $hLabel }}</span>
+                        <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl badge-pulse border transition-all duration-500"
+                             :style="hero ? 'background:'+hero.badgeBg+';border-color:'+hero.badgeBorder : ''">
+                            <i class="fas float-anim text-[8px]" :class="hero ? hero.icon : '{{ $hIcon }}'" :style="hero ? 'color:'+hero.badgeText : ''"></i>
+                            <span class="text-[8px] font-black tracking-widest" :style="hero ? 'color:'+hero.badgeText : ''" x-text="hero ? hero.label : '{{ $hLabel }}'">{{ $hLabel }}</span>
                         </div>
                     </div>
                 </div>
                 
                 {{-- Progress Bar (linear, below) --}}
-                @if(isset($grandTarget) && $grandTarget > 0)
-                <div class="mt-4 relative z-10">
+                <div class="mt-4 relative z-10" x-show="hero ? hero.hasTarget : {{ $grandTarget > 0 ? 'true' : 'false' }}">
                     <div class="flex items-center justify-between mb-1.5">
                         <span class="text-[8px] text-white/40 font-bold uppercase tracking-widest">Achievement</span>
-                        <span class="text-[8px] font-black text-white/70">
-                            @if($hPercent >= 100)
-                            <i class="fas fa-check-circle text-emerald-300 mr-1"></i>Completed
-                            @elseif($hPercent >= 75)
-                            <i class="fas fa-arrow-trend-up text-emerald-300 mr-1"></i>Almost there!
-                            @elseif($hPercent >= 50)
-                            <i class="fas fa-fire text-amber-300 mr-1"></i>Halfway
-                            @else
-                            <i class="fas fa-bolt text-rose-300 mr-1"></i>Keep going
-                            @endif
-                        </span>
+                        <span class="text-[8px] font-black text-white/70" x-text="hero ? hero.milestone : '{{ $hPercent >= 100 ? 'Completed' : ($hPercent >= 75 ? 'Almost there!' : ($hPercent >= 50 ? 'Halfway' : 'Keep going')) }}'"></span>
                     </div>
                     <div class="w-full bg-white/10 rounded-full h-3 overflow-hidden relative">
-                        <div class="h-3 rounded-full relative overflow-hidden transition-all duration-1000"
-                             style="width: {{ $hPercent }}%; background: {{ $hBarColor }};">
+                        <div class="h-3 rounded-full relative overflow-hidden transition-all duration-700"
+                             :style="'width:' + (hero ? hero.percent : {{ $hPercent }}) + '%; background:' + (hero ? hero.barColor : '{{ $hBarColor }}')">
                             {{-- Shimmer animation --}}
                             <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%); background-size: 200px 100%;"></div>
                         </div>
@@ -328,20 +319,19 @@
                         <span class="text-[7px] text-white/30 font-bold">100%</span>
                     </div>
                 </div>
-                @endif
                 
                 {{-- Stat pills row --}}
                 <div class="flex items-center gap-2 mt-3 pt-3 border-t border-white/10 relative z-10">
                     <div class="flex-1 bg-white/10 rounded-2xl py-2 px-3 text-center">
-                        <div class="text-sm font-black text-white">{{ $hGroups }}</div>
-                        <div class="text-[7px] font-black text-white/50 uppercase tracking-widest mt-0.5">Groups</div>
+                        <div class="text-sm font-black text-white" x-text="hero ? hero.groups : '{{ $hGroups }}'">{{ $hGroups }}</div>
+                        <div class="text-[7px] font-black text-white/50 uppercase tracking-widest mt-0.5" x-text="hero && !hero.isRoot ? 'Agents' : 'Groups'">Groups</div>
                     </div>
                     <div class="flex-1 bg-white/10 rounded-2xl py-2 px-3 text-center">
-                        <div class="text-sm font-black text-white">{{ $hParties }}</div>
+                        <div class="text-sm font-black text-white" x-text="hero ? hero.accounts : '{{ $hParties }}'">{{ $hParties }}</div>
                         <div class="text-[7px] font-black text-white/50 uppercase tracking-widest mt-0.5">Accounts</div>
                     </div>
                     <div class="flex-1 bg-white/10 rounded-2xl py-2 px-3 text-center">
-                        <div class="text-sm font-black text-white">{{ $hPercent }}%</div>
+                        <div class="text-sm font-black text-white" x-text="(hero ? hero.percent : {{ $hPercent }}) + '%'">{{ $hPercent }}%</div>
                         <div class="text-[7px] font-black text-white/50 uppercase tracking-widest mt-0.5">Achieved</div>
                     </div>
                 </div>
@@ -1007,52 +997,79 @@
                     <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full blur-xl opacity-10 {{ $tPercent >= 100 ? 'bg-emerald-400' : ($tPercent >= 75 ? 'bg-teal-400' : ($tPercent >= 50 ? 'bg-amber-400' : 'bg-rose-400')) }}"></div>
                     @endif
                     
-                    <div class="flex items-center justify-between relative z-10">
+                    {{-- Title Row --}}
+                    <div class="flex items-center justify-between relative z-10 mb-3">
                         <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-transform duration-300 {{ $iconBg }}">
+                            <div class="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 transition-transform duration-300 {{ $iconBg }}">
                                 <i class="fas {{ $tTargetAmt > 0 ? $iconClass : ($isRoot ? 'fa-globe' : ($hasChildren ? 'fa-map-marker-alt' : 'fa-users')) }} text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="font-black {{ $nameColor }} text-sm tracking-tight truncate uppercase flex items-center gap-1.5">
+                                <div class="font-black {{ $nameColor }} text-base tracking-tight truncate uppercase flex items-center gap-1.5">
                                     {{ $teamName }}
-                                    @if($tTargetAmt > 0)
-                                    <span class="text-[8px] font-black tracking-widest px-2 py-0.5 rounded-lg {{ $tPercent >= 100 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : ($tPercent >= 75 ? 'bg-teal-500/10 text-teal-700 border border-teal-500/20' : ($tPercent >= 50 ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rose-500/10 text-rose-700 border border-rose-500/15')) }}">
-                                        {{ $percentText }}
-                                    </span>
-                                    @endif
                                 </div>
-                                <div class="text-[9px] {{ $infoColor }} font-bold mt-0.5">
+                                <div class="text-[11px] {{ $infoColor }} font-bold mt-0.5">
                                     {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="flex items-center gap-2 ml-2 flex-shrink-0 relative z-10">
-                            <div class="text-right">
-                                <div class="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Collected</div>
-                                <div class="text-emerald-600 font-black text-base leading-none mt-0.5">{{ $formatCr($bSummary['total']) }}</div>
-                            </div>
-                            @if($hasChildren || $hasAgents)
-                            <div class="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }}">
-                                <i class="fas fa-chevron-right text-[10px]"></i>
-                            </div>
+                        @if($hasChildren || $hasAgents)
+                        <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }} flex-shrink-0">
+                            <i class="fas fa-chevron-right text-[9px]"></i>
+                        </div>
+                        @endif
+                    </div>
+
+                    {{-- Metrics Comparison Grid --}}
+                    <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 relative z-10">
+                        <div>
+                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                            <span class="block text-sm font-black text-slate-800 tracking-tight">
+                                {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                                {{ $formatCr($bSummary['total']) }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                            @if($tTargetAmt > 0)
+                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                                {{ $tPercent }}%
+                            </span>
+                            @else
+                            <span class="block text-[10px] font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
                             @endif
                         </div>
                     </div>
-                    
+
                     {{-- Progress Details --}}
-                    <div class="mt-3.5 pt-3 border-t border-slate-100 relative z-10">
-                        <div class="flex items-center justify-between mb-1.5 text-[8px] font-bold uppercase tracking-widest {{ $infoColor }}">
-                            <span>Target: <strong class="{{ $nameColor }}">{{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '₹0' }}</strong></span>
-                            <span>Achieved: <strong class="{{ $percentColor }}">{{ $tTargetAmt > 0 ? $tPercent . '%' : '0%' }}</strong></span>
-                        </div>
-                        <div class="w-full {{ $progressBg }} rounded-full h-2 overflow-hidden relative border border-slate-100">
-                            <div class="h-2 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $progressColor }}"
-                                 style="width: {{ $tPercent > 0 ? $tPercent : 0 }}%">
+                    @if($tTargetAmt > 0)
+                    <div class="mt-3 relative z-10 space-y-2">
+                        <div class="w-full {{ $progressBg }} rounded-full h-1.5 overflow-hidden border border-slate-100/50">
+                            <div class="h-1.5 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $progressColor }}"
+                                 style="width: {{ $tPercent > 0 ? min(100, $tPercent) : 0 }}%">
                                 <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
+                        <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                            @if($bSummary['total'] >= $tTargetAmt)
+                            <span class="text-emerald-650 flex items-center gap-1">
+                                <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                            </span>
+                            <span class="text-emerald-650">0 Left</span>
+                            @else
+                            @php $gapAmt = $tTargetAmt - $bSummary['total']; @endphp
+                            <span class="text-rose-605 flex items-center gap-1">
+                                <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                            </span>
+                            <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
+                            @endif
+                        </div>
                     </div>
+                    @endif
                 </div>
             @if($hasChildren || $hasAgents)
             </button>
@@ -1141,47 +1158,75 @@
                          style="animation-delay: {{ $loop->index * 0.05 }}s;"
                          class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
                         <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
-                            <div class="flex items-center justify-between">
+                            {{-- Agent Title Row --}}
+                            <div class="flex items-center justify-between relative z-10 mb-3">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
                                     <div class="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 {{ $agentIconBg }}">
                                         <i class="fas fa-user-tie text-xs"></i>
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="font-black {{ $agentNameColor }} text-xs truncate uppercase flex items-center gap-1.5">
+                                        <div class="font-black {{ $agentNameColor }} text-sm truncate uppercase flex items-center gap-1.5">
                                             {{ $agentName }}
-                                            @if($targetAmt > 0)
-                                            <span class="text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-md {{ $percent >= 100 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : ($percent >= 75 ? 'bg-teal-500/10 text-teal-700 border border-teal-500/20' : ($percent >= 50 ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rose-500/10 text-rose-700 border border-rose-500/15')) }}">
-                                                {{ $agentPercentText }}
-                                            </span>
-                                            @endif
                                         </div>
-                                        <div class="text-[8px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
+                                        <div class="text-[10px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2 ml-2 flex-shrink-0">
-                                    <div class="text-right">
-                                        <div class="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Collected</div>
-                                        <div class="font-black text-emerald-600 text-sm leading-none mt-0.5">{{ $formatCr($agentTotal) }}</div>
-                                    </div>
-                                    <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }}">
-                                        <i class="fas fa-chevron-right text-[9px]"></i>
-                                    </div>
+                                <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }} flex-shrink-0">
+                                    <i class="fas fa-chevron-right text-[9px]"></i>
                                 </div>
                             </div>
                             
-                            {{-- Target detail bar --}}
-                            <div class="mt-3.5 pt-2.5 border-t border-slate-100">
-                                <div class="flex items-center justify-between mb-1 text-[7px] font-bold uppercase tracking-widest {{ $agentInfoColor }}">
-                                    <span>Target: <strong class="{{ $agentNameColor }}">{{ $targetAmt > 0 ? $formatCr($targetAmt) : '₹0' }}</strong></span>
-                                    <span>Achieved: <strong class="{{ $agentPercentColor }}">{{ $targetAmt > 0 ? $percent . '%' : '0%' }}</strong></span>
+                            {{-- Metrics Comparison Grid --}}
+                            <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 mb-3 relative z-10">
+                                <div>
+                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                                    <span class="block text-sm font-black text-slate-800 tracking-tight">
+                                        {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
+                                    </span>
                                 </div>
-                                <div class="w-full {{ $agentProgressBg }} rounded-full h-1 overflow-hidden relative border border-slate-100">
+                                <div>
+                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                                    <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                                        {{ $formatCr($agentTotal) }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                                    @if($targetAmt > 0)
+                                    <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                                        {{ $percent }}%
+                                    </span>
+                                    @else
+                                    <span class="block text-[10px] font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Progress Details --}}
+                            @if($targetAmt > 0)
+                            <div class="space-y-2 relative z-10">
+                                <div class="w-full {{ $agentProgressBg }} rounded-full h-1 overflow-hidden border border-slate-100/50">
                                     <div class="h-1 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $agentProgressColor }}"
-                                         style="width: {{ $percent > 0 ? $percent : 0 }}%">
+                                         style="width: {{ $percent > 0 ? min(100, $percent) : 0 }}%">
                                         <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                                     </div>
                                 </div>
+                                <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                                    @if($agentTotal >= $targetAmt)
+                                    <span class="text-emerald-650 flex items-center gap-1">
+                                        <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                                    </span>
+                                    <span class="text-emerald-650">0 Left</span>
+                                    @else
+                                    @php $gapAmt = $targetAmt - $agentTotal; @endphp
+                                    <span class="text-rose-605 flex items-center gap-1">
+                                        <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                                    </span>
+                                    <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
+                                    @endif
+                                </div>
                             </div>
+                            @endif
                         </button>
                     </div>
 
@@ -1297,49 +1342,77 @@
                     <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full blur-xl opacity-10 {{ $tPercent >= 100 ? 'bg-emerald-400' : ($tPercent >= 75 ? 'bg-teal-400' : ($tPercent >= 50 ? 'bg-amber-400' : 'bg-rose-400')) }}"></div>
                     @endif
                     
-                    <div class="flex items-center justify-between relative z-10">
+                    {{-- Title Row --}}
+                    <div class="flex items-center justify-between relative z-10 mb-3">
                         <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-transform duration-300 {{ $iconBg }}">
+                            <div class="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 transition-transform duration-300 {{ $iconBg }}">
                                 <i class="fas {{ $tTargetAmt > 0 ? $iconClass : 'fa-building' }} text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="font-black {{ $nameColor }} text-sm tracking-tight truncate uppercase flex items-center gap-1.5">
+                                <div class="font-black {{ $nameColor }} text-base tracking-tight truncate uppercase flex items-center gap-1.5">
                                     {{ $teamName }}
-                                    @if($tTargetAmt > 0)
-                                    <span class="text-[8px] font-black tracking-widest px-2 py-0.5 rounded-lg {{ $tPercent >= 100 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : ($tPercent >= 75 ? 'bg-teal-500/10 text-teal-700 border border-teal-500/20' : ($tPercent >= 50 ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rose-500/10 text-rose-700 border border-rose-500/15')) }}">
-                                        {{ $percentText }}
-                                    </span>
-                                    @endif
                                 </div>
-                                <div class="text-[9px] {{ $infoColor }} font-bold mt-0.5">
+                                <div class="text-[11px] {{ $infoColor }} font-bold mt-0.5">
                                     {{ $bSummary['agents'] }} Agents &middot; {{ $bSummary['parties'] }} A/C
                                 </div>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 ml-2 flex-shrink-0 relative z-10">
-                            <div class="text-right">
-                                <div class="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Collected</div>
-                                <div class="text-emerald-600 font-black text-base leading-none mt-0.5">{{ $formatCr($bSummary['total']) }}</div>
-                            </div>
-                            <div class="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }}">
-                                <i class="fas fa-chevron-right text-[10px]"></i>
-                            </div>
+                        <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }} flex-shrink-0">
+                            <i class="fas fa-chevron-right text-[9px]"></i>
                         </div>
                     </div>
-                    
-                    {{-- Progress Details --}}
-                    <div class="mt-3.5 pt-3 border-t border-slate-100 relative z-10">
-                        <div class="flex items-center justify-between mb-1.5 text-[8px] font-bold uppercase tracking-widest {{ $infoColor }}">
-                            <span>Target: <strong class="{{ $nameColor }}">{{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '₹0' }}</strong></span>
-                            <span>Achieved: <strong class="{{ $percentColor }}">{{ $tTargetAmt > 0 ? $tPercent . '%' : '0%' }}</strong></span>
+
+                    {{-- Metrics Comparison Grid --}}
+                    <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 relative z-10">
+                        <div>
+                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                            <span class="block text-sm font-black text-slate-800 tracking-tight">
+                                {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
+                            </span>
                         </div>
-                        <div class="w-full {{ $progressBg }} rounded-full h-2 overflow-hidden relative border border-slate-100">
-                            <div class="h-2 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $progressColor }}"
-                                 style="width: {{ $tPercent > 0 ? $tPercent : 0 }}%">
+                        <div>
+                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                                {{ $formatCr($bSummary['total']) }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                            @if($tTargetAmt > 0)
+                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                                {{ $tPercent }}%
+                            </span>
+                            @else
+                            <span class="block text-[10px] font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Progress Details --}}
+                    @if($tTargetAmt > 0)
+                    <div class="mt-3 relative z-10 space-y-2">
+                        <div class="w-full {{ $progressBg }} rounded-full h-1.5 overflow-hidden border border-slate-100/50">
+                            <div class="h-1.5 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $progressColor }}"
+                                 style="width: {{ $tPercent > 0 ? min(100, $tPercent) : 0 }}%">
                                 <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
+                        <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                            @if($bSummary['total'] >= $tTargetAmt)
+                            <span class="text-emerald-650 flex items-center gap-1">
+                                <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                            </span>
+                            <span class="text-emerald-650">0 Left</span>
+                            @else
+                            @php $gapAmt = $tTargetAmt - $bSummary['total']; @endphp
+                            <span class="text-rose-605 flex items-center gap-1">
+                                <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                            </span>
+                            <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
+                            @endif
+                        </div>
                     </div>
+                    @endif
                 </div>
             </button>
         </div>
@@ -1415,47 +1488,75 @@
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
              class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
             <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
-                <div class="flex items-center justify-between">
+                {{-- Agent Title Row --}}
+                <div class="flex items-center justify-between relative z-10 mb-3">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                         <div class="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 {{ $agentIconBg }}">
                             <i class="fas fa-user-tie text-xs"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="font-black {{ $agentNameColor }} text-xs truncate uppercase flex items-center gap-1.5">
+                            <div class="font-black {{ $agentNameColor }} text-sm truncate uppercase flex items-center gap-1.5">
                                 {{ $agentName }}
-                                @if($targetAmt > 0)
-                                <span class="text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-md {{ $percent >= 100 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : ($percent >= 75 ? 'bg-teal-500/10 text-teal-700 border border-teal-500/20' : ($percent >= 50 ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-rose-500/10 text-rose-700 border border-rose-500/15')) }}">
-                                    {{ $agentPercentText }}
-                                </span>
-                                @endif
                             </div>
-                            <div class="text-[8px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
+                            <div class="text-[10px] {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <div class="text-right">
-                            <div class="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Collected</div>
-                            <div class="font-black text-emerald-600 text-sm leading-none mt-0.5">{{ $formatCr($agentTotal) }}</div>
-                        </div>
-                        <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }}">
-                            <i class="fas fa-chevron-right text-[9px]"></i>
-                        </div>
+                    <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }} flex-shrink-0">
+                        <i class="fas fa-chevron-right text-[9px]"></i>
                     </div>
                 </div>
                 
-                {{-- Target detail bar --}}
-                <div class="mt-3.5 pt-2.5 border-t border-slate-100">
-                    <div class="flex items-center justify-between mb-1 text-[7px] font-bold uppercase tracking-widest {{ $agentInfoColor }}">
-                        <span>Target: <strong class="{{ $agentNameColor }}">{{ $targetAmt > 0 ? $formatCr($targetAmt) : '₹0' }}</strong></span>
-                        <span>Achieved: <strong class="{{ $agentPercentColor }}">{{ $targetAmt > 0 ? $percent . '%' : '0%' }}</strong></span>
+                {{-- Metrics Comparison Grid --}}
+                <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 mb-3 relative z-10">
+                    <div>
+                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                        <span class="block text-sm font-black text-slate-800 tracking-tight">
+                            {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
+                        </span>
                     </div>
-                    <div class="w-full {{ $agentProgressBg }} rounded-full h-1 overflow-hidden relative border border-slate-100">
+                    <div>
+                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                        <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                            {{ $formatCr($agentTotal) }}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                        @if($targetAmt > 0)
+                        <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            {{ $percent }}%
+                        </span>
+                        @else
+                        <span class="block text-[10px] font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Progress Details --}}
+                @if($targetAmt > 0)
+                <div class="space-y-2 relative z-10">
+                    <div class="w-full {{ $agentProgressBg }} rounded-full h-1 overflow-hidden border border-slate-100/50">
                         <div class="h-1 rounded-full relative overflow-hidden transition-all duration-1000 progress-glow-bar {{ $agentProgressColor }}"
-                             style="width: {{ $percent > 0 ? $percent : 0 }}%">
+                             style="width: {{ $percent > 0 ? min(100, $percent) : 0 }}%">
                             <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                         </div>
                     </div>
+                    <div class="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+                        @if($agentTotal >= $targetAmt)
+                        <span class="text-emerald-650 flex items-center gap-1">
+                            <i class="fas fa-check-circle text-[10px]"></i> Target Achieved
+                        </span>
+                        <span class="text-emerald-650">0 Left</span>
+                        @else
+                        @php $gapAmt = $targetAmt - $agentTotal; @endphp
+                        <span class="text-rose-605 flex items-center gap-1">
+                            <i class="fas fa-exclamation-triangle text-[10px]"></i> Target Gap
+                        </span>
+                        <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
+                        @endif
+                    </div>
                 </div>
+                @endif
             </button>
         </div>
         
@@ -1501,14 +1602,177 @@
 
 </div>
 
+@php
+/* ===== BUILD crStats MAP FOR HERO CARD JS REACTIVITY ===== */
+$crStatsMap = [];
+
+// Root entry
+$crStatsMap['root'] = [
+    'title'    => 'All Groups',
+    'total'    => round($grandTotal ?? 0, 2),
+    'target'   => round($grandTarget ?? 0, 2),
+    'percent'  => $hPercent,
+    'groups'   => $hGroups,
+    'accounts' => $hParties,
+    'isRoot'   => true,
+];
+
+// DB Teams
+foreach($dbTeams ?? [] as $team) {
+    $tn = $team->name;
+    $bs = $branchSummary[$tn] ?? ['total'=>0,'parties'=>0,'agents'=>0];
+    $tt = $teamTargets[$team->id] ?? 0;
+    if ($tt == 0) {
+        $stFn = function($node) use (&$stFn, $dbTeams, $agentTargets, $teamTargets) {
+            $s = 0;
+            foreach ($node->agents ?? [] as $ag) { $s += ($agentTargets[$ag] ?? 0); }
+            foreach ($dbTeams->where('parent_id', $node->id) as $ch) {
+                $ct = (float)($teamTargets[$ch->id] ?? 0);
+                $s += $ct > 0 ? $ct : $stFn($ch);
+            }
+            return $s;
+        };
+        $tt = $stFn($team);
+    }
+    $tp = $tt > 0 ? min(100, round(($bs['total'] / $tt) * 100)) : 0;
+    // Count agents under this team
+    $teamAgentCount = count($team->agents ?? []);
+    $teamPartiesCount = 0;
+    foreach($team->agents ?? [] as $an) {
+        if (isset($grouped[$tn][$an])) $teamPartiesCount += count($grouped[$tn][$an]);
+    }
+    $crStatsMap[(string)$team->id] = [
+        'title'    => $tn,
+        'total'    => round($bs['total'], 2),
+        'target'   => round($tt, 2),
+        'percent'  => $tp,
+        'groups'   => $teamAgentCount,
+        'accounts' => $teamPartiesCount,
+        'isRoot'   => false,
+    ];
+    // Agents under this team
+    foreach($team->agents ?? [] as $agentName) {
+        if (!isset($grouped[$tn][$agentName])) continue;
+        $agRows = $grouped[$tn][$agentName];
+        $agTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField ?? 'CrAmt'] ?? 0), $agRows));
+        $agTarget = $agentTargets[$agentName] ?? 0;
+        $agPct = $agTarget > 0 ? min(100, round(($agTotal / $agTarget) * 100)) : 0;
+        $agId = 'agent_' . $team->id . '_' . Str::slug($agentName);
+        $crStatsMap[$agId] = [
+            'title'    => $agentName,
+            'total'    => round($agTotal, 2),
+            'target'   => round($agTarget, 2),
+            'percent'  => $agPct,
+            'groups'   => 1,
+            'accounts' => count($agRows),
+            'isRoot'   => false,
+        ];
+    }
+}
+
+// Ungrouped branches + their agents
+foreach($grouped as $teamName => $agents) {
+    if ($dbTeams->contains('name', $teamName)) continue;
+    $bs = $branchSummary[$teamName] ?? ['total'=>0,'parties'=>0,'agents'=>0];
+    $tt = 0;
+    foreach ($agents as $an => $ar) { $tt += ($agentTargets[$an] ?? 0); }
+    $tp = $tt > 0 ? min(100, round(($bs['total'] / $tt) * 100)) : 0;
+    $tSlug = 'ungrouped_' . Str::slug($teamName);
+    $crStatsMap[$tSlug] = [
+        'title'    => $teamName,
+        'total'    => round($bs['total'], 2),
+        'target'   => round($tt, 2),
+        'percent'  => $tp,
+        'groups'   => count($agents),
+        'accounts' => $bs['parties'],
+        'isRoot'   => false,
+    ];
+    foreach($agents as $agentName => $agRows) {
+        $agTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField ?? 'CrAmt'] ?? 0), $agRows));
+        $agTarget = $agentTargets[$agentName] ?? 0;
+        $agPct = $agTarget > 0 ? min(100, round(($agTotal / $agTarget) * 100)) : 0;
+        $agId = 'agent_ungrouped_' . Str::slug($teamName) . '_' . Str::slug($agentName);
+        $crStatsMap[$agId] = [
+            'title'    => $agentName,
+            'total'    => round($agTotal, 2),
+            'target'   => round($agTarget, 2),
+            'percent'  => $agPct,
+            'groups'   => 1,
+            'accounts' => count($agRows),
+            'isRoot'   => false,
+        ];
+    }
+}
+@endphp
+
 <script>
+window.crStats = @json($crStatsMap);
+
 function collectionApp() {
     return {
         showFilters: {{ request()->has('fetch') ? 'false' : 'true' }},
         currentParentId: 'root',
         currentTitle: 'All Groups',
-        history: [], // array of { id, title }
-        
+        history: [],
+        activeStats: window.crStats['root'] || null,
+
+        get hero() {
+            const s = this.activeStats || window.crStats['root'];
+            if (!s) return null;
+            const pct = Math.min(100, s.percent);
+            // Color logic
+            let gradient, barColor, badgeBg, badgeText, badgeBorder, label, icon;
+            if (pct >= 100) {
+                gradient = 'linear-gradient(135deg, #10b981, #059669, #0d9488)';
+                barColor = '#34d399'; badgeBg = 'rgba(52,211,153,0.25)'; badgeText = '#a7f3d0';
+                badgeBorder = 'rgba(52,211,153,0.4)'; label = 'TARGET HIT!'; icon = 'fa-trophy';
+            } else if (pct >= 75) {
+                gradient = 'linear-gradient(135deg, #10b981, #059669, #0f766e)';
+                barColor = '#34d399'; badgeBg = 'rgba(52,211,153,0.2)'; badgeText = '#a7f3d0';
+                badgeBorder = 'rgba(52,211,153,0.3)'; label = 'ON TRACK'; icon = 'fa-chart-line';
+            } else if (pct >= 50) {
+                gradient = 'linear-gradient(135deg, #f59e0b, #f97316, #d97706)';
+                barColor = '#fbbf24'; badgeBg = 'rgba(251,191,36,0.2)'; badgeText = '#fde68a';
+                badgeBorder = 'rgba(251,191,36,0.3)'; label = 'IN PROGRESS'; icon = 'fa-fire';
+            } else {
+                gradient = 'linear-gradient(135deg, #f43f5e, #e11d48, #b91c1c)';
+                barColor = '#fb7185'; badgeBg = 'rgba(251,113,133,0.2)'; badgeText = '#fecdd3';
+                badgeBorder = 'rgba(251,113,133,0.3)'; label = 'NEEDS PUSH'; icon = 'fa-bolt';
+            }
+            // Milestone label
+            let milestone;
+            if (pct >= 100) milestone = 'Completed';
+            else if (pct >= 75) milestone = 'Almost there!';
+            else if (pct >= 50) milestone = 'Halfway';
+            else milestone = 'Keep going';
+
+            // Circular dash
+            const circ = 163.4;
+            const dashOffset = circ - (circ * pct / 100);
+
+            // Format total/target as Cr
+            const fmt = (v) => {
+                if (v >= 10000000) return '₹' + (v / 10000000).toFixed(2) + 'Cr';
+                if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + 'L';
+                if (v >= 1000) return '₹' + (v / 1000).toFixed(1) + 'K';
+                return '₹' + parseFloat(v).toFixed(0);
+            };
+
+            return {
+                title: s.title,
+                total: fmt(s.total),
+                target: fmt(s.target),
+                hasTarget: s.target > 0,
+                percent: pct,
+                groups: s.groups,
+                accounts: s.accounts,
+                isRoot: s.isRoot,
+                gradient, barColor, badgeBg, badgeText, badgeBorder, label, icon,
+                milestone, dashOffset, circ,
+                mascotMood: pct >= 100 ? 'happy' : pct >= 75 ? 'good' : pct >= 50 ? 'mid' : 'sad',
+            };
+        },
+
         drillDown(parentId, title) {
             this.history.push({
                 id: this.currentParentId,
@@ -1516,6 +1780,7 @@ function collectionApp() {
             });
             this.currentParentId = parentId;
             this.currentTitle = title;
+            this.activeStats = window.crStats[parentId] || null;
         },
         
         goBack() {
@@ -1523,6 +1788,7 @@ function collectionApp() {
                 const prev = this.history.pop();
                 this.currentParentId = prev.id;
                 this.currentTitle = prev.title;
+                this.activeStats = window.crStats[prev.id] || window.crStats['root'];
             }
         },
         
@@ -1531,12 +1797,14 @@ function collectionApp() {
                 this.currentParentId = 'root';
                 this.currentTitle = 'All Groups';
                 this.history = [];
+                this.activeStats = window.crStats['root'];
             } else {
                 const index = this.history.findIndex(h => h.id === id);
                 if (index !== -1) {
                     this.currentParentId = id;
                     this.currentTitle = title || 'Detail';
                     this.history = this.history.slice(0, index);
+                    this.activeStats = window.crStats[id] || null;
                 }
             }
         }
