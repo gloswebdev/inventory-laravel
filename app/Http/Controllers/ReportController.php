@@ -1418,13 +1418,15 @@ class ReportController extends Controller
 
     public function syncSalesReportRaw()
     {
+        @set_time_limit(300);
+
         $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
         $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
 
         // FY auto-dates
         $now     = now();
         $fyStart = $now->month >= 4 ? $now->year . '-04-01' : ($now->year - 1) . '-04-01';
-        $fyEnd   = $now->month >= 4 ? ($now->year + 1) . '-03-31' : $now->year . '-03-31';
+        $fyEnd   = $now->format('Y-m-d'); // Fetch only up to today to minimize API processing time
 
         $actCode   = AppSetting::get('sales_api_actcode', 'ALL') ?: 'ALL';
         $agentCode = AppSetting::get('sales_api_agentcode', 'ALL') ?: 'ALL';
