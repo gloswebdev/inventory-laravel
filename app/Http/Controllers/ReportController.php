@@ -511,7 +511,10 @@ class ReportController extends Controller
             ->unique()->sort()->values()->toArray();
 
         // --- Month Filter options (Past 12 months + Next 2 months) ---
-        $monthOptions = [];
+        $monthOptions = [
+            'this_week' => 'This Week',
+            'last_week' => 'Last Week',
+        ];
         $currentYm = date('Y-m');
         for ($i = -12; $i <= 2; $i++) {
             $time = strtotime("$i month");
@@ -526,12 +529,45 @@ class ReportController extends Controller
         // --- Filters ---
         $monthFilter = $request->input('month_filter', $currentYm);
 
-        if ($monthFilter && $monthFilter !== 'custom') {
-            $fromDate = $monthFilter . '-01';
-            $toDate   = date('Y-m-t', strtotime($fromDate));
+        // Date calculations for current and comparison periods
+        $prevFromDate = null;
+        $prevToDate = null;
+        $comparisonLabel = 'Previous Period';
+
+        if ($monthFilter === 'this_week') {
+            $fromDate = date('Y-m-d', strtotime('monday this week'));
+            $toDate   = date('Y-m-d', strtotime('sunday this week'));
+            $prevFromDate = date('Y-m-d', strtotime('monday last week'));
+            $prevToDate   = date('Y-m-d', strtotime('sunday last week'));
+            $comparisonLabel = 'vs Last Week';
+        } elseif ($monthFilter === 'last_week') {
+            $fromDate = date('Y-m-d', strtotime('monday last week'));
+            $toDate   = date('Y-m-d', strtotime('sunday last week'));
+            $prevFromDate = date('Y-m-d', strtotime('monday -2 weeks'));
+            $prevToDate   = date('Y-m-d', strtotime('sunday -2 weeks'));
+            $comparisonLabel = 'vs Week Before';
+        } elseif ($monthFilter && $monthFilter !== 'custom') {
+            if (preg_match('/^\d{4}-\d{2}$/', $monthFilter)) {
+                $fromDate = $monthFilter . '-01';
+                $toDate   = date('Y-m-t', strtotime($fromDate));
+                $prevFromDate = date('Y-m-d', strtotime("$fromDate -1 month"));
+                $prevToDate   = date('Y-m-t', strtotime($prevFromDate));
+                $comparisonLabel = 'vs Last Month';
+            } else {
+                $fromDate = date('Y-m-01');
+                $toDate   = date('Y-m-t');
+                $prevFromDate = date('Y-m-d', strtotime("$fromDate -1 month"));
+                $prevToDate   = date('Y-m-t', strtotime($prevFromDate));
+                $comparisonLabel = 'vs Last Month';
+            }
         } else {
             $fromDate = $request->input('from_date', date('Y-m-01'));
             $toDate   = $request->input('to_date',   date('Y-m-t'));
+            
+            $diff = abs(strtotime($toDate) - strtotime($fromDate));
+            $prevFromDate = date('Y-m-d', strtotime($fromDate) - $diff - 86400);
+            $prevToDate   = date('Y-m-d', strtotime($fromDate) - 86400);
+            $comparisonLabel = 'vs Prior Period';
         }
 
         $finYear = $request->input('fin_year', '2627');
@@ -579,9 +615,11 @@ class ReportController extends Controller
         Log::info('Collection Report API Call', ['url' => $baseUrl . '/LogicPartyCollection', 'payload' => $payload]);
 
         $reportData = [];
+        $prevReportData = [];
         $error      = null;
 
         try {
+            // Fetch current period data
             $response = Http::withoutVerifying()
                 ->timeout(90)
                 ->connectTimeout(20)
@@ -601,6 +639,27 @@ class ReportController extends Controller
             } else {
                 $error = 'HTTP ' . $response->status();
             }
+
+            // Fetch previous period data
+            if ($prevFromDate && $prevToDate) {
+                $prevPayload = $payload;
+                $prevPayload['FromDate'] = $prevFromDate;
+                $prevPayload['ToDate']   = $prevToDate;
+
+                $prevResponse = Http::withoutVerifying()
+                    ->timeout(90)
+                    ->connectTimeout(20)
+                    ->post("{$baseUrl}/LogicPartyCollection", $prevPayload);
+
+                if ($prevResponse->successful()) {
+                    $prevData = $prevResponse->json();
+                    if (isset($prevData['response']) && $prevData['response'] === 'success' && isset($prevData['resultdata'])) {
+                        $prevReportData = $prevData['resultdata'];
+                    } elseif (is_array($prevData) && !isset($prevData['response'])) {
+                        $prevReportData = $prevData;
+                    }
+                }
+            }
         } catch (\Exception $e) {
             $error = 'Connection error: ' . $e->getMessage();
             Log::error('Collection Report API Exception: ' . $e->getMessage());
@@ -614,67 +673,80 @@ class ReportController extends Controller
             return true;
         }));
 
-        // ── Merge PartyMaster (Branch_Name, Agent_Name, Town) ──
-        $reportData = array_map(function ($row) use ($partyMasterMap) {
-            // Strictly align the Collection API's "act_code" and "act_name"
-            $colPartyCode = trim(
-                $row['act_code']   ?? $row['Act_Code']   ?? $row['ActCode']   ??
-                $row['AC_Code']    ?? $row['Ac_Code']    ??
-                $row['PartyCode']  ?? $row['Party_Code']  ?? ''
-            );
-            
-            $masterInfo = null;
-            if ($colPartyCode && isset($partyMasterMap[$colPartyCode])) {
-                $masterInfo = $partyMasterMap[$colPartyCode];
+        $prevReportData = array_values(array_filter($prevReportData, function ($row) {
+            foreach ($row as $v) {
+                if (is_string($v) && stripos($v, 'DEPOSIT') !== false) return false;
             }
+            return true;
+        }));
 
-            // Fallback to name match (check act_name)
-            if (!$masterInfo) {
-                $rowName = strtolower(trim(
-                    $row['act_name']   ?? $row['AC_Name']    ?? $row['AcName']    ?? 
-                    $row['PartyName']  ?? $row['Party_Name']  ?? ''
-                ));
-                foreach ($partyMasterMap as $info) {
-                    if (strtolower(trim($info['PartyName'] ?? '')) === $rowName) {
-                        $masterInfo = $info; 
-                        break;
+        // ── Merge PartyMaster and Apply Filters (Branch, Team, Agent) ──
+        $processReportRows = function($rawData) use ($partyMasterMap, $branchFilter, $teamAgents, $agentFilter) {
+            $mapped = array_map(function ($row) use ($partyMasterMap) {
+                // Strictly align the Collection API's "act_code" and "act_name"
+                $colPartyCode = trim(
+                    $row['act_code']   ?? $row['Act_Code']   ?? $row['ActCode']   ??
+                    $row['AC_Code']    ?? $row['Ac_Code']    ??
+                    $row['PartyCode']  ?? $row['Party_Code']  ?? ''
+                );
+                
+                $masterInfo = null;
+                if ($colPartyCode && isset($partyMasterMap[$colPartyCode])) {
+                    $masterInfo = $partyMasterMap[$colPartyCode];
+                }
+
+                // Fallback to name match (check act_name)
+                if (!$masterInfo) {
+                    $rowName = strtolower(trim(
+                        $row['act_name']   ?? $row['AC_Name']    ?? $row['AcName']    ?? 
+                        $row['PartyName']  ?? $row['Party_Name']  ?? ''
+                    ));
+                    foreach ($partyMasterMap as $info) {
+                        if (strtolower(trim($info['PartyName'] ?? '')) === $rowName) {
+                            $masterInfo = $info; 
+                            break;
+                        }
                     }
                 }
+
+                $row['_AgentName']  = $masterInfo['AgentName']  ?? '—';
+                $row['_AgentCode']  = $masterInfo['AgentCode']  ?? '—';
+                $row['_BranchName'] = $masterInfo['BranchName'] ?? '—';
+                $row['_TownName']   = $masterInfo['TownName']   ?? '—';
+                
+                // Override raw names/codes for rendering consistency
+                $row['PartyName']   = $row['act_name'] ?? $row['PartyName'] ?? ($masterInfo['PartyName'] ?? '—');
+                $row['ActCode']     = $colPartyCode;
+                
+                return $row;
+            }, $rawData);
+
+            // ── Apply Branch filter (handles array of selected branches) ──
+            if (!empty($branchFilter)) {
+                $mapped = array_values(array_filter($mapped, function($r) use ($branchFilter) {
+                    return in_array(trim($r['_BranchName'] ?? ''), $branchFilter);
+                }));
             }
 
-            $row['_AgentName']  = $masterInfo['AgentName']  ?? '—';
-            $row['_AgentCode']  = $masterInfo['AgentCode']  ?? '—';
-            $row['_BranchName'] = $masterInfo['BranchName'] ?? '—';
-            $row['_TownName']   = $masterInfo['TownName']   ?? '—';
-            
-            // Override raw names/codes for rendering consistency
-            $row['PartyName']   = $row['act_name'] ?? $row['PartyName'] ?? ($masterInfo['PartyName'] ?? '—');
-            $row['ActCode']     = $colPartyCode;
-            
-            return $row;
-        }, $reportData);
+            // ── Apply Team / Agent Filter ──
+            if (!empty($teamAgents)) {
+                $mapped = array_values(array_filter($mapped, function($r) use ($teamAgents) {
+                    return in_array(trim($r['_AgentName'] ?? ''), $teamAgents);
+                }));
+            }
 
-        // ── Apply Branch filter (handles array of selected branches) ──
-        if (!empty($branchFilter)) {
-            $reportData = array_values(array_filter($reportData, function($r) use ($branchFilter) {
-                return in_array(trim($r['_BranchName'] ?? ''), $branchFilter);
-            }));
-        }
+            // ── Apply Agent filter ──
+            if (!empty($agentFilter)) {
+                $mapped = array_values(array_filter($mapped,
+                    fn($r) => trim($r['_AgentName'] ?? '') === trim($agentFilter)
+                ));
+            }
 
-        // ── Apply Team / Agent Filter ──
-        // If specific agents in active teams are selected, limit search to them
-        if (!empty($teamAgents)) {
-            $reportData = array_values(array_filter($reportData, function($r) use ($teamAgents) {
-                return in_array(trim($r['_AgentName'] ?? ''), $teamAgents);
-            }));
-        }
+            return $mapped;
+        };
 
-        // ── Apply Agent filter (direct agent selector overrides team filters) ──
-        if (!empty($agentFilter)) {
-            $reportData = array_values(array_filter($reportData,
-                fn($r) => trim($r['_AgentName'] ?? '') === trim($agentFilter)
-            ));
-        }
+        $reportData = $processReportRows($reportData);
+        $prevReportData = $processReportRows($prevReportData);
 
         // ── Detect amount fields (smart auto-detection) ──
         $firstRow  = $reportData[0] ?? [];
@@ -784,6 +856,19 @@ class ReportController extends Controller
         $totalParties = count($reportData);
         $totalAgents  = collect($reportData)->pluck('_AgentName')->filter(fn($v)=>$v&&$v!=='—')->unique()->count();
 
+        // ── Compute Previous Period Grand Total & Growth ──
+        $prevGrandTotal = 0;
+        if (!empty($prevReportData)) {
+            $prevGrandTotal = array_sum(array_map(fn($r) => $parseAmt($r[$crField] ?? 0), $prevReportData));
+        }
+
+        $momGrowthPercent = 0;
+        if ($prevGrandTotal > 0) {
+            $momGrowthPercent = round((($grandTotal - $prevGrandTotal) / $prevGrandTotal) * 100, 1);
+        } elseif ($grandTotal > 0) {
+            $momGrowthPercent = 100.0;
+        }
+
         // Party name key
         $partyNameKey = collect(['AC_Name','AcName','PartyName','Party_Name'])
                           ->first(fn($k) => array_key_exists($k, $firstRow));
@@ -810,7 +895,8 @@ class ReportController extends Controller
             'error', 'defaults', 'monthFilter', 'monthOptions',
             'finYear', 'fromDate', 'toDate', 'selectedTeams', 'dbTeams',
             'branchFilter', 'agentFilter', 'branchOptions', 'agentOptions',
-            'crField', 'drField', 'partyNameKey', 'agentTargets', 'teamTargets'
+            'crField', 'drField', 'partyNameKey', 'agentTargets', 'teamTargets',
+            'prevGrandTotal', 'momGrowthPercent', 'comparisonLabel'
         ));
     }
 

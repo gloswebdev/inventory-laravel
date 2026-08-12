@@ -959,6 +959,65 @@
         </div>
     </div>
 
+    {{-- Period comparison analysis card --}}
+    @if(isset($prevGrandTotal) && $prevGrandTotal >= 0)
+    <div class="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white rounded-[2rem] p-5 shadow-xl relative overflow-hidden border border-indigo-500/20" x-show="currentParentId === 'root'">
+        <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
+        
+        <div class="relative z-10 flex items-center justify-between">
+            <div class="space-y-1">
+                <span class="text-[9px] font-black text-indigo-300 uppercase tracking-wider block">{{ $comparisonLabel }} Comparison</span>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-xs text-indigo-200 font-bold">Prev: {{ $formatCr($prevGrandTotal) }}</span>
+                    <i class="fas fa-arrow-right text-[9px] text-indigo-400"></i>
+                    <span class="text-sm font-black text-white">Curr: {{ $formatCr($grandTotal) }}</span>
+                </div>
+            </div>
+            
+            {{-- MoM Growth Indicator Badge --}}
+            <div>
+                @if($momGrowthPercent >= 0)
+                <div class="px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center gap-1.5 text-emerald-350">
+                    <i class="fas fa-circle-arrow-up text-sm animate-pulse"></i>
+                    <span class="text-xs font-black">+{{ $momGrowthPercent }}%</span>
+                </div>
+                @else
+                <div class="px-3 py-2 bg-rose-500/20 border border-rose-500/30 rounded-2xl flex items-center gap-1.5 text-rose-350">
+                    <i class="fas fa-circle-arrow-down text-sm animate-pulse"></i>
+                    <span class="text-xs font-black">{{ $momGrowthPercent }}%</span>
+                </div>
+                @endif
+            </div>
+        </div>
+        
+        {{-- Comparative Mini Bar Chart/Visual --}}
+        <div class="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+            <div class="flex items-center justify-between text-[9px] font-bold text-slate-400">
+                <span>Performance Ratio</span>
+                <span class="text-white font-black">
+                    @php
+                        $diffAmt = $grandTotal - $prevGrandTotal;
+                    @endphp
+                    {{ $diffAmt >= 0 ? '+' : '' }}{{ $formatCr($diffAmt) }} variance
+                </span>
+            </div>
+            <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden flex gap-0.5">
+                @php
+                    $totalBoth = $grandTotal + $prevGrandTotal;
+                    $currRatio = $totalBoth > 0 ? round(($grandTotal / $totalBoth) * 100) : 50;
+                    $prevRatio = 100 - $currRatio;
+                @endphp
+                <div class="h-full bg-slate-500/30 transition-all duration-1000" style="width: {{ $prevRatio }}%"></div>
+                <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000 progress-glow-bar" style="width: {{ $currRatio }}%"></div>
+            </div>
+            <div class="flex items-center justify-between text-[8px] font-black text-slate-500">
+                <span>PREV ({{ $prevRatio }}%)</span>
+                <span>CURR ({{ $currRatio }}%)</span>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Flat Drill-down List --}}
     <div class="space-y-3">
         {{-- 1. Database Teams (Root and Sub-Teams) --}}
@@ -2053,6 +2112,81 @@
 
 
 @php
+/* ===== BUILD prevCrStats MAP FOR JS REACTIVITY ===== */
+$prevCrStatsMap = [];
+
+// 1. Group previous data by agent & team names
+$prevGrouped = [];
+foreach ($prevReportData ?? [] as $row) {
+    $agentName = $row['_AgentName'] ?: '(No Agent)';
+    
+    $matchedTeams = [];
+    foreach ($dbTeams as $team) {
+        if (in_array($agentName, $team->getEffectiveAgents($dbTeams))) {
+            $matchedTeams[] = $team->name;
+        }
+    }
+    if (empty($matchedTeams)) {
+        $matchedTeams = ['Unassigned Agents'];
+    }
+    
+    foreach ($matchedTeams as $tName) {
+        $prevGrouped[$tName][$agentName][] = $row;
+    }
+}
+
+// 2. Build map values
+$prevCrStatsMap['root'] = [
+    'total' => round($prevGrandTotal ?? 0, 2),
+];
+
+foreach ($dbTeams ?? [] as $team) {
+    $tn = $team->name;
+    // Calculate team total for prev period
+    $tTotalPrev = 0;
+    if (isset($prevGrouped[$tn])) {
+        foreach ($prevGrouped[$tn] as $agName => $rows) {
+            $tTotalPrev += array_sum(array_map(fn($r) => $parseAmt($r[$crField ?? 'CrAmt'] ?? 0), $rows));
+        }
+    }
+    $prevCrStatsMap[(string)$team->id] = [
+        'total' => round($tTotalPrev, 2),
+    ];
+
+    // Agents
+    foreach ($team->agents ?? [] as $agentName) {
+        $agTotalPrev = 0;
+        if (isset($prevGrouped[$tn][$agentName])) {
+            $agTotalPrev = array_sum(array_map(fn($r) => $parseAmt($r[$crField ?? 'CrAmt'] ?? 0), $prevGrouped[$tn][$agentName]));
+        }
+        $agId = 'agent_' . $team->id . '_' . Str::slug($agentName);
+        $prevCrStatsMap[$agId] = [
+            'total' => round($agTotalPrev, 2),
+        ];
+    }
+}
+
+// Ungrouped
+foreach ($prevGrouped as $teamName => $agents) {
+    if ($dbTeams->contains('name', $teamName)) continue;
+    $tTotalPrev = 0;
+    foreach ($agents as $agName => $rows) {
+        $tTotalPrev += array_sum(array_map(fn($r) => $parseAmt($r[$crField ?? 'CrAmt'] ?? 0), $rows));
+    }
+    $tSlug = 'ungrouped_' . Str::slug($teamName);
+    $prevCrStatsMap[$tSlug] = [
+        'total' => round($tTotalPrev, 2),
+    ];
+
+    foreach ($agents as $agentName => $rows) {
+        $agTotalPrev = array_sum(array_map(fn($r) => $parseAmt($r[$crField ?? 'CrAmt'] ?? 0), $rows));
+        $agId = 'agent_ungrouped_' . Str::slug($teamName) . '_' . Str::slug($agentName);
+        $prevCrStatsMap[$agId] = [
+            'total' => round($agTotalPrev, 2),
+        ];
+    }
+}
+
 /* ===== BUILD crStats MAP FOR HERO CARD JS REACTIVITY ===== */
 $crStatsMap = [];
 
@@ -2507,7 +2641,7 @@ function handleMobMonthChange(val) {
         row.classList.remove('hidden');
     } else {
         row.classList.add('hidden');
-        if (val) {
+        if (val && val !== 'this_week' && val !== 'last_week') {
             const parts = val.split('-');
             const year = parseInt(parts[0]);
             const month = parseInt(parts[1]);
