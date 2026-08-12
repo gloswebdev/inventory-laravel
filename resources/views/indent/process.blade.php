@@ -81,14 +81,12 @@
             </div>
         </div>
 
-        <!-- Processing Grid Card -->
-        <!-- Processing Grid Card -->
         <div class="bg-white rounded-3xl shadow-sm overflow-hidden border border-slate-100/80 mb-32">
-            <div class="overflow-x-auto custom-scrollbar pb-4">
+            <div class="overflow-auto max-h-[calc(100vh-340px)] custom-scrollbar pb-4">
                 <table class="w-full text-left border-collapse relative">
                     <thead class="sticky top-0 z-20 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
                         <tr>
-                            <th class="sticky left-0 bg-slate-50 px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest z-30 border-r border-slate-200 border-b min-w-[250px]">Product Details</th>
+                            <th class="sticky top-0 left-0 bg-slate-50 px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest z-30 border-r border-slate-200 border-b min-w-[250px]">Product Details</th>
                             <th class="px-6 py-5 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center bg-indigo-50/50 border-b border-indigo-100 min-w-[120px]">Indent<br>Qty (Boxes)</th>
                             
                             @foreach($branches as $branch)
