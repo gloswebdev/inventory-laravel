@@ -369,8 +369,128 @@
                             </div>
                         </div>
                     </div>
+                </div>                <hr class="border-slate-100">
+
+                {{-- ---- SECTION 5b: Sales Report Sync API & Schedule ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-black">5B</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">Sales Report API & Daily Sync</h4>
+                        <span class="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-bold rounded">REPORTS MODULE</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Reports → Sales Report</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-violet-700 text-[10px]">POST /PartyWiseProductWiseSales</code>
+                    </p>
+
+                    <div class="bg-violet-50/50 border border-violet-100 rounded-xl p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Party Code</label>
+                                <input type="text" name="sales_api_actcode"
+                                    value="{{ $settings['sales_api_actcode']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Agent Code</label>
+                                <input type="text" name="sales_api_agentcode"
+                                    value="{{ $settings['sales_api_agentcode']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Item Code</label>
+                                <input type="text" name="sales_api_item"
+                                    value="{{ $settings['sales_api_item']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-violet-100">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">User Code</label>
+                                <input type="text" name="sales_api_usercode"
+                                    value="{{ $settings['sales_api_usercode']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Branch</label>
+                                <input type="text" name="sales_api_branch"
+                                    value="{{ $settings['sales_api_branch']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 outline-none transition bg-white">
+                            </div>
+                        </div>
+
+                        {{-- Scheduler Config --}}
+                        <div class="pt-4 border-t border-violet-100">
+                            <h5 class="text-[10px] font-black text-violet-700 uppercase tracking-widest mb-3">Automatic Daily Sync (Cron Scheduler)</h5>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                                <div class="md:col-span-1">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" name="sales_sync_auto" value="enabled"
+                                            {{ ($settings['sales_sync_auto']->value ?? 'enabled') === 'enabled' ? 'checked' : '' }}
+                                            class="w-4 h-4 text-violet-600 border-gray-300 rounded focus:ring-violet-500">
+                                        <span class="text-xs font-bold text-slate-700">Enable Auto Sync</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Frequency</label>
+                                    <select name="sales_sync_frequency" class="w-full border border-gray-200 rounded-xl py-2 px-3 text-xs focus:ring-2 focus:ring-violet-500 outline-none bg-white">
+                                        <option value="daily" {{ ($settings['sales_sync_frequency']->value ?? 'daily') === 'daily' ? 'selected' : '' }}>Daily</option>
+                                        <option value="weekly" {{ ($settings['sales_sync_frequency']->value ?? 'daily') === 'weekly' ? 'selected' : '' }}>Weekly</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Sync Time</label>
+                                    <input type="text" name="sales_sync_time"
+                                        value="{{ $settings['sales_sync_time']->value ?? '03:00' }}"
+                                        placeholder="03:00"
+                                        class="w-full border border-gray-200 rounded-xl py-2 px-3 text-xs focus:ring-2 focus:ring-violet-500 outline-none transition bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Weekly Sync Day</label>
+                                    <select name="sales_sync_day" class="w-full border border-gray-200 rounded-xl py-2 px-3 text-xs focus:ring-2 focus:ring-violet-500 outline-none bg-white">
+                                        @foreach(['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as $d)
+                                            <option value="{{ $d }}" {{ ($settings['sales_sync_day']->value ?? 'Sunday') === $d ? 'selected' : '' }}>{{ $d }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
+                <hr class="border-slate-100">
+
+                {{-- ---- SECTION 5c: Collection Report API ---- --}}
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-black">5C</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">Collection Report API Config</h4>
+                        <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-bold rounded">REPORTS MODULE</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-4 ml-8">
+                        Used in: <span class="font-semibold text-slate-500">Reports → Collection Report</span>
+                        &nbsp;→&nbsp; <code class="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 text-[10px]">POST /LogicPartyCollection</code>
+                    </p>
+
+                    <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fin Year <span class="font-normal text-gray-400 normal-case">(e.g. 2627)</span></label>
+                                <input type="text" name="collection_api_fin_year"
+                                    value="{{ $settings['collection_api_fin_year']->value ?? '2627' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                    placeholder="2627">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Party Code <span class="font-normal text-gray-400 normal-case">(ALL or specific code)</span></label>
+                                <input type="text" name="collection_api_party_code"
+                                    value="{{ $settings['collection_api_party_code']->value ?? 'ALL' }}"
+                                    class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                                    placeholder="ALL">
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <hr class="border-slate-100">
 

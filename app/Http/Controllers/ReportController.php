@@ -570,7 +570,10 @@ class ReportController extends Controller
             $comparisonLabel = 'vs Prior Period';
         }
 
-        $finYear = $request->input('fin_year', '2627');
+        $finYearDefault = AppSetting::get('collection_api_fin_year', '2627') ?: '2627';
+        $partyCodeDefault = AppSetting::get('collection_api_party_code', 'ALL') ?: 'ALL';
+
+        $finYear = $request->input('fin_year', $finYearDefault);
 
         // Support array (multiple select) or string for branch_filter
         $branchFilter = $request->input('branch_filter', []);
@@ -598,7 +601,7 @@ class ReportController extends Controller
         }
 
         $defaults = [
-            'fin_year'     => '2627',
+            'fin_year'     => $finYearDefault,
             'month_filter' => $currentYm,
             'from_date'    => date('Y-m-01'),
             'to_date'      => date('Y-m-t'),
@@ -607,7 +610,7 @@ class ReportController extends Controller
         $payload = [
             'apikey'    => $apiKey,
             'FinYear'   => $finYear,
-            'PartyCode' => 'ALL',
+            'PartyCode' => $partyCodeDefault,
             'FromDate'  => $fromDate,
             'ToDate'    => $toDate,
         ];
@@ -1305,6 +1308,212 @@ class ReportController extends Controller
             'success' => true,
             'message' => 'Team hierarchy structure saved successfully!'
         ]);
+    }
+
+    public function salesReport(Request $request)
+    {
+        // --- Default values ---
+        $baseUrl  = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey   = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        // FY auto-dates
+        $now      = now();
+        $fyStart  = $now->month >= 4
+            ? $now->year . '-04-01'
+            : ($now->year - 1) . '-04-01';
+        $fyEnd    = $now->month >= 4
+            ? ($now->year + 1) . '-03-31'
+            : $now->year . '-03-31';
+
+        $defaults = [
+            'from_date'  => $fyStart,
+            'to_date'    => $fyEnd,
+            'act_code'   => AppSetting::get('sales_api_actcode', 'ALL') ?: 'ALL',
+            'agent_code' => AppSetting::get('sales_api_agentcode', 'ALL') ?: 'ALL',
+            'item'       => AppSetting::get('sales_api_item', 'ALL') ?: 'ALL',
+            'usercode'   => AppSetting::get('sales_api_usercode', 'ALL') ?: 'ALL',
+            'branch'     => AppSetting::get('sales_api_branch', 'ALL') ?: 'ALL',
+        ];
+
+        $fromDate  = $request->input('from_date', $defaults['from_date']);
+        $toDate    = $request->input('to_date', $defaults['to_date']);
+        $actCode   = $request->input('act_code', $defaults['act_code']);
+        $agentCode = $request->input('agent_code', $defaults['agent_code']);
+        $item      = $request->input('item', $defaults['item']);
+        $usercode  = $request->input('usercode', $defaults['usercode']);
+        $branch    = $request->input('branch', $defaults['branch']);
+
+        $totalDbCount = \App\Models\SalesRegister::count();
+
+        // If no filter values and no DB records, we just load view with empty report
+        if (!$request->hasAny(['from_date', 'to_date', 'act_code', 'agent_code', 'item', 'usercode', 'branch']) && $totalDbCount == 0) {
+            $reportData = [];
+            return view('reports.sales_report', compact('defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'totalDbCount'));
+        }
+
+        // Search the DB table
+        $query = \App\Models\SalesRegister::query();
+
+        if ($fromDate) {
+            $query->whereDate('vouch_date', '>=', $fromDate);
+        }
+        if ($toDate) {
+            $query->whereDate('vouch_date', '<=', $toDate);
+        }
+        if ($actCode && strtoupper($actCode) !== 'ALL') {
+            $query->where('act_code', $actCode);
+        }
+        if ($agentCode && strtoupper($agentCode) !== 'ALL') {
+            $query->where('agent_code', $agentCode);
+        }
+        if ($item && strtoupper($item) !== 'ALL') {
+            $query->where('item_code', $item);
+        }
+        if ($branch && strtoupper($branch) !== 'ALL') {
+            $query->where('branch', $branch);
+        }
+
+        $records = $query->orderBy('vouch_date')->get();
+
+        // Map database records back to the dynamic row structure for views
+        $reportData = [];
+        foreach ($records as $record) {
+            if ($record->raw_data) {
+                $reportData[] = $record->raw_data;
+            } else {
+                $reportData[] = [
+                    'Date'        => $record->vouch_date ? $record->vouch_date->format('d/m/Y') : '',
+                    'PartyCode'   => $record->act_code,
+                    'PartyName'   => $record->act_name,
+                    'AgentCode'   => $record->agent_code,
+                    'AgentName'   => $record->agent_name,
+                    'ProductCode' => $record->item_code,
+                    'ProductName' => $record->item_name,
+                    'Qty'         => $record->qty,
+                    'Amount'      => $record->amount,
+                    'Branch'      => $record->branch,
+                ];
+            }
+        }
+
+        $error = null;
+        return view('reports.sales_report', compact(
+            'defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'error', 'totalDbCount'
+        ));
+    }
+
+    public function syncSalesReport(Request $request)
+    {
+        try {
+            $count = $this->syncSalesReportRaw();
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully synced {$count} sales records from ERP API into database.",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Sales Register Sync Error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function syncSalesReportRaw()
+    {
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        // FY auto-dates
+        $now     = now();
+        $fyStart = $now->month >= 4 ? $now->year . '-04-01' : ($now->year - 1) . '-04-01';
+        $fyEnd   = $now->month >= 4 ? ($now->year + 1) . '-03-31' : $now->year . '-03-31';
+
+        $actCode   = AppSetting::get('sales_api_actcode', 'ALL') ?: 'ALL';
+        $agentCode = AppSetting::get('sales_api_agentcode', 'ALL') ?: 'ALL';
+        $item      = AppSetting::get('sales_api_item', 'ALL') ?: 'ALL';
+        $usercode  = AppSetting::get('sales_api_usercode', 'ALL') ?: 'ALL';
+        $branch    = AppSetting::get('sales_api_branch', 'ALL') ?: 'ALL';
+
+        $response = Http::withoutVerifying()
+            ->timeout(120)
+            ->post("{$baseUrl}/PartyWiseProductWiseSales", [
+                'apikey'    => $apiKey,
+                'FromDate'  => $fyStart,
+                'ToDate'    => $fyEnd,
+                'ActCode'   => $actCode,
+                'AgentCode' => $agentCode,
+                'Item'      => $item,
+                'Usercode'  => $usercode,
+                'Branch'    => $branch,
+            ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('ERP API request failed.');
+        }
+
+        $data = $response->json();
+        $resultdata = null;
+        if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
+            $resultdata = $data['resultdata'];
+        } elseif (is_array($data) && !isset($data['response'])) {
+            $resultdata = $data;
+        }
+
+        if (empty($resultdata)) {
+            throw new \Exception('No data returned from ERP API.');
+        }
+
+        $count = 0;
+        \Illuminate\Support\Facades\DB::transaction(function () use ($resultdata, &$count) {
+            foreach ($resultdata as $row) {
+                $vouchDateStr = $row['Vouch_Date'] ?? $row['VouchDate'] ?? $row['Date'] ?? $row['BillDate'] ?? null;
+                $formattedDate = null;
+                if ($vouchDateStr) {
+                    try {
+                        if (str_contains($vouchDateStr, '/')) {
+                            $formattedDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($vouchDateStr))->format('Y-m-d');
+                        } else {
+                            $formattedDate = \Carbon\Carbon::parse(trim($vouchDateStr))->format('Y-m-d');
+                        }
+                    } catch (\Exception $e) {
+                        $formattedDate = null;
+                    }
+                }
+
+                $actCodeVal   = trim($row['ActCode'] ?? $row['PartyCode'] ?? $row['AC_Code'] ?? $row['AcCode'] ?? '');
+                $actNameVal   = trim($row['ActName'] ?? $row['PartyName'] ?? $row['AC_Name'] ?? $row['AcName'] ?? '');
+                $agentCodeVal = trim($row['AgentCode'] ?? $row['SalesmanCode'] ?? '');
+                $agentNameVal = trim($row['AgentName'] ?? $row['SalesmanName'] ?? $row['Agent_Name'] ?? '');
+                $itemCodeVal  = trim($row['User_Code'] ?? $row['ItemCode'] ?? $row['ProductCode'] ?? '');
+                $itemNameVal  = trim($row['Item_Hd_Name'] ?? $row['ItemName'] ?? $row['ProductName'] ?? '');
+                $qtyVal       = (float)($row['Qty'] ?? $row['Quantity'] ?? 0);
+                $amtVal       = (float)($row['Amount'] ?? $row['NetAmt'] ?? $row['SalesValue'] ?? 0);
+                $branchVal    = trim($row['Branch'] ?? $row['BranchName'] ?? $row['Branch_Code'] ?? '');
+
+                if (empty($actCodeVal) && empty($itemCodeVal) && empty($itemNameVal)) {
+                    continue;
+                }
+
+                \App\Models\SalesRegister::updateOrCreate(
+                    [
+                        'vouch_date' => $formattedDate,
+                        'act_code'   => $actCodeVal,
+                        'item_code'  => $itemCodeVal,
+                        'branch'     => $branchVal,
+                        'qty'        => $qtyVal,
+                        'amount'     => $amtVal,
+                    ],
+                    [
+                        'act_name'   => $actNameVal,
+                        'agent_code' => $agentCodeVal,
+                        'agent_name' => $agentNameVal,
+                        'item_name'  => $itemNameVal,
+                        'raw_data'   => $row,
+                    ]
+                );
+                $count++;
+            }
+        });
+
+        return $count;
     }
 }
 

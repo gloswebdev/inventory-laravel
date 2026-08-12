@@ -133,6 +133,8 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::get('reports/teams/setup', [ReportController::class, 'teamsSetup'])->name('reports.teams.setup');
     Route::post('reports/teams/setup/save', [ReportController::class, 'saveTeamsSetup'])->name('reports.teams.setup.save');
     Route::get('reports/party-master', [ReportController::class, 'partyMasterReport'])->name('reports.party-master');
+    Route::get('reports/sales-report', [ReportController::class, 'salesReport'])->name('reports.sales-report');
+    Route::post('reports/sales-report/sync', [ReportController::class, 'syncSalesReport'])->name('reports.sales-report.sync');
     Route::post('reports/collection/teams', [ReportController::class, 'storeTeam'])->name('reports.collection.teams.store');
     Route::put('reports/collection/teams/{team}', [ReportController::class, 'updateTeam'])->name('reports.collection.teams.update');
     Route::delete('reports/collection/teams/{team}', [ReportController::class, 'deleteTeam'])->name('reports.collection.teams.destroy');

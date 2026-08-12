@@ -59,6 +59,18 @@ class SettingController extends Controller
             'erp_issue_doc_prefix'      => 'nullable|string',
             'erp_issue_godown_name'     => 'nullable|string',
             'erp_issue_issue_to'        => 'nullable|string',
+            // Sales Report API & Sync Config
+            'sales_api_actcode'         => 'nullable|string',
+            'sales_api_agentcode'       => 'nullable|string',
+            'sales_api_item'            => 'nullable|string',
+            'sales_api_usercode'        => 'nullable|string',
+            'sales_api_branch'          => 'nullable|string',
+            'sales_sync_frequency'      => 'nullable|string',
+            'sales_sync_time'           => 'nullable|string',
+            'sales_sync_day'            => 'nullable|string',
+            // Collection API Settings
+            'collection_api_fin_year'   => 'nullable|string',
+            'collection_api_party_code' => 'nullable|string',
         ]);
 
         $keys = [
@@ -75,6 +87,11 @@ class SettingController extends Controller
             'erp_push_base_url', 'erp_push_username', 'erp_push_password',
             'erp_receipt_doc_prefix', 'erp_receipt_godown_name', 'erp_receipt_received_from', 'erp_receipt_issue_to',
             'erp_issue_doc_prefix', 'erp_issue_godown_name', 'erp_issue_issue_to',
+            // Sales Report settings
+            'sales_api_actcode', 'sales_api_agentcode', 'sales_api_item', 'sales_api_usercode', 'sales_api_branch',
+            'sales_sync_frequency', 'sales_sync_time', 'sales_sync_day',
+            // Collection API settings
+            'collection_api_fin_year', 'collection_api_party_code',
         ];
 
         foreach ($keys as $key) {
@@ -83,6 +100,9 @@ class SettingController extends Controller
 
         // erp_push_enabled is a checkbox — only present in request when checked
         AppSetting::set('erp_push_enabled', $request->has('erp_push_enabled') ? '1' : '0');
+        
+        // sales_sync_auto is a checkbox — default disabled if not present
+        AppSetting::set('sales_sync_auto', $request->has('sales_sync_auto') ? 'enabled' : 'disabled');
 
         // Bust the stock cache so new settings take effect immediately
         Cache::forget('external_stock_data_grouped');
