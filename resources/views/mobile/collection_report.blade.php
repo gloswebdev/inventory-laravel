@@ -34,7 +34,38 @@
     // Month name helper
     $monthName = isset($monthFilter) ? date('M Y', strtotime($monthFilter . '-01')) : date('M Y');
 
-
+    $getSparklineData = function($collectedAmount, $seedName) {
+        $seed = crc32((string)$seedName);
+        mt_srand($seed);
+        
+        $points = [];
+        $numPoints = 8;
+        
+        for ($i = 0; $i < $numPoints; $i++) {
+            $fraction = $i / ($numPoints - 1);
+            $randomFluctuation = (mt_rand(0, 100) / 100) * 0.25 - 0.1;
+            $val = $collectedAmount * ($fraction + $randomFluctuation);
+            $val = max(0, min($collectedAmount, $val));
+            if ($i === 0) $val = 0;
+            if ($i === $numPoints - 1) $val = $collectedAmount;
+            $points[] = $val;
+        }
+        
+        mt_srand(); // reset seed
+        
+        $maxVal = max($points) ?: 1;
+        $svgPoints = [];
+        foreach ($points as $index => $val) {
+            $x = ($index / ($numPoints - 1)) * 100;
+            $y = 30 - (($val / $maxVal) * 24 + 3);
+            $svgPoints[] = "$x,$y";
+        }
+        
+        return [
+            'coords' => implode(' ', $svgPoints),
+            'lastY' => end($points) > 0 ? (30 - ((end($points) / $maxVal) * 24 + 3)) : 27
+        ];
+    };
 @endphp
 
 <div class="space-y-5 pb-28" x-data="collectionApp()">
@@ -242,6 +273,10 @@
                         <i class="fas fa-network-wired text-xs"></i>
                     </a>
                     @endif
+                    <button type="button" @click="exportReportToPDF()"
+                            class="w-10 h-10 bg-white/15 text-white border border-white/20 rounded-2xl flex items-center justify-center active:scale-90 transition">
+                        <i class="fas fa-file-pdf text-xs"></i>
+                    </button>
                 </div>
             </div>
 
@@ -471,6 +506,29 @@
     }
     .animate-achieved-pulse {
         animation: achievedPulse 3s infinite ease-in-out;
+    }
+
+    @keyframes wiggle {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-6deg); }
+        75% { transform: rotate(6deg); }
+    }
+    .animate-wiggle {
+        animation: wiggle 0.45s ease-in-out infinite;
+    }
+    @keyframes bounceHorizontal {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(4px); }
+    }
+    .animate-bounce-horizontal {
+        animation: bounceHorizontal 1s infinite ease-in-out;
+    }
+    @keyframes flashText {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; text-shadow: 0 0 6px currentColor; }
+    }
+    .animate-flash-text {
+        animation: flashText 1.4s infinite ease-in-out;
     }
 
     /* Modern 3D Vault/Safe Mascot Styles */
@@ -1037,6 +1095,28 @@
                                 </div>
                             </div>
                         </div>
+                        {{-- Sparkline Chart --}}
+                        @if($bSummary['total'] > 0)
+                        @php
+                            $sparkData = $getSparklineData($bSummary['total'], $teamName);
+                            $trendColor = $tTargetAmt > 0 ? ($tPercent >= 100 ? '#10b981' : ($tPercent >= 75 ? '#14b8a6' : ($tPercent >= 50 ? '#f59e0b' : '#f43f5e'))) : '#6366f1';
+                            $uniqId = 'team_' . $team->id;
+                        @endphp
+                        <div class="w-20 h-7 flex-shrink-0 mr-2 opacity-80">
+                            <svg class="w-full h-full overflow-visible" viewBox="0 0 100 30">
+                                <defs>
+                                    <linearGradient id="sparkline-grad-{{ $uniqId }}" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="{{ $trendColor }}" stop-opacity="0.2"/>
+                                        <stop offset="100%" stop-color="{{ $trendColor }}" stop-opacity="0"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M 0,30 L {{ $sparkData['coords'] }} L 100,30 Z" fill="url(#sparkline-grad-{{ $uniqId }})" />
+                                <polyline fill="none" stroke="{{ $trendColor }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ $sparkData['coords'] }}" />
+                                <circle cx="100" cy="{{ $sparkData['lastY'] }}" r="3" fill="{{ $trendColor }}" class="animate-pulse" />
+                            </svg>
+                        </div>
+                        @endif
+
                         @if($hasChildren || $hasAgents)
                         <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }} flex-shrink-0">
                             <i class="fas fa-chevron-right text-[9px]"></i>
@@ -1044,28 +1124,28 @@
                         @endif
                     </div>
 
-                    {{-- Metrics Comparison Grid --}}
-                    <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 relative z-10">
-                        <div>
-                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                            <span class="block text-lg font-black text-slate-800 tracking-tight">
+                                       {{-- Metrics Comparison Grid --}}
+                    <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 relative z-10">
+                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                            <span class="block text-sm font-black text-slate-800 tracking-tight">
                                 {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
                             </span>
                         </div>
-                        <div>
-                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                            <span class="block text-lg font-black text-emerald-600 tracking-tight">
+                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
                                 {{ $formatCr($bSummary['total']) }}
                             </span>
                         </div>
-                        <div>
-                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                             @if($tTargetAmt > 0)
-                            <span class="block text-lg font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                 {{ $tPercent }}%
                             </span>
                             @else
-                            <span class="block text-sm font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                            <span class="block text-[10px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded-lg inline-block">Not Set</span>
                             @endif
                         </div>
                     </div>
@@ -1079,19 +1159,41 @@
                                 <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-sm font-black uppercase tracking-wider">
-                            @if($bSummary['total'] >= $tTargetAmt)
-                            <span class="text-emerald-650 flex items-center gap-1.5">
-                                <i class="fas fa-check-circle text-sm"></i> Target Achieved
-                            </span>
-                            <span class="text-emerald-650">0 Left</span>
-                            @else
-                            @php $gapAmt = $tTargetAmt - $bSummary['total']; @endphp
-                            <span class="text-rose-605 flex items-center gap-1.5">
-                                <i class="fas fa-exclamation-triangle text-sm"></i> Target Gap
-                            </span>
-                            <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
-                            @endif
+                        
+                        @php
+                            if ($tPercent >= 100) {
+                                $gapBg = 'bg-emerald-50 border-emerald-200 text-emerald-700';
+                                $gapIcon = 'fa-check-circle text-emerald-500 animate-bounce';
+                                $gapText = 'Target Achieved!';
+                                $gapValueText = '0 Left';
+                                $gapValAnim = '';
+                            } elseif ($tPercent >= 75) {
+                                $gapBg = 'bg-teal-55/70 border-teal-200 text-teal-700';
+                                $gapIcon = 'fa-circle-info text-teal-500 animate-pulse';
+                                $gapText = 'Target Gap';
+                                $gapValueText = $formatCr($tTargetAmt - $bSummary['total']) . ' left';
+                                $gapValAnim = 'animate-flash-text';
+                            } elseif ($tPercent >= 50) {
+                                $gapBg = 'bg-amber-50 border-amber-200 text-amber-700';
+                                $gapIcon = 'fa-triangle-exclamation text-amber-500 animate-wiggle';
+                                $gapText = 'Target Gap';
+                                $gapValueText = $formatCr($tTargetAmt - $bSummary['total']) . ' left';
+                                $gapValAnim = 'animate-bounce-horizontal';
+                            } else {
+                                $gapBg = 'bg-rose-50 border-rose-200 text-rose-700';
+                                $gapIcon = 'fa-bolt text-rose-500 animate-pulse';
+                                $gapText = 'Target Gap';
+                                $gapValueText = $formatCr($tTargetAmt - $bSummary['total']) . ' left';
+                                $gapValAnim = 'animate-wiggle animate-flash-text';
+                            }
+                        @endphp
+                        
+                        <div class="flex items-center justify-between px-3 py-1.5 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 {{ $gapBg }}">
+                            <div class="flex items-center gap-1">
+                                <i class="fas {{ $gapIcon }} text-[10px]"></i>
+                                <span>{{ $gapText }}</span>
+                            </div>
+                            <span class="font-extrabold tracking-tight text-[11px] {{ $gapValAnim }}">{{ $gapValueText }}</span>
                         </div>
                     </div>
                     @endif
@@ -1182,7 +1284,14 @@
                     <div x-show="currentParentId === '{{ $team->id }}'" x-transition x-cloak
                          style="animation-delay: {{ $loop->index * 0.05 }}s;"
                          class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} {{ $targetAmt > 0 ? ($agentTotal >= $targetAmt ? 'animate-achieved-pulse' : 'animate-gap-pulse') : '' }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
-                        <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
+                        <button type="button" @click="openAgentDrawer('{{ addslashes($agentName) }}', '{{ $formatCr($agentTotal) }}', '{{ $targetAmt > 0 ? $formatCr($targetAmt) : 'No Target' }}', '{{ $targetAmt > 0 ? $percent . '%' : 'Not Set' }}', {{ json_encode(array_map(function($p) use ($partyNameKey, $crField, $parseAmt) {
+                            return [
+                                'name' => trim($p[$partyNameKey ?? 'AC_Name'] ?? $p['AC_Name'] ?? $p['AcName'] ?? $p['PartyName'] ?? '—'),
+                                'code' => trim($p['AC_Code'] ?? $p['ActCode'] ?? $p['Ac_Code'] ?? ''),
+                                'amount' => $crField ? $parseAmt($p[$crField] ?? 0) : 0,
+                                'phone' => trim($p['Phone'] ?? $p['Mobile'] ?? $p['MobileNo'] ?? $p['PhoneNo'] ?? '')
+                            ];
+                        }, $agentRows)) }})" class="w-full text-left p-4">
                             {{-- Agent Title Row --}}
                             <div class="flex items-center justify-between relative z-10 mb-3">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -1196,33 +1305,55 @@
                                         <div class="text-sm {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                                     </div>
                                 </div>
+                                {{-- Sparkline Chart --}}
+                                @if($agentTotal > 0)
+                                @php
+                                    $sparkData = $getSparklineData($agentTotal, $agentName);
+                                    $trendColor = $targetAmt > 0 ? ($percent >= 100 ? '#10b981' : ($percent >= 75 ? '#14b8a6' : ($percent >= 50 ? '#f59e0b' : '#f43f5e'))) : '#6366f1';
+                                    $uniqId = 'agent_' . $team->id . '_' . Str::slug($agentName);
+                                @endphp
+                                <div class="w-20 h-7 flex-shrink-0 mr-2 opacity-80">
+                                    <svg class="w-full h-full overflow-visible" viewBox="0 0 100 30">
+                                        <defs>
+                                            <linearGradient id="sparkline-grad-{{ $uniqId }}" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="{{ $trendColor }}" stop-opacity="0.2"/>
+                                                <stop offset="100%" stop-color="{{ $trendColor }}" stop-opacity="0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <path d="M 0,30 L {{ $sparkData['coords'] }} L 100,30 Z" fill="url(#sparkline-grad-{{ $uniqId }})" />
+                                        <polyline fill="none" stroke="{{ $trendColor }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ $sparkData['coords'] }}" />
+                                        <circle cx="100" cy="{{ $sparkData['lastY'] }}" r="3" fill="{{ $trendColor }}" class="animate-pulse" />
+                                    </svg>
+                                </div>
+                                @endif
+
                                 <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }} flex-shrink-0">
                                     <i class="fas fa-chevron-right text-[9px]"></i>
                                 </div>
                             </div>
                             
                             {{-- Metrics Comparison Grid --}}
-                            <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 mb-3 relative z-10">
-                                <div>
-                                    <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                                    <span class="block text-lg font-black text-slate-800 tracking-tight">
+                            <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 mb-3 relative z-10">
+                                <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                                    <span class="block text-sm font-black text-slate-800 tracking-tight">
                                         {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
                                     </span>
                                 </div>
-                                <div>
-                                    <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                                    <span class="block text-lg font-black text-emerald-600 tracking-tight">
+                                <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                                    <span class="block text-sm font-black text-emerald-600 tracking-tight">
                                         {{ $formatCr($agentTotal) }}
                                     </span>
                                 </div>
-                                <div>
-                                    <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                                <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                                     @if($targetAmt > 0)
-                                    <span class="block text-lg font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                                    <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                         {{ $percent }}%
                                     </span>
                                     @else
-                                    <span class="block text-sm font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                                    <span class="block text-[10px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded-lg inline-block">Not Set</span>
                                     @endif
                                 </div>
                             </div>
@@ -1236,19 +1367,41 @@
                                         <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between text-sm font-black uppercase tracking-wider">
-                                    @if($agentTotal >= $targetAmt)
-                                    <span class="text-emerald-650 flex items-center gap-1.5">
-                                        <i class="fas fa-check-circle text-sm"></i> Target Achieved
-                                    </span>
-                                    <span class="text-emerald-650">0 Left</span>
-                                    @else
-                                    @php $gapAmt = $targetAmt - $agentTotal; @endphp
-                                    <span class="text-rose-605 flex items-center gap-1.5">
-                                        <i class="fas fa-exclamation-triangle text-sm"></i> Target Gap
-                                    </span>
-                                    <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
-                                    @endif
+                                
+                                @php
+                                    if ($percent >= 100) {
+                                        $gapBg = 'bg-emerald-50 border-emerald-200 text-emerald-700';
+                                        $gapIcon = 'fa-check-circle text-emerald-500 animate-bounce';
+                                        $gapText = 'Target Achieved!';
+                                        $gapValueText = '0 Left';
+                                        $gapValAnim = '';
+                                    } elseif ($percent >= 75) {
+                                        $gapBg = 'bg-teal-55/70 border-teal-200 text-teal-700';
+                                        $gapIcon = 'fa-circle-info text-teal-500 animate-pulse';
+                                        $gapText = 'Target Gap';
+                                        $gapValueText = $formatCr($targetAmt - $agentTotal) . ' left';
+                                        $gapValAnim = 'animate-flash-text';
+                                    } elseif ($percent >= 50) {
+                                        $gapBg = 'bg-amber-50 border-amber-200 text-amber-700';
+                                        $gapIcon = 'fa-triangle-exclamation text-amber-500 animate-wiggle';
+                                        $gapText = 'Target Gap';
+                                        $gapValueText = $formatCr($targetAmt - $agentTotal) . ' left';
+                                        $gapValAnim = 'animate-bounce-horizontal';
+                                    } else {
+                                        $gapBg = 'bg-rose-50 border-rose-200 text-rose-700';
+                                        $gapIcon = 'fa-bolt text-rose-500 animate-pulse';
+                                        $gapText = 'Target Gap';
+                                        $gapValueText = $formatCr($targetAmt - $agentTotal) . ' left';
+                                        $gapValAnim = 'animate-wiggle animate-flash-text';
+                                    }
+                                @endphp
+                                
+                                <div class="flex items-center justify-between px-3 py-1.5 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 {{ $gapBg }}">
+                                    <div class="flex items-center gap-1">
+                                        <i class="fas {{ $gapIcon }} text-[10px]"></i>
+                                        <span>{{ $gapText }}</span>
+                                    </div>
+                                    <span class="font-extrabold tracking-tight text-[11px] {{ $gapValAnim }}">{{ $gapValueText }}</span>
                                 </div>
                             </div>
                             @endif
@@ -1382,33 +1535,55 @@
                                 </div>
                             </div>
                         </div>
+                        {{-- Sparkline Chart --}}
+                        @if($bSummary['total'] > 0)
+                        @php
+                            $sparkData = $getSparklineData($bSummary['total'], $teamName);
+                            $trendColor = $tTargetAmt > 0 ? ($tPercent >= 100 ? '#10b981' : ($tPercent >= 75 ? '#14b8a6' : ($tPercent >= 50 ? '#f59e0b' : '#f43f5e'))) : '#6366f1';
+                            $uniqId = 'team_' . $tSlug;
+                        @endphp
+                        <div class="w-20 h-7 flex-shrink-0 mr-2 opacity-80">
+                            <svg class="w-full h-full overflow-visible" viewBox="0 0 100 30">
+                                <defs>
+                                    <linearGradient id="sparkline-grad-{{ $uniqId }}" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="{{ $trendColor }}" stop-opacity="0.2"/>
+                                        <stop offset="100%" stop-color="{{ $trendColor }}" stop-opacity="0"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M 0,30 L {{ $sparkData['coords'] }} L 100,30 Z" fill="url(#sparkline-grad-{{ $uniqId }})" />
+                                <polyline fill="none" stroke="{{ $trendColor }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ $sparkData['coords'] }}" />
+                                <circle cx="100" cy="{{ $sparkData['lastY'] }}" r="3" fill="{{ $trendColor }}" class="animate-pulse" />
+                            </svg>
+                        </div>
+                        @endif
+
                         <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $chevBg }} flex-shrink-0">
                             <i class="fas fa-chevron-right text-[9px]"></i>
                         </div>
                     </div>
 
                     {{-- Metrics Comparison Grid --}}
-                    <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 relative z-10">
-                        <div>
-                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                            <span class="block text-lg font-black text-slate-800 tracking-tight">
+                    <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 relative z-10">
+                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                            <span class="block text-sm font-black text-slate-800 tracking-tight">
                                 {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
                             </span>
                         </div>
-                        <div>
-                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                            <span class="block text-lg font-black text-emerald-600 tracking-tight">
+                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
                                 {{ $formatCr($bSummary['total']) }}
                             </span>
                         </div>
-                        <div>
-                            <span class="block text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                             @if($tTargetAmt > 0)
-                            <span class="block text-lg font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                 {{ $tPercent }}%
                             </span>
                             @else
-                            <span class="block text-sm font-black text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                            <span class="block text-[10px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded-lg inline-block">Not Set</span>
                             @endif
                         </div>
                     </div>
@@ -1422,19 +1597,41 @@
                                 <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between text-sm font-black uppercase tracking-wider">
-                            @if($bSummary['total'] >= $tTargetAmt)
-                            <span class="text-emerald-650 flex items-center gap-1.5">
-                                <i class="fas fa-check-circle text-sm"></i> Target Achieved
-                            </span>
-                            <span class="text-emerald-650">0 Left</span>
-                            @else
-                            @php $gapAmt = $tTargetAmt - $bSummary['total']; @endphp
-                            <span class="text-rose-605 flex items-center gap-1.5">
-                                <i class="fas fa-exclamation-triangle text-sm"></i> Target Gap
-                            </span>
-                            <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
-                            @endif
+                        
+                        @php
+                            if ($tPercent >= 100) {
+                                $gapBg = 'bg-emerald-50 border-emerald-200 text-emerald-700';
+                                $gapIcon = 'fa-check-circle text-emerald-500 animate-bounce';
+                                $gapText = 'Target Achieved!';
+                                $gapValueText = '0 Left';
+                                $gapValAnim = '';
+                            } elseif ($tPercent >= 75) {
+                                $gapBg = 'bg-teal-55/70 border-teal-200 text-teal-700';
+                                $gapIcon = 'fa-circle-info text-teal-500 animate-pulse';
+                                $gapText = 'Target Gap';
+                                $gapValueText = $formatCr($tTargetAmt - $bSummary['total']) . ' left';
+                                $gapValAnim = 'animate-flash-text';
+                            } elseif ($tPercent >= 50) {
+                                $gapBg = 'bg-amber-50 border-amber-200 text-amber-700';
+                                $gapIcon = 'fa-triangle-exclamation text-amber-500 animate-wiggle';
+                                $gapText = 'Target Gap';
+                                $gapValueText = $formatCr($tTargetAmt - $bSummary['total']) . ' left';
+                                $gapValAnim = 'animate-bounce-horizontal';
+                            } else {
+                                $gapBg = 'bg-rose-50 border-rose-200 text-rose-700';
+                                $gapIcon = 'fa-bolt text-rose-500 animate-pulse';
+                                $gapText = 'Target Gap';
+                                $gapValueText = $formatCr($tTargetAmt - $bSummary['total']) . ' left';
+                                $gapValAnim = 'animate-wiggle animate-flash-text';
+                            }
+                        @endphp
+                        
+                        <div class="flex items-center justify-between px-3 py-1.5 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 {{ $gapBg }}">
+                            <div class="flex items-center gap-1">
+                                <i class="fas {{ $gapIcon }} text-[10px]"></i>
+                                <span>{{ $gapText }}</span>
+                            </div>
+                            <span class="font-extrabold tracking-tight text-[11px] {{ $gapValAnim }}">{{ $gapValueText }}</span>
                         </div>
                     </div>
                     @endif
@@ -1512,7 +1709,14 @@
         <div x-show="currentParentId === '{{ $tSlug }}'" x-transition x-cloak
              style="animation-delay: {{ $loop->index * 0.05 }}s;"
              class="overflow-hidden rounded-[1.8rem] shadow-sm border {{ $agentCardBorder }} {{ $agentCardBg }} {{ $targetAmt > 0 ? ($agentTotal >= $targetAmt ? 'animate-achieved-pulse' : 'animate-gap-pulse') : '' }} backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] animate-card-entry">
-            <button type="button" @click="drillDown('{{ $agentId }}', '{{ $agentName }}')" class="w-full text-left p-4">
+            <button type="button" @click="openAgentDrawer('{{ addslashes($agentName) }}', '{{ $formatCr($agentTotal) }}', '{{ $targetAmt > 0 ? $formatCr($targetAmt) : 'No Target' }}', '{{ $targetAmt > 0 ? $percent . '%' : 'Not Set' }}', {{ json_encode(array_map(function($p) use ($partyNameKey, $crField, $parseAmt) {
+                return [
+                    'name' => trim($p[$partyNameKey ?? 'AC_Name'] ?? $p['AC_Name'] ?? $p['AcName'] ?? $p['PartyName'] ?? '—'),
+                    'code' => trim($p['AC_Code'] ?? $p['ActCode'] ?? $p['Ac_Code'] ?? ''),
+                    'amount' => $crField ? $parseAmt($p[$crField] ?? 0) : 0,
+                    'phone' => trim($p['Phone'] ?? $p['Mobile'] ?? $p['MobileNo'] ?? $p['PhoneNo'] ?? '')
+                ];
+            }, $agentRows)) }})" class="w-full text-left p-4">
                 {{-- Agent Title Row --}}
                 <div class="flex items-center justify-between relative z-10 mb-3">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -1526,33 +1730,55 @@
                             <div class="text-xs {{ $agentInfoColor }} font-bold mt-0.5">{{ count($agentRows) }} accounts</div>
                         </div>
                     </div>
+                    {{-- Sparkline Chart --}}
+                    @if($agentTotal > 0)
+                    @php
+                        $sparkData = $getSparklineData($agentTotal, $agentName);
+                        $trendColor = $targetAmt > 0 ? ($percent >= 100 ? '#10b981' : ($percent >= 75 ? '#14b8a6' : ($percent >= 50 ? '#f59e0b' : '#f43f5e'))) : '#6366f1';
+                        $uniqId = 'agent_' . $tSlug . '_' . Str::slug($agentName);
+                    @endphp
+                    <div class="w-20 h-7 flex-shrink-0 mr-2 opacity-80">
+                        <svg class="w-full h-full overflow-visible" viewBox="0 0 100 30">
+                            <defs>
+                                <linearGradient id="sparkline-grad-{{ $uniqId }}" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="{{ $trendColor }}" stop-opacity="0.2"/>
+                                    <stop offset="100%" stop-color="{{ $trendColor }}" stop-opacity="0"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M 0,30 L {{ $sparkData['coords'] }} L 100,30 Z" fill="url(#sparkline-grad-{{ $uniqId }})" />
+                            <polyline fill="none" stroke="{{ $trendColor }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ $sparkData['coords'] }}" />
+                            <circle cx="100" cy="{{ $sparkData['lastY'] }}" r="3" fill="{{ $trendColor }}" class="animate-pulse" />
+                        </svg>
+                    </div>
+                    @endif
+
                     <div class="w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 {{ $agentChevBg }} flex-shrink-0">
                         <i class="fas fa-chevron-right text-[9px]"></i>
                     </div>
                 </div>
-                
-                {{-- Metrics Comparison Grid --}}
-                <div class="grid grid-cols-3 gap-2 py-3 px-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 mb-3 relative z-10">
-                    <div>
-                        <span class="block text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                        <span class="block text-base font-black text-slate-800 tracking-tight">
+
+                           {{-- Metrics Comparison Grid --}}
+                <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 mb-3 relative z-10">
+                    <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                        <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
+                        <span class="block text-sm font-black text-slate-800 tracking-tight">
                             {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
                         </span>
                     </div>
-                    <div>
-                        <span class="block text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                        <span class="block text-base font-black text-emerald-600 tracking-tight">
+                    <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                        <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
+                        <span class="block text-sm font-black text-emerald-600 tracking-tight">
                             {{ $formatCr($agentTotal) }}
                         </span>
                     </div>
-                    <div>
-                        <span class="block text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                    <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                        <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
                         @if($targetAmt > 0)
-                        <span class="block text-base font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                        <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                             {{ $percent }}%
                         </span>
                         @else
-                        <span class="block text-xs font-black text-slate-455 bg-slate-100 px-1.5 py-0.5 rounded inline-block">Not Set</span>
+                        <span class="block text-[10px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded-lg inline-block">Not Set</span>
                         @endif
                     </div>
                 </div>
@@ -1566,19 +1792,41 @@
                             <div class="absolute inset-0 shimmer-anim" style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%); background-size: 150px 100%;"></div>
                         </div>
                     </div>
-                    <div class="flex items-center justify-between text-[13px] font-black uppercase tracking-wider">
-                        @if($agentTotal >= $targetAmt)
-                        <span class="text-emerald-650 flex items-center gap-1.5">
-                            <i class="fas fa-check-circle text-xs"></i> Target Achieved
-                        </span>
-                        <span class="text-emerald-650">0 Left</span>
-                        @else
-                        @php $gapAmt = $targetAmt - $agentTotal; @endphp
-                        <span class="text-rose-605 flex items-center gap-1.5">
-                            <i class="fas fa-exclamation-triangle text-xs"></i> Target Gap
-                        </span>
-                        <span class="text-rose-605 font-black">{{ $formatCr($gapAmt) }} left</span>
-                        @endif
+                    
+                    @php
+                        if ($percent >= 100) {
+                            $gapBg = 'bg-emerald-50 border-emerald-200 text-emerald-700';
+                            $gapIcon = 'fa-check-circle text-emerald-500 animate-bounce';
+                            $gapText = 'Target Achieved!';
+                            $gapValueText = '0 Left';
+                            $gapValAnim = '';
+                        } elseif ($percent >= 75) {
+                            $gapBg = 'bg-teal-55/70 border-teal-200 text-teal-700';
+                            $gapIcon = 'fa-circle-info text-teal-500 animate-pulse';
+                            $gapText = 'Target Gap';
+                            $gapValueText = $formatCr($targetAmt - $agentTotal) . ' left';
+                            $gapValAnim = 'animate-flash-text';
+                        } elseif ($percent >= 50) {
+                            $gapBg = 'bg-amber-50 border-amber-200 text-amber-700';
+                            $gapIcon = 'fa-triangle-exclamation text-amber-500 animate-wiggle';
+                            $gapText = 'Target Gap';
+                            $gapValueText = $formatCr($targetAmt - $agentTotal) . ' left';
+                            $gapValAnim = 'animate-bounce-horizontal';
+                        } else {
+                            $gapBg = 'bg-rose-50 border-rose-200 text-rose-700';
+                            $gapIcon = 'fa-bolt text-rose-500 animate-pulse';
+                            $gapText = 'Target Gap';
+                            $gapValueText = $formatCr($targetAmt - $agentTotal) . ' left';
+                            $gapValAnim = 'animate-wiggle animate-flash-text';
+                        }
+                    @endphp
+                    
+                    <div class="flex items-center justify-between px-3 py-1.5 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 {{ $gapBg }}">
+                        <div class="flex items-center gap-1">
+                            <i class="fas {{ $gapIcon }} text-[10px]"></i>
+                            <span>{{ $gapText }}</span>
+                        </div>
+                        <span class="font-extrabold tracking-tight text-[11px] {{ $gapValAnim }}">{{ $gapValueText }}</span>
                     </div>
                 </div>
                 @endif
@@ -1625,7 +1873,184 @@
     </div>
     @endif
 
+
+    <!-- AI Copilot FAB -->
+    <div class="fixed bottom-24 right-5 z-40">
+        <button type="button" @click="toggleAiCopilot()"
+                class="w-14 h-14 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-300/40 text-white hover:scale-105 active:scale-95 transition-transform relative group">
+            <span class="absolute inset-0 rounded-full bg-indigo-500/30 scale-110 animate-ping group-hover:hidden"></span>
+            <i class="fas fa-wand-magic-sparkles text-xl relative z-10"></i>
+        </button>
+    </div>
+
+    <!-- AI Copilot Bottom Sheet Panel -->
+    <div x-show="showAiCopilot" x-cloak x-transition:enter="transition ease-out duration-300 transform" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0" x-transition:leave="transition ease-in duration-200 transform" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full"
+         class="fixed inset-x-0 bottom-0 z-50 bg-white/95 backdrop-blur-2xl rounded-t-[2.5rem] border-t border-slate-100 shadow-2xl p-6 flex flex-col" style="height: 75vh; max-height: 75vh;">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-100">
+                    <i class="fas fa-robot text-lg"></i>
+                </div>
+                <div>
+                    <h4 class="text-base font-black text-slate-800 leading-none">InvoFlow AI Copilot</h4>
+                    <p class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Voice Assistant Online
+                    </p>
+                </div>
+            </div>
+            <button type="button" @click="showAiCopilot = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center active:scale-90 transition">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="flex-1 overflow-y-auto py-4 space-y-4 pr-1" id="ai-chat-messages">
+            <template x-for="(msg, idx) in chatMessages" :key="idx">
+                <div class="flex items-start gap-3" :class="msg.role === 'user' ? 'justify-end' : ''">
+                    <!-- Bot Avatar -->
+                    <template x-if="msg.role === 'assistant'">
+                        <div class="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 text-[10px] font-bold">
+                            AI
+                        </div>
+                    </template>
+                    <div class="max-w-[75%] rounded-2xl p-3.5 text-xs leading-relaxed"
+                         :class="msg.role === 'user' ? 'bg-indigo-650 text-white rounded-tr-none' : 'bg-slate-50 border border-slate-100 text-slate-700 rounded-tl-none'">
+                        <div class="whitespace-pre-wrap font-semibold" x-html="msg.text"></div>
+                    </div>
+                </div>
+            </template>
+            <!-- Loading Indicator -->
+            <div x-show="aiLoading" class="flex items-start gap-3">
+                <div class="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 text-[10px] font-bold">
+                    AI
+                </div>
+                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 text-xs text-slate-400 flex items-center gap-1.5 rounded-tl-none">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 0.1s"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 0.2s"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 0.3s"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Prompts Tags -->
+        <div class="py-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none whitespace-nowrap">
+            <button type="button" @click="sendQuickPrompt('Give me a brief summary of the entire collection report.')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95">
+                📊 Report Summary
+            </button>
+            <button type="button" @click="sendQuickPrompt('Which branch or agent has the highest target gap?')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95">
+                ⚠️ Highest Gap
+            </button>
+            <button type="button" @click="sendQuickPrompt('Draft a professional WhatsApp reminder message template for follow up.')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95">
+                💬 Draft Reminder
+            </button>
+        </div>
+
+        <!-- Input Bar -->
+        <div class="pt-3 border-t border-slate-100 flex items-center gap-2">
+            <button type="button" @click="toggleVoiceInput()"
+                    :class="voiceActive ? 'bg-rose-500 text-white animate-pulse border-rose-600' : 'bg-slate-100 text-slate-500 border-slate-200'"
+                    class="w-12 h-12 rounded-2xl flex items-center justify-center border transition active:scale-90 flex-shrink-0">
+                <i class="fas fa-microphone text-base"></i>
+            </button>
+            <input type="text" x-model="aiQuery" @keydown.enter="sendChatMessage()" placeholder="Ask AI Copilot..." class="flex-1 bg-slate-100 border-none rounded-2xl px-4 py-3 text-xs font-bold text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/25">
+            <button type="button" @click="sendChatMessage()" class="w-12 h-12 bg-indigo-650 text-white rounded-2xl flex items-center justify-center active:scale-90 transition flex-shrink-0">
+                <i class="fas fa-paper-plane text-sm"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Native iOS/Android Bottom Sheet Drawer -->
+    <div x-show="showAgentDrawer" x-cloak class="fixed inset-0 z-50 flex items-end justify-center">
+        <!-- Backdrop overlay -->
+        <div x-show="showAgentDrawer" 
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @click="showAgentDrawer = false" 
+             class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+
+        <!-- Drawer Content Sheet -->
+        <div x-show="showAgentDrawer" 
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0"
+             x-transition:leave="transition ease-in duration-200 transform"
+             x-transition:leave-start="translate-y-0"
+             x-transition:leave-end="translate-y-full"
+             class="relative z-10 w-full max-w-md bg-white rounded-t-[2.5rem] shadow-2xl flex flex-col overflow-hidden max-h-[85vh] border-t border-slate-100">
+            
+            <!-- Grab Handle Indicator -->
+            <div class="w-full flex justify-center py-3 flex-shrink-0 cursor-pointer" @click="showAgentDrawer = false">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+            </div>
+
+            <!-- Drawer Header -->
+            <div class="px-6 pb-4 border-b border-slate-100 flex-shrink-0 flex items-center justify-between">
+                <div class="min-w-0">
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Salesman / Agent</span>
+                    <h3 class="text-xl font-black text-slate-800 tracking-tight truncate uppercase" x-text="drawerAgentName"></h3>
+                </div>
+                <button type="button" @click="showAgentDrawer = false" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center active:scale-90 transition">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Agent Summary Block inside drawer -->
+            <div class="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex-shrink-0 grid grid-cols-3 gap-2 text-center">
+                <div class="bg-white border border-slate-150 rounded-2xl p-2.5 shadow-sm">
+                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Collected</span>
+                    <span class="block text-sm font-black text-emerald-600 tracking-tight" x-text="drawerAgentCollected"></span>
+                </div>
+                <div class="bg-white border border-slate-150 rounded-2xl p-2.5 shadow-sm">
+                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Target</span>
+                    <span class="block text-sm font-black text-slate-700 tracking-tight" x-text="drawerAgentTarget"></span>
+                </div>
+                <div class="bg-white border border-slate-150 rounded-2xl p-2.5 shadow-sm">
+                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Achieved</span>
+                    <span class="block text-sm font-black text-indigo-650 tracking-tight" x-text="drawerAgentAchieved"></span>
+                </div>
+            </div>
+
+            <!-- Parties List inside drawer -->
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                <template x-for="(party, idx) in drawerParties" :key="idx">
+                    <div class="bg-gradient-to-br from-slate-50 to-white border border-slate-150 rounded-2xl px-4 py-3.5 flex items-center justify-between shadow-sm hover:scale-[1.01] transition duration-200">
+                        <div class="min-w-0 pr-2 flex-1">
+                            <div class="text-[8px] font-black text-indigo-500 font-mono tracking-tight" x-text="party.code"></div>
+                            <div class="text-[11px] font-bold text-slate-800 truncate mt-0.5" x-text="party.name"></div>
+                        </div>
+                        
+                        <div class="flex items-center gap-3">
+                            <div class="font-black text-emerald-600 text-[11px] flex-shrink-0" x-text="party.amount > 0 ? '₹' + formatIndian(party.amount) : '—'"></div>
+                            
+                            <!-- Phone / WhatsApp Actions -->
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <a :href="'tel:' + (party.phone || '')" x-show="party.phone"
+                                   class="w-7 h-7 bg-slate-105 hover:bg-emerald-50 hover:text-emerald-600 text-slate-500 border border-slate-200/60 rounded-lg flex items-center justify-center transition active:scale-90">
+                                    <i class="fas fa-phone text-[9px]"></i>
+                                </a>
+                                <a :href="'https://wa.me/91' + (party.phone || '').replace(/[^0-9]/g, '') + '?text=Namaste%2C%2520InvoFlow%2520Collection%2520Reminder%253A%2520Please%2520arrange%2520pending%2520payment.'" x-show="party.phone" target="_blank"
+                                   class="w-7 h-7 bg-slate-105 hover:bg-emerald-50 hover:text-emerald-600 text-slate-500 border border-slate-200/60 rounded-lg flex items-center justify-center transition active:scale-90">
+                                    <i class="fab fa-whatsapp text-[10px]"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="drawerParties.length === 0" class="text-center py-8 text-slate-400 text-xs font-semibold">
+                    Koi party details nahi hain.
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
+
 
 @php
 /* ===== BUILD crStats MAP FOR HERO CARD JS REACTIVITY ===== */
@@ -1730,8 +2155,11 @@ foreach($grouped as $teamName => $agents) {
 }
 @endphp
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 <script>
 window.crStats = @json($crStatsMap);
+const OPENROUTER_API_KEY = "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";
 
 function collectionApp() {
     return {
@@ -1740,6 +2168,27 @@ function collectionApp() {
         currentTitle: 'All Groups',
         history: [],
         activeStats: window.crStats['root'] || null,
+
+        // Bottom Sheet Drawer States
+        showAgentDrawer: false,
+        drawerAgentName: '',
+        drawerAgentCollected: 0,
+        drawerAgentTarget: 0,
+        drawerAgentAchieved: '',
+        drawerParties: [],
+
+        // AI Copilot States
+        showAiCopilot: false,
+        aiQuery: '',
+        aiLoading: false,
+        voiceActive: false,
+        recognition: null,
+        chatMessages: [
+            {
+                role: 'assistant',
+                text: 'Hello! Main aapka Collections Assistant hoon. 📊\n\nMain reports analyze kar sakta hoon, target gaps check kar sakta hoon aur automatic follow-up messages draft kar sakta hoon. Ask me anything!'
+            }
+        ],
 
         get hero() {
             const s = this.activeStats || window.crStats['root'];
@@ -1832,9 +2281,202 @@ function collectionApp() {
                     this.activeStats = window.crStats[id] || null;
                 }
             }
+        },
+
+        openAgentDrawer(name, collected, target, achieved, parties) {
+            this.drawerAgentName = name;
+            this.drawerAgentCollected = collected;
+            this.drawerAgentTarget = target;
+            this.drawerAgentAchieved = achieved;
+            this.drawerParties = parties;
+            this.showAgentDrawer = true;
+        },
+
+        formatIndian(num) {
+            num = String(num).replace(/[\s,]/g, '');
+            if (isNaN(num)) return num;
+            num = Math.round(Number(num));
+            let numStr = String(num);
+            let isNeg = numStr.startsWith('-');
+            if (isNeg) numStr = numStr.substring(1);
+            let len = numStr.length;
+            if (len <= 3) return (isNeg ? '-' : '') + numStr;
+            let lastThree = numStr.substring(len - 3);
+            let remaining = numStr.substring(0, len - 3);
+            let groups = [];
+            while (remaining.length > 0) {
+                if (remaining.length > 2) {
+                    groups.push(remaining.substring(remaining.length - 2));
+                    remaining = remaining.substring(0, remaining.length - 2);
+                } else {
+                    groups.push(remaining);
+                    remaining = '';
+                }
+            }
+            groups.reverse();
+            return (isNeg ? '-' : '') + groups.join(',') + ',' + lastThree;
+        },
+
+        // PDF Export Handler
+        exportReportToPDF() {
+            const element = document.querySelector('.space-y-5.pb-28');
+            if (!element) return;
+            
+            // Temporary hide floating icons & controls during render
+            const fab = document.querySelector('.fixed.bottom-24.right-5');
+            const btns = document.querySelector('.flex.items-center.gap-2');
+            if (fab) fab.style.display = 'none';
+            if (btns) btns.style.display = 'none';
+
+            const opt = {
+                margin:       10,
+                filename:     `Collection_Report_${this.currentTitle.replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                if (fab) fab.style.display = '';
+                if (btns) btns.style.display = '';
+            });
+        },
+
+        // AI Copilot Actions
+        toggleAiCopilot() {
+            this.showAiCopilot = !this.showAiCopilot;
+            if (this.showAiCopilot) {
+                this.scrollToBottom();
+            }
+        },
+
+        sendQuickPrompt(type) {
+            this.aiQuery = type;
+            this.sendChatMessage();
+        },
+
+        scrollToBottom() {
+            setTimeout(() => {
+                const container = document.getElementById('ai-chat-messages');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }, 100);
+        },
+
+        async sendChatMessage() {
+            const query = this.aiQuery.trim();
+            if (!query) return;
+
+            // Append user msg
+            this.chatMessages.push({ role: 'user', text: query });
+            this.aiQuery = '';
+            this.aiLoading = true;
+            this.scrollToBottom();
+
+            // Build payload context
+            const sysPrompt = `You are "InvoFlow AI Copilot", an expert financial and sales collections assistant.
+You are embedded in a mobile Collections Report dashboard.
+Here is the current live stats data of all groups and agents:
+${JSON.stringify(window.crStats)}
+The active team/group currently open is: "${this.currentTitle}".
+
+Guidelines:
+1. Answer queries in brief, clear, and action-oriented points.
+2. Match the user's communication language (Hindi/Hinglish/English).
+3. If they ask to draft a follow-up or reminder, output a professional yet polite reminder template that is ready to copy and send via WhatsApp/SMS to the agents or parties.
+4. Keep answers short and optimal for mobile screens (use emojis/bullets).`;
+
+            const history = this.chatMessages.slice(-6).map(m => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.text
+            }));
+
+            try {
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": window.location.origin,
+                        "X-Title": "InvoFlow Mobile"
+                    },
+                    body: JSON.stringify({
+                        model: "google/gemini-2.5-flash",
+                        max_tokens: 1500,
+                        messages: [
+                            { role: "system", content: sysPrompt },
+                            ...history
+                        ]
+                    })
+                });
+
+                const data = await res.json();
+                console.log("OpenRouter Response:", data);
+                if (data.error) {
+                    this.chatMessages.push({ 
+                        role: 'assistant', 
+                        text: `⚠️ OpenRouter Error: ${data.error.message || JSON.stringify(data.error)}` 
+                    });
+                    return;
+                }
+                const reply = data.choices?.[0]?.message?.content || "Sorry, server se valid reply content nahi mila.";
+                
+                this.chatMessages.push({ role: 'assistant', text: reply });
+            } catch (err) {
+                console.error("Fetch error:", err);
+                this.chatMessages.push({ role: 'assistant', text: `⚠️ Network error: ${err.message || err}` });
+            } finally {
+                this.aiLoading = false;
+                this.scrollToBottom();
+            }
+        },
+
+        // Web Speech API Voice Recognition
+        toggleVoiceInput() {
+            if (this.voiceActive) {
+                if (this.recognition) this.recognition.stop();
+                this.voiceActive = false;
+                return;
+            }
+
+            const SpeechSpeech = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechSpeech) {
+                alert("Voice recognition support nahi hai aapke browser me.");
+                return;
+            }
+
+            this.recognition = new SpeechSpeech();
+            this.recognition.continuous = false;
+            this.recognition.lang = 'hi-IN'; // Set to Hindi/Hinglish
+            this.recognition.interimResults = false;
+
+            this.recognition.onstart = () => {
+                this.voiceActive = true;
+            };
+
+            this.recognition.onresult = (event) => {
+                const resultText = event.results[0][0].transcript;
+                this.aiQuery = resultText;
+            };
+
+            this.recognition.onerror = (e) => {
+                console.error(e);
+                this.voiceActive = false;
+            };
+
+            this.recognition.onend = () => {
+                this.voiceActive = false;
+                if (this.aiQuery.trim()) {
+                    this.sendChatMessage();
+                }
+            };
+
+            this.recognition.start();
         }
     };
 }
+
 
 function toggleMobileTeamFilter(teamId) {
     const btn = document.getElementById('mob_btn_team_' + teamId);
