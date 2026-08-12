@@ -131,27 +131,20 @@
             <span class="font-bold text-sm">No records found for the selected filter parameters.</span>
         </div>
         @else
-        
-        @php
-            $firstRow = $reportData[0] ?? [];
-            $headers = array_keys($firstRow);
-            
-            if (!function_exists('cleanHeader')) {
-                function cleanHeader($key) {
-                    $spaced = preg_replace('/(?<!^)[A-Z]/', ' $0', str_replace('_', ' ', $key));
-                    return ucwords(strtolower($spaced));
-                }
-            }
-        @endphp
 
-        {{-- Table header bar --}}
-        <div class="px-6 py-4 border-b border-gray-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-                <h3 class="text-sm font-black text-slate-800 tracking-tight">Sales Records</h3>
-                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Found {{ count($reportData) }} rows in Database</p>
+        {{-- Tab Buttons --}}
+        <div class="px-6 pt-4 border-b border-gray-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-2 border-b border-transparent">
+                <button type="button" onclick="switchView('pivot')" id="tab_btn_pivot"
+                    class="px-4 py-2 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition flex items-center gap-2">
+                    <i class="fas fa-chart-pie text-xs"></i> Pivot Summary View
+                </button>
+                <button type="button" onclick="switchView('detail')" id="tab_btn_detail"
+                    class="px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2">
+                    <i class="fas fa-list text-xs"></i> Detailed Sales View
+                </button>
             </div>
-            
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 pb-3 sm:pb-0">
                 <div class="relative">
                     <input type="text" id="salesSearchInput" onkeyup="searchTable()" placeholder="Local search..." 
                            class="border border-gray-200 rounded-xl py-1.5 pl-9 pr-4 text-xs focus:ring-2 focus:ring-indigo-400 outline-none w-52 transition font-medium">
@@ -160,39 +153,112 @@
             </div>
         </div>
 
-        {{-- Dynamic Data Table --}}
-        <div class="overflow-x-auto max-h-[60vh] overflow-y-auto content-scroll relative">
+        {{-- Tab 1: Pivot Summary View --}}
+        <div id="pivot_view_container" class="overflow-x-auto max-h-[65vh] overflow-y-auto content-scroll relative">
+            <table class="w-full text-left border-collapse text-[11px]">
+                <thead class="sticky top-0 z-20 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
+                    <tr class="border-b border-slate-200">
+                        <th colspan="4" class="py-2.5 px-3 text-center bg-slate-100/80 font-black text-slate-700 uppercase tracking-wider border-r border-slate-200">Item Details</th>
+                        @foreach($activeBranches as $branchName)
+                        <th colspan="2" class="py-2.5 px-3 text-center bg-indigo-50/80 font-black text-indigo-700 uppercase tracking-wider border-r border-slate-200">{{ $branchName }}</th>
+                        @endforeach
+                        <th colspan="2" class="py-2.5 px-3 text-center bg-slate-100/80 font-black text-slate-700 uppercase tracking-wider">Total Sales</th>
+                    </tr>
+                    <tr class="border-b border-slate-200">
+                        <th class="py-2 px-3 font-black text-slate-500 uppercase tracking-wider border-r border-slate-200">Code</th>
+                        <th class="py-2 px-3 font-black text-slate-500 uppercase tracking-wider border-r border-slate-200">Item Name</th>
+                        <th class="py-2 px-3 font-black text-slate-500 uppercase tracking-wider border-r border-slate-200">Pack</th>
+                        <th class="py-2 px-3 font-black text-slate-500 text-right uppercase tracking-wider border-r border-slate-200">MRP</th>
+                        @foreach($activeBranches as $branchName)
+                        <th class="py-2 px-3 font-black text-slate-500 text-right uppercase tracking-wider border-r border-slate-200 bg-indigo-50/10">Qty</th>
+                        <th class="py-2 px-3 font-black text-slate-500 text-right uppercase tracking-wider border-r border-slate-200 bg-indigo-50/10">Amt</th>
+                        @endforeach
+                        <th class="py-2 px-3 font-black text-slate-700 text-right uppercase tracking-wider border-r border-slate-200 bg-slate-100/50">Qty</th>
+                        <th class="py-2 px-3 font-black text-slate-700 text-right uppercase tracking-wider bg-slate-100/50">Amt</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100" id="pivotTbody">
+                    @foreach($pivotData as $row)
+                    <tr class="hover:bg-slate-50/50 transition-colors pivot-row">
+                        <td class="py-2.5 px-3 border-r border-slate-100 text-slate-600 font-medium font-mono">{{ $row['item_code'] }}</td>
+                        <td class="py-2.5 px-3 border-r border-slate-100 font-bold text-slate-800">{{ $row['item_name'] }}</td>
+                        <td class="py-2.5 px-3 border-r border-slate-100 text-slate-500">{{ $row['pack_name'] }}</td>
+                        <td class="py-2.5 px-3 border-r border-slate-100 text-right text-slate-600 font-mono">₹{{ number_format($row['mrp'], 2) }}</td>
+                        @foreach($activeBranches as $branchName)
+                        @php
+                            $qty = $row['branches'][$branchName]['qty'] ?? 0;
+                            $amt = $row['branches'][$branchName]['amt'] ?? 0;
+                        @endphp
+                        <td class="py-2.5 px-3 border-r border-slate-100 text-right font-mono text-slate-600 bg-indigo-50/5">{{ $qty > 0 ? number_format($qty, 2) : '—' }}</td>
+                        <td class="py-2.5 px-3 border-r border-slate-100 text-right font-mono text-slate-600 bg-indigo-50/5">{{ $amt > 0 ? '₹' . number_format($amt, 2) : '—' }}</td>
+                        @endforeach
+                        <td class="py-2.5 px-3 border-r border-slate-100 text-right font-mono font-bold text-indigo-600 bg-slate-50">{{ number_format($row['total_qty'], 2) }}</td>
+                        <td class="py-2.5 px-3 text-right font-mono font-bold text-indigo-600 bg-slate-50">₹{{ number_format($row['total_amt'], 2) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr class="bg-slate-100 font-black text-slate-800 text-xs border-t-2 border-slate-300">
+                        <td colspan="4" class="py-3 px-3 text-right">Grand Total:</td>
+                        @php
+                            $grandTotalQty = 0;
+                            $grandTotalAmt = 0;
+                            $branchTotals = [];
+                            foreach ($activeBranches as $branchName) {
+                                $branchTotals[$branchName] = ['qty' => 0, 'amt' => 0];
+                            }
+                            foreach ($pivotData as $row) {
+                                foreach ($activeBranches as $branchName) {
+                                    $branchTotals[$branchName]['qty'] += $row['branches'][$branchName]['qty'] ?? 0;
+                                    $branchTotals[$branchName]['amt'] += $row['branches'][$branchName]['amt'] ?? 0;
+                                }
+                                $grandTotalQty += $row['total_qty'];
+                                $grandTotalAmt += $row['total_amt'];
+                            }
+                        @endphp
+                        @foreach($activeBranches as $branchName)
+                        <td class="py-3 px-3 text-right border-r border-slate-200 font-mono text-indigo-700 bg-indigo-50/30">{{ number_format($branchTotals[$branchName]['qty'], 2) }}</td>
+                        <td class="py-3 px-3 text-right border-r border-slate-200 font-mono text-indigo-700 bg-indigo-50/30">₹{{ number_format($branchTotals[$branchName]['amt'], 2) }}</td>
+                        @endforeach
+                        <td class="py-3 px-3 text-right border-r border-slate-200 font-mono text-indigo-700 bg-slate-200/50">{{ number_format($grandTotalQty, 2) }}</td>
+                        <td class="py-3 px-3 text-right font-mono text-indigo-700 bg-slate-200/50">₹{{ number_format($grandTotalAmt, 2) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        {{-- Tab 2: Detailed Sales View --}}
+        <div id="detail_view_container" class="overflow-x-auto max-h-[65vh] overflow-y-auto content-scroll relative hidden">
             <table class="w-full text-left border-collapse text-xs">
                 <thead class="sticky top-0 z-20 bg-slate-50 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-200">
                     <tr>
-                        @foreach($headers as $header)
-                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">
-                            {{ cleanHeader($header) }}
-                        </th>
-                        @endforeach
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Date</th>
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Branch Name</th>
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Party</th>
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Agent</th>
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Item Code</th>
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Item Name</th>
+                        <th class="py-3 px-4 font-black text-slate-500 uppercase tracking-widest border-r border-gray-200">Pack</th>
+                        <th class="py-3 px-4 font-black text-slate-500 text-right uppercase tracking-widest border-r border-gray-200">MRP</th>
+                        <th class="py-3 px-4 font-black text-slate-500 text-right uppercase tracking-widest border-r border-gray-200">Qty</th>
+                        <th class="py-3 px-4 font-black text-slate-500 text-right uppercase tracking-widest border-r border-gray-200">Rate</th>
+                        <th class="py-3 px-4 font-black text-slate-500 text-right uppercase tracking-widest">Net Amt</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100" id="salesTbody">
                     @foreach($reportData as $row)
                     <tr class="hover:bg-slate-50/50 transition-colors sales-row">
-                        @foreach($headers as $header)
-                        @php
-                            $val = $row[$header] ?? '';
-                            $isNumeric = is_numeric($val) && !preg_match('/(code|id|date|phone)/i', $header);
-                            $isAmount = $isNumeric && preg_match('/(amount|amt|rate|price|value|gst|tax|val)/i', $header);
-                        @endphp
-                        <td class="py-3 px-4 border-r border-gray-50 text-gray-700 font-medium {{ $isNumeric ? 'text-right' : '' }}">
-                            @if($isNumeric)
-                                @if($isAmount)
-                                    ₹{{ number_format((float)$val, 2) }}
-                                @else
-                                    {{ number_format((float)$val, 2) }}
-                                @endif
-                            @else
-                                {{ $val }}
-                            @endif
-                        </td>
-                        @endforeach
+                        <td class="py-3 px-4 border-r border-gray-50 text-gray-700">{{ $row['vouch_date'] }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-indigo-700 font-bold">{{ $row['branch_name'] }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-gray-700 font-semibold">{{ $row['act_name'] }} <span class="text-[10px] text-gray-400 font-mono">({{ $row['act_code'] }})</span></td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-gray-600">{{ $row['agent_name'] }} <span class="text-[10px] text-gray-400 font-mono">({{ $row['agent_code'] }})</span></td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-slate-500 font-mono">{{ $row['item_code'] }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-gray-800 font-bold">{{ $row['item_name'] }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-gray-500">{{ $row['pack_name'] }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-right text-gray-600 font-mono">₹{{ number_format($row['mrp'], 2) }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-right text-gray-800 font-bold font-mono">{{ number_format($row['qty'], 2) }}</td>
+                        <td class="py-3 px-4 border-r border-gray-50 text-right text-gray-600 font-mono">₹{{ number_format($row['rate'], 2) }}</td>
+                        <td class="py-3 px-4 text-right text-indigo-600 font-bold font-mono">₹{{ number_format($row['amount'], 2) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -200,7 +266,7 @@
         </div>
 
         {{-- Pagination Bar --}}
-        <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-slate-50" id="paginationBar">
+        <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-slate-50 hidden" id="paginationBar">
             <div class="flex items-center gap-3 text-xs text-slate-500 font-medium">
                 <span>Show</span>
                 <select id="pageSizeSelect" onchange="changePageSize()" class="border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-400 outline-none">
@@ -222,10 +288,44 @@
 </div>
 
 <script>
+let currentView = 'pivot';
 let allRows = [];
 let filteredRows = [];
 let currentPage = 1;
 let pageSize = 50;
+
+function switchView(view) {
+    currentView = view;
+    const pivotContainer = document.getElementById('pivot_view_container');
+    const detailContainer = document.getElementById('detail_view_container');
+    const paginationBar = document.getElementById('paginationBar');
+    
+    const tabPivot = document.getElementById('tab_btn_pivot');
+    const tabDetail = document.getElementById('tab_btn_detail');
+
+    if (view === 'pivot') {
+        pivotContainer.classList.remove('hidden');
+        detailContainer.classList.add('hidden');
+        paginationBar.classList.add('hidden');
+        
+        tabPivot.className = "px-4 py-2 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition flex items-center gap-2";
+        tabDetail.className = "px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2";
+    } else {
+        pivotContainer.classList.add('hidden');
+        detailContainer.classList.remove('hidden');
+        paginationBar.classList.remove('hidden');
+        
+        tabPivot.className = "px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2";
+        tabDetail.className = "px-4 py-2 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition flex items-center gap-2";
+        
+        initPagination();
+    }
+    
+    // Reset search inputs
+    const searchInput = document.getElementById('salesSearchInput');
+    if (searchInput) searchInput.value = '';
+    searchTable();
+}
 
 function initPagination() {
     allRows = Array.from(document.querySelectorAll('#salesTbody .sales-row'));
@@ -320,69 +420,6 @@ function renderPaginationButtons(totalPages) {
     // Next Button
     addBtn(currentPage + 1, 'Next', false, currentPage === totalPages);
 }
-
-function changePageSize() {
-    const select = document.getElementById('pageSizeSelect');
-    if (!select) return;
-    pageSize = parseInt(select.value);
-    currentPage = 1;
-    renderPage();
-}
-
-function searchTable() {
-    const input = document.getElementById('salesSearchInput');
-    if (!input) return;
-    const filter = input.value.toUpperCase();
-
-    filteredRows = allRows.filter(row => {
-        return row.innerText.toUpperCase().includes(filter);
-    });
-
-    currentPage = 1;
-    renderPage();
-}
-
-// Auto-run on load
-document.addEventListener('DOMContentLoaded', () => {
-    initPagination();
-});
-
-function syncSalesData() {
-    const btn = document.getElementById('sync_sales_btn');
-    const text = document.getElementById('sync_btn_text');
-    const icon = document.getElementById('sync_icon');
-
-    if (!btn) return;
-
-    btn.disabled = true;
-    if (text) text.innerText = 'Syncing...';
-    if (icon) icon.className = 'fas fa-rotate fa-spin mr-0.5';
-
-    fetch("{{ route('reports.sales-report.sync') }}", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-TOKEN": "{{ csrf_token() }}"
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            window.location.reload();
-        } else {
-            alert("Error: " + data.message);
-            btn.disabled = false;
-            if (text) text.innerText = 'Sync Database Now';
-            if (icon) icon.className = 'fas fa-rotate mr-0.5';
-        }
-    })
-    .catch(err => {
-        alert("Connection Error: " + err.message);
-        btn.disabled = false;
-        if (text) text.innerText = 'Sync Database Now';
-        if (icon) icon.className = 'fas fa-rotate mr-0.5';
-    });
 }
 </script>
 @endsection

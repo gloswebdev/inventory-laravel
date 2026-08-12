@@ -1348,7 +1348,9 @@ class ReportController extends Controller
         // If no filter values and no DB records, we just load view with empty report
         if (!$request->hasAny(['from_date', 'to_date', 'act_code', 'agent_code', 'item', 'usercode', 'branch']) && $totalDbCount == 0) {
             $reportData = [];
-            return view('reports.sales_report', compact('defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'totalDbCount'));
+            $pivotData = [];
+            $activeBranches = [];
+            return view('reports.sales_report', compact('defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'totalDbCount', 'pivotData', 'activeBranches'));
         }
 
         // Search the DB table
@@ -1375,30 +1377,96 @@ class ReportController extends Controller
 
         $records = $query->orderBy('vouch_date')->get();
 
-        // Map database records back to the dynamic row structure for views
+        $branchMap = \App\Models\Branch::pluck('name', 'code')->toArray();
+        $partyMasterMap = $this->getPartyMasterMap($baseUrl, $apiKey);
+
+        // Map database records and join with Party Master & Branch Names
         $reportData = [];
+        $pivotRows = [];
+        $activeBranches = [];
+
         foreach ($records as $record) {
-            if ($record->raw_data) {
-                $reportData[] = $record->raw_data;
-            } else {
-                $reportData[] = [
-                    'Date'        => $record->vouch_date ? $record->vouch_date->format('d/m/Y') : '',
-                    'PartyCode'   => $record->act_code,
-                    'PartyName'   => $record->act_name,
-                    'AgentCode'   => $record->agent_code,
-                    'AgentName'   => $record->agent_name,
-                    'ProductCode' => $record->item_code,
-                    'ProductName' => $record->item_name,
-                    'Qty'         => $record->qty,
-                    'Amount'      => $record->amount,
-                    'Branch'      => $record->branch,
+            $row = $record->raw_data ?: [];
+            
+            $branchCode = trim($record->branch);
+            $actCodeVal = trim($record->act_code);
+            $agentCodeVal = trim($record->agent_code);
+            
+            // Map branch display name
+            $branchName = $branchMap[$branchCode] ?? $branchMap[(int)$branchCode] ?? $row['Branch'] ?? $branchCode;
+            $activeBranches[$branchName] = $branchName;
+            
+            // Map party and agent display names from party master map
+            $partyName = '';
+            $agentName = '';
+            if (isset($partyMasterMap[$actCodeVal])) {
+                $partyName = $partyMasterMap[$actCodeVal]['PartyName'] ?? '';
+                $agentName = $partyMasterMap[$actCodeVal]['AgentName'] ?? '';
+                if (empty($agentCodeVal)) {
+                    $agentCodeVal = $partyMasterMap[$actCodeVal]['AgentCode'] ?? '';
+                }
+            }
+            if (empty($partyName)) {
+                $partyName = $record->act_name ?: $row['PartyName'] ?? $row['ActName'] ?? '';
+            }
+            if (empty($agentName)) {
+                $agentName = $record->agent_name ?: $row['AgentName'] ?? '';
+            }
+
+            $mappedRow = [
+                'branch_code' => $branchCode,
+                'branch_name' => $branchName,
+                'vouch_date'  => $record->vouch_date ? $record->vouch_date->format('d/m/Y') : ($row['Date'] ?? $row['Vouch_Date'] ?? ''),
+                'act_code'    => $actCodeVal,
+                'act_name'    => $partyName,
+                'agent_code'  => $agentCodeVal,
+                'agent_name'  => $agentName,
+                'item_code'   => $record->item_code ?: $row['User_Code'] ?? $row['ProductCode'] ?? '',
+                'item_name'   => $record->item_name ?: $row['Item_Hd_Name'] ?? $row['ProductName'] ?? '',
+                'pack_name'   => $row['Pack_Name'] ?? $row['PackName'] ?? $row['Packing'] ?? '—',
+                'mrp'         => (float)($row['MRP'] ?? $row['Mrp'] ?? 0),
+                'qty'         => (float)$record->qty,
+                'rate'        => (float)($row['Rate'] ?? 0),
+                'amount'      => (float)$record->amount,
+            ];
+
+            $reportData[] = $mappedRow;
+
+            // Aggregate into Pivot rows
+            $itemKey = $mappedRow['item_code'] . '||' . $mappedRow['pack_name'] . '||' . $mappedRow['mrp'];
+            if (!isset($pivotRows[$itemKey])) {
+                $pivotRows[$itemKey] = [
+                    'item_code' => $mappedRow['item_code'],
+                    'item_name' => $mappedRow['item_name'],
+                    'pack_name' => $mappedRow['pack_name'],
+                    'mrp'       => $mappedRow['mrp'],
+                    'branches'  => [],
+                    'total_qty' => 0,
+                    'total_amt' => 0,
                 ];
             }
+
+            if (!isset($pivotRows[$itemKey]['branches'][$branchName])) {
+                $pivotRows[$itemKey]['branches'][$branchName] = [
+                    'qty' => 0,
+                    'amt' => 0,
+                ];
+            }
+
+            $pivotRows[$itemKey]['branches'][$branchName]['qty'] += $mappedRow['qty'];
+            $pivotRows[$itemKey]['branches'][$branchName]['amt'] += $mappedRow['amount'];
+            
+            $pivotRows[$itemKey]['total_qty'] += $mappedRow['qty'];
+            $pivotRows[$itemKey]['total_amt'] += $mappedRow['amount'];
         }
+
+        $activeBranches = array_values($activeBranches);
+        sort($activeBranches);
+        $pivotData = array_values($pivotRows);
 
         $error = null;
         return view('reports.sales_report', compact(
-            'defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'error', 'totalDbCount'
+            'defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'error', 'totalDbCount', 'pivotData', 'activeBranches'
         ));
     }
 
