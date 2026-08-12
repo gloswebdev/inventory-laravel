@@ -645,7 +645,6 @@ class ReportController extends Controller
                 $prevPayload = $payload;
                 $prevPayload['FromDate'] = $prevFromDate;
                 $prevPayload['ToDate']   = $prevToDate;
-
                 $prevResponse = Http::withoutVerifying()
                     ->timeout(90)
                     ->connectTimeout(20)
@@ -896,7 +895,7 @@ class ReportController extends Controller
             'finYear', 'fromDate', 'toDate', 'selectedTeams', 'dbTeams',
             'branchFilter', 'agentFilter', 'branchOptions', 'agentOptions',
             'crField', 'drField', 'partyNameKey', 'agentTargets', 'teamTargets',
-            'prevGrandTotal', 'momGrowthPercent', 'comparisonLabel'
+            'prevGrandTotal', 'momGrowthPercent', 'comparisonLabel', 'prevReportData'
         ));
     }
 

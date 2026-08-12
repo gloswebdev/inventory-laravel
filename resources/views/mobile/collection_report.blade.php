@@ -961,32 +961,34 @@
 
     {{-- Period comparison analysis card --}}
     @if(isset($prevGrandTotal) && $prevGrandTotal >= 0)
-    <div class="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white rounded-[2rem] p-5 shadow-xl relative overflow-hidden border border-indigo-500/20" x-show="currentParentId === 'root'">
+    <div class="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white rounded-[2rem] p-5 shadow-xl relative overflow-hidden border border-indigo-500/20" 
+         x-show="comparison.hasPrev" x-cloak>
         <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
         
         <div class="relative z-10 flex items-center justify-between">
             <div class="space-y-1">
-                <span class="text-[9px] font-black text-indigo-300 uppercase tracking-wider block">{{ $comparisonLabel }} Comparison</span>
+                <span class="text-[9px] font-black text-indigo-300 uppercase tracking-wider block">
+                    {{ $comparisonLabel }} Comparison
+                </span>
                 <div class="flex items-baseline gap-2">
-                    <span class="text-xs text-indigo-200 font-bold">Prev: {{ $formatCr($prevGrandTotal) }}</span>
+                    <span class="text-xs text-indigo-200 font-bold">Prev: <span x-text="comparison.prevTotal"></span></span>
                     <i class="fas fa-arrow-right text-[9px] text-indigo-400"></i>
-                    <span class="text-sm font-black text-white">Curr: {{ $formatCr($grandTotal) }}</span>
+                    <span class="text-sm font-black text-white">Curr: <span x-text="comparison.currTotal"></span></span>
                 </div>
             </div>
             
             {{-- MoM Growth Indicator Badge --}}
             <div>
-                @if($momGrowthPercent >= 0)
-                <div class="px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center gap-1.5 text-emerald-350">
+                <!-- Positive growth badge -->
+                <div x-show="comparison.percent >= 0" class="px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center gap-1.5 text-emerald-350">
                     <i class="fas fa-circle-arrow-up text-sm animate-pulse"></i>
-                    <span class="text-xs font-black">+{{ $momGrowthPercent }}%</span>
+                    <span class="text-xs font-black" x-text="'+' + comparison.percent + '%'"></span>
                 </div>
-                @else
-                <div class="px-3 py-2 bg-rose-500/20 border border-rose-500/30 rounded-2xl flex items-center gap-1.5 text-rose-350">
+                <!-- Negative decline badge -->
+                <div x-show="comparison.percent < 0" class="px-3 py-2 bg-rose-500/20 border border-rose-500/30 rounded-2xl flex items-center gap-1.5 text-rose-350">
                     <i class="fas fa-circle-arrow-down text-sm animate-pulse"></i>
-                    <span class="text-xs font-black">{{ $momGrowthPercent }}%</span>
+                    <span class="text-xs font-black" x-text="comparison.percent + '%'"></span>
                 </div>
-                @endif
             </div>
         </div>
         
@@ -994,25 +996,15 @@
         <div class="mt-4 pt-3 border-t border-white/5 space-y-1.5">
             <div class="flex items-center justify-between text-[9px] font-bold text-slate-400">
                 <span>Performance Ratio</span>
-                <span class="text-white font-black">
-                    @php
-                        $diffAmt = $grandTotal - $prevGrandTotal;
-                    @endphp
-                    {{ $diffAmt >= 0 ? '+' : '' }}{{ $formatCr($diffAmt) }} variance
-                </span>
+                <span class="text-white font-black" x-text="comparison.varianceText"></span>
             </div>
             <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden flex gap-0.5">
-                @php
-                    $totalBoth = $grandTotal + $prevGrandTotal;
-                    $currRatio = $totalBoth > 0 ? round(($grandTotal / $totalBoth) * 100) : 50;
-                    $prevRatio = 100 - $currRatio;
-                @endphp
-                <div class="h-full bg-slate-500/30 transition-all duration-1000" style="width: {{ $prevRatio }}%"></div>
-                <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000 progress-glow-bar" style="width: {{ $currRatio }}%"></div>
+                <div class="h-full bg-slate-500/30 transition-all duration-1000" :style="'width: ' + comparison.prevRatio + '%'"></div>
+                <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000 progress-glow-bar" :style="'width: ' + comparison.currRatio + '%'"></div>
             </div>
             <div class="flex items-center justify-between text-[8px] font-black text-slate-500">
-                <span>PREV ({{ $prevRatio }}%)</span>
-                <span>CURR ({{ $currRatio }}%)</span>
+                <span x-text="'PREV (' + comparison.prevRatio + '%)'"></span>
+                <span x-text="'CURR (' + comparison.currRatio + '%)'"></span>
             </div>
         </div>
     </div>
@@ -2293,6 +2285,7 @@ foreach($grouped as $teamName => $agents) {
 
 <script>
 window.crStats = @json($crStatsMap);
+window.prevCrStats = @json($prevCrStatsMap);
 const OPENROUTER_API_KEY = "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";
 
 function collectionApp() {
@@ -2323,6 +2316,51 @@ function collectionApp() {
                 text: 'Hello! Main aapka Collections Assistant hoon. 📊\n\nMain reports analyze kar sakta hoon, target gaps check kar sakta hoon aur automatic follow-up messages draft kar sakta hoon. Ask me anything!'
             }
         ],
+
+        get comparison() {
+            const currentStats = this.activeStats || window.crStats['root'];
+            const currentTotal = currentStats ? currentStats.total : 0;
+            
+            const key = this.currentParentId;
+            const prevStats = window.prevCrStats[key] || { total: 0 };
+            const prevTotal = prevStats.total;
+            
+            const variance = currentTotal - prevTotal;
+            let percent = 0;
+            if (prevTotal > 0) {
+                percent = Math.round((variance / prevTotal) * 100 * 10) / 10;
+            } else if (currentTotal > 0) {
+                percent = 100;
+            }
+            
+            const totalBoth = currentTotal + prevTotal;
+            const currRatio = totalBoth > 0 ? Math.round((currentTotal / totalBoth) * 100) : 50;
+            const prevRatio = 100 - currRatio;
+            
+            const fmt = (v) => {
+                const absVal = Math.abs(v);
+                let text = '';
+                if (absVal >= 10000000) text = '₹' + (absVal / 10000000).toFixed(2) + 'Cr';
+                else if (absVal >= 100000) text = '₹' + (absVal / 100000).toFixed(2) + 'L';
+                else if (absVal >= 1000) text = '₹' + (absVal / 1000).toFixed(1) + 'K';
+                else text = '₹' + parseFloat(absVal).toFixed(0);
+                return (v < 0 ? '-' : '') + text;
+            };
+
+            const fmtVariance = (v) => {
+                return (v >= 0 ? '+' : '') + fmt(v);
+            };
+
+            return {
+                prevTotal: fmt(prevTotal),
+                currTotal: fmt(currentTotal),
+                percent,
+                varianceText: fmtVariance(variance) + ' variance',
+                prevRatio,
+                currRatio,
+                hasPrev: prevTotal > 0 || currentTotal > 0
+            };
+        },
 
         get hero() {
             const s = this.activeStats || window.crStats['root'];
