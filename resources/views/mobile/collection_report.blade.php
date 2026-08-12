@@ -1125,23 +1125,23 @@
                     </div>
 
                                        {{-- Metrics Comparison Grid --}}
-                    <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 relative z-10">
-                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                            <span class="block text-sm font-black text-slate-800 tracking-tight">
+                    <div class="grid grid-cols-3 gap-2 py-2 px-2 bg-slate-50/50 rounded-2xl border border-slate-100/80 relative z-10">
+                        <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Target</span>
+                            <span class="block text-base font-black text-slate-800 tracking-tight">
                                 {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
                             </span>
                         </div>
-                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                        <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Collected</span>
+                            <span class="block text-base font-black text-emerald-600 tracking-tight">
                                 {{ $formatCr($bSummary['total']) }}
                             </span>
                         </div>
-                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                        <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Achieved</span>
                             @if($tTargetAmt > 0)
-                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            <span class="block text-base font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                 {{ $tPercent }}%
                             </span>
                             @else
@@ -1333,23 +1333,23 @@
                             </div>
                             
                             {{-- Metrics Comparison Grid --}}
-                            <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 mb-3 relative z-10">
-                                <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                                    <span class="block text-sm font-black text-slate-800 tracking-tight">
+                            <div class="grid grid-cols-3 gap-2 py-2 px-2 bg-slate-50/50 rounded-2xl border border-slate-100/80 mb-3 relative z-10">
+                                <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Target</span>
+                                    <span class="block text-base font-black text-slate-800 tracking-tight">
                                         {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
                                     </span>
                                 </div>
-                                <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                                    <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                                <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Collected</span>
+                                    <span class="block text-base font-black text-emerald-600 tracking-tight">
                                         {{ $formatCr($agentTotal) }}
                                     </span>
                                 </div>
-                                <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                                <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Achieved</span>
                                     @if($targetAmt > 0)
-                                    <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                                    <span class="block text-base font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                         {{ $percent }}%
                                     </span>
                                     @else
@@ -1563,23 +1563,23 @@
                     </div>
 
                     {{-- Metrics Comparison Grid --}}
-                    <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 relative z-10">
-                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                            <span class="block text-sm font-black text-slate-800 tracking-tight">
+                    <div class="grid grid-cols-3 gap-2 py-2 px-2 bg-slate-50/50 rounded-2xl border border-slate-100/80 relative z-10">
+                        <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Target</span>
+                            <span class="block text-base font-black text-slate-800 tracking-tight">
                                 {{ $tTargetAmt > 0 ? $formatCr($tTargetAmt) : '—' }}
                             </span>
                         </div>
-                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                            <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                        <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Collected</span>
+                            <span class="block text-base font-black text-emerald-600 tracking-tight">
                                 {{ $formatCr($bSummary['total']) }}
                             </span>
                         </div>
-                        <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                            <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                        <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                            <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Achieved</span>
                             @if($tTargetAmt > 0)
-                            <span class="block text-sm font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                            <span class="block text-base font-black {{ $tPercent >= 100 ? 'text-emerald-600' : ($tPercent >= 75 ? 'text-teal-600' : ($tPercent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                                 {{ $tPercent }}%
                             </span>
                             @else
@@ -1758,23 +1758,23 @@
                 </div>
 
                            {{-- Metrics Comparison Grid --}}
-                <div class="grid grid-cols-3 gap-2.5 py-2 px-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/80 mb-3 relative z-10">
-                    <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                        <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Target</span>
-                        <span class="block text-sm font-black text-slate-800 tracking-tight">
+                <div class="grid grid-cols-3 gap-2 py-2 px-2 bg-slate-50/50 rounded-2xl border border-slate-100/80 mb-3 relative z-10">
+                    <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                        <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Target</span>
+                        <span class="block text-base font-black text-slate-800 tracking-tight">
                             {{ $targetAmt > 0 ? $formatCr($targetAmt) : '—' }}
                         </span>
                     </div>
-                    <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                        <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Collected</span>
-                        <span class="block text-sm font-black text-emerald-600 tracking-tight">
+                    <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                        <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Collected</span>
+                        <span class="block text-base font-black text-emerald-600 tracking-tight">
                             {{ $formatCr($agentTotal) }}
                         </span>
                     </div>
-                    <div class="text-center py-1.5 px-2 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
-                        <span class="block text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Achieved</span>
+                    <div class="text-center py-2 px-1.5 bg-white rounded-xl border border-slate-100/60 shadow-[0_1px_2px_rgba(0,0,0,0.015)]">
+                        <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Achieved</span>
                         @if($targetAmt > 0)
-                        <span class="block text-sm font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
+                        <span class="block text-base font-black {{ $percent >= 100 ? 'text-emerald-600' : ($percent >= 75 ? 'text-teal-600' : ($percent >= 50 ? 'text-amber-600' : 'text-rose-600')) }} tracking-tight">
                             {{ $percent }}%
                         </span>
                         @else
@@ -2001,18 +2001,18 @@
             </div>
 
             <!-- Agent Summary Block inside drawer -->
-            <div class="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex-shrink-0 grid grid-cols-3 gap-2 text-center">
+            <div class="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex-shrink-0 grid grid-cols-3 gap-2.5 text-center">
                 <div class="bg-white border border-slate-150 rounded-2xl p-2.5 shadow-sm">
-                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Collected</span>
-                    <span class="block text-sm font-black text-emerald-600 tracking-tight" x-text="drawerAgentCollected"></span>
+                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Collected</span>
+                    <span class="block text-base font-black text-emerald-600 tracking-tight" x-text="drawerAgentCollected"></span>
                 </div>
                 <div class="bg-white border border-slate-150 rounded-2xl p-2.5 shadow-sm">
-                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Target</span>
-                    <span class="block text-sm font-black text-slate-700 tracking-tight" x-text="drawerAgentTarget"></span>
+                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Target</span>
+                    <span class="block text-base font-black text-slate-700 tracking-tight" x-text="drawerAgentTarget"></span>
                 </div>
                 <div class="bg-white border border-slate-150 rounded-2xl p-2.5 shadow-sm">
-                    <span class="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Achieved</span>
-                    <span class="block text-sm font-black text-indigo-650 tracking-tight" x-text="drawerAgentAchieved"></span>
+                    <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Achieved</span>
+                    <span class="block text-base font-black text-indigo-650 tracking-tight" x-text="drawerAgentAchieved"></span>
                 </div>
             </div>
 
