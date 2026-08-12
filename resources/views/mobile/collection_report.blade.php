@@ -255,27 +255,27 @@
                         <p class="text-[8px] font-black uppercase tracking-[0.2em] text-white/60 mt-0.5">{{ $monthName }}</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5 flex-shrink-0">
                     <button @click="showFilters = !showFilters"
                             :class="showFilters ? 'bg-white text-emerald-600' : 'bg-white/15 text-white border-white/20'"
-                            class="w-10 h-10 rounded-2xl flex items-center justify-center border transition active:scale-90">
-                        <i class="fas fa-sliders text-xs"></i>
+                            class="w-[34px] h-[34px] rounded-xl flex items-center justify-center border transition active:scale-90 flex-shrink-0">
+                        <i class="fas fa-sliders text-[11px]"></i>
                     </button>
                     @if(Auth::user()->hasFeature('mobile_collection', 'target_setting') || Auth::user()->role === 'admin')
                     <a href="{{ route('mobile.agent-targets.index') }}"
-                       class="w-10 h-10 bg-white/15 text-white border border-white/20 rounded-2xl flex items-center justify-center active:scale-90 transition">
-                        <i class="fas fa-bullseye text-xs"></i>
+                       class="w-[34px] h-[34px] bg-white/15 text-white border border-white/20 rounded-xl flex items-center justify-center active:scale-90 transition flex-shrink-0">
+                        <i class="fas fa-bullseye text-[11px]"></i>
                     </a>
                     @endif
                     @if(Auth::user()->hasPermission('mobile_teams_setup', 'view') || Auth::user()->role === 'admin')
                     <a href="{{ route('mobile.teams.setup') }}"
-                       class="w-10 h-10 bg-white/15 text-white border border-white/20 rounded-2xl flex items-center justify-center active:scale-90 transition">
-                        <i class="fas fa-network-wired text-xs"></i>
+                       class="w-[34px] h-[34px] bg-white/15 text-white border border-white/20 rounded-xl flex items-center justify-center active:scale-90 transition flex-shrink-0">
+                        <i class="fas fa-network-wired text-[11px]"></i>
                     </a>
                     @endif
                     <button type="button" @click="exportReportToPDF()"
-                            class="w-10 h-10 bg-white/15 text-white border border-white/20 rounded-2xl flex items-center justify-center active:scale-90 transition">
-                        <i class="fas fa-file-pdf text-xs"></i>
+                            class="w-[34px] h-[34px] bg-white/15 text-white border border-white/20 rounded-xl flex items-center justify-center active:scale-90 transition flex-shrink-0">
+                        <i class="fas fa-file-pdf text-[11px]"></i>
                     </button>
                 </div>
             </div>
@@ -926,17 +926,17 @@
     @if(isset($grouped) && count($grouped) > 0)
     
     {{-- Breadcrumb Trail --}}
-    <div class="bg-white/90 backdrop-blur-xl border border-slate-100 rounded-3xl p-4 shadow-sm flex items-center justify-between" x-show="currentParentId !== 'root'" x-cloak>
-        <div class="flex items-center flex-wrap gap-2 text-xs font-bold text-slate-500">
-            <button type="button" @click="goToLevel('root')" class="text-indigo-600 hover:text-indigo-800 transition">All Groups</button>
+    <div class="bg-white/90 backdrop-blur-xl border border-slate-100 rounded-3xl p-3.5 shadow-sm flex items-center justify-between" x-show="currentParentId !== 'root'" x-cloak>
+        <div class="flex items-center flex-nowrap gap-1.5 text-xs font-bold text-slate-500 overflow-x-auto scrollbar-none mr-2 pr-1 flex-1">
+            <button type="button" @click="goToLevel('root')" class="text-indigo-600 hover:text-indigo-800 transition whitespace-nowrap flex-shrink-0">All Groups</button>
             <template x-for="(crumb, idx) in history" :key="idx">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-chevron-right text-[8px] text-slate-300"></i>
-                    <button type="button" @click="goToLevel(crumb.id, crumb.title)" class="text-indigo-600 hover:text-indigo-800 transition" x-text="crumb.title"></button>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <i class="fas fa-chevron-right text-[7px] text-slate-300"></i>
+                    <button type="button" @click="goToLevel(crumb.id, crumb.title)" class="text-indigo-600 hover:text-indigo-800 transition whitespace-nowrap" x-text="crumb.title"></button>
                 </div>
             </template>
-            <i class="fas fa-chevron-right text-[8px] text-slate-300"></i>
-            <span class="text-slate-800 font-black" x-text="currentTitle"></span>
+            <i class="fas fa-chevron-right text-[7px] text-slate-300 flex-shrink-0"></i>
+            <span class="text-slate-800 font-black whitespace-nowrap" x-text="currentTitle"></span>
         </div>
         <button type="button" @click="goBack()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black transition active:scale-95">
             <i class="fas fa-arrow-left text-[8px]"></i> Back
@@ -1875,7 +1875,7 @@
 
 
     <!-- AI Copilot FAB -->
-    <div class="fixed bottom-24 right-5 z-40">
+    <div class="fixed bottom-28 right-5 z-40">
         <button type="button" @click="toggleAiCopilot()"
                 class="w-14 h-14 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-300/40 text-white hover:scale-105 active:scale-95 transition-transform relative group">
             <span class="absolute inset-0 rounded-full bg-indigo-500/30 scale-110 animate-ping group-hover:hidden"></span>
