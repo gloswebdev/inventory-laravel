@@ -1463,57 +1463,62 @@ class ReportController extends Controller
             throw new \Exception('No data returned from ERP API.');
         }
 
-        $count = 0;
-        \Illuminate\Support\Facades\DB::transaction(function () use ($resultdata, &$count) {
-            foreach ($resultdata as $row) {
-                $vouchDateStr = $row['Vouch_Date'] ?? $row['VouchDate'] ?? $row['Date'] ?? $row['BillDate'] ?? null;
-                $formattedDate = null;
-                if ($vouchDateStr) {
-                    try {
-                        if (str_contains($vouchDateStr, '/')) {
-                            $formattedDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($vouchDateStr))->format('Y-m-d');
-                        } else {
-                            $formattedDate = \Carbon\Carbon::parse(trim($vouchDateStr))->format('Y-m-d');
-                        }
-                    } catch (\Exception $e) {
-                        $formattedDate = null;
+        $insertData = [];
+        foreach ($resultdata as $row) {
+            $vouchDateStr = $row['Vouch_Date'] ?? $row['VouchDate'] ?? $row['Date'] ?? $row['BillDate'] ?? null;
+            $formattedDate = null;
+            if ($vouchDateStr) {
+                try {
+                    if (str_contains($vouchDateStr, '/')) {
+                        $formattedDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($vouchDateStr))->format('Y-m-d');
+                    } else {
+                        $formattedDate = \Carbon\Carbon::parse(trim($vouchDateStr))->format('Y-m-d');
                     }
+                } catch (\Exception $e) {
+                    $formattedDate = null;
                 }
-
-                $actCodeVal   = trim($row['ActCode'] ?? $row['PartyCode'] ?? $row['AC_Code'] ?? $row['AcCode'] ?? '');
-                $actNameVal   = trim($row['ActName'] ?? $row['PartyName'] ?? $row['AC_Name'] ?? $row['AcName'] ?? '');
-                $agentCodeVal = trim($row['AgentCode'] ?? $row['SalesmanCode'] ?? '');
-                $agentNameVal = trim($row['AgentName'] ?? $row['SalesmanName'] ?? $row['Agent_Name'] ?? '');
-                $itemCodeVal  = trim($row['User_Code'] ?? $row['ItemCode'] ?? $row['ProductCode'] ?? '');
-                $itemNameVal  = trim($row['Item_Hd_Name'] ?? $row['ItemName'] ?? $row['ProductName'] ?? '');
-                $qtyVal       = (float)($row['Qty'] ?? $row['Quantity'] ?? 0);
-                $amtVal       = (float)($row['Amount'] ?? $row['NetAmt'] ?? $row['SalesValue'] ?? 0);
-                $branchVal    = trim($row['Branch'] ?? $row['BranchName'] ?? $row['Branch_Code'] ?? '');
-
-                if (empty($actCodeVal) && empty($itemCodeVal) && empty($itemNameVal)) {
-                    continue;
-                }
-
-                \App\Models\SalesRegister::updateOrCreate(
-                    [
-                        'vouch_date' => $formattedDate,
-                        'act_code'   => $actCodeVal,
-                        'item_code'  => $itemCodeVal,
-                        'branch'     => $branchVal,
-                        'qty'        => $qtyVal,
-                        'amount'     => $amtVal,
-                    ],
-                    [
-                        'act_name'   => $actNameVal,
-                        'agent_code' => $agentCodeVal,
-                        'agent_name' => $agentNameVal,
-                        'item_name'  => $itemNameVal,
-                        'raw_data'   => $row,
-                    ]
-                );
-                $count++;
             }
-        });
+
+            $actCodeVal   = trim($row['ActCode'] ?? $row['PartyCode'] ?? $row['AC_Code'] ?? $row['AcCode'] ?? '');
+            $actNameVal   = trim($row['ActName'] ?? $row['PartyName'] ?? $row['AC_Name'] ?? $row['AcName'] ?? '');
+            $agentCodeVal = trim($row['AgentCode'] ?? $row['SalesmanCode'] ?? '');
+            $agentNameVal = trim($row['AgentName'] ?? $row['SalesmanName'] ?? $row['Agent_Name'] ?? '');
+            $itemCodeVal  = trim($row['User_Code'] ?? $row['ItemCode'] ?? $row['ProductCode'] ?? '');
+            $itemNameVal  = trim($row['Item_Hd_Name'] ?? $row['ItemName'] ?? $row['ProductName'] ?? '');
+            $qtyVal       = (float)($row['Qty'] ?? $row['Quantity'] ?? 0);
+            $amtVal       = (float)($row['Amount'] ?? $row['NetAmt'] ?? $row['SalesValue'] ?? 0);
+            $branchVal    = trim($row['Branch'] ?? $row['BranchName'] ?? $row['Branch_Code'] ?? '');
+
+            if (empty($actCodeVal) && empty($itemCodeVal) && empty($itemNameVal)) {
+                continue;
+            }
+
+            $insertData[] = [
+                'vouch_date'  => $formattedDate,
+                'act_code'    => $actCodeVal,
+                'act_name'    => $actNameVal,
+                'agent_code'  => $agentCodeVal,
+                'agent_name'  => $agentNameVal,
+                'item_code'   => $itemCodeVal,
+                'item_name'   => $itemNameVal,
+                'qty'         => $qtyVal,
+                'amount'      => $amtVal,
+                'branch'      => $branchVal,
+                'raw_data'    => json_encode($row),
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ];
+        }
+
+        $count = count($insertData);
+        if ($count > 0) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($insertData) {
+                \App\Models\SalesRegister::truncate();
+                foreach (array_chunk($insertData, 500) as $chunk) {
+                    \App\Models\SalesRegister::insert($chunk);
+                }
+            });
+        }
 
         return $count;
     }
