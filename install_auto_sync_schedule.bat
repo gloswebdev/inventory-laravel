@@ -1,23 +1,11 @@
 @echo off
-title Setup InvoFlow Auto Sync Background Task
+title Setup InvoFlow Daily Auto Sync (02:00 AM)
 color 0A
 echo ================================================================
-echo        INVOFLOW: AUTOMATIC BACKGROUND SYNC SETUP
+echo        INVOFLOW: DAILY NIGHT AUTO-SYNC SETUP (02:00 AM)
 echo ================================================================
-echo This will configure Windows Task Scheduler to run MS SQL sync
-echo automatically in the background every 15 minutes silently.
+echo Setting up Windows Task Scheduler to run MS SQL sync every night at 02:00 AM...
 echo.
-schtasks /create /tn "InvoFlow_Sales_AutoSync" /tr "wscript.exe \"C:\xampp\htdocs\inventorymanager\inventory-laravel\run_sync_silent.vbs\"" /sc minute /mo 15 /f
-
-if %ERRORLEVEL% EQU 0 (
-    echo.
-    echo ================================================================
-    echo [SUCCESS] Auto-sync scheduled successfully every 15 minutes!
-    echo It will now run completely SILENT in the background.
-    echo ================================================================
-) else (
-    echo.
-    echo [NOTE] If permission error, please Right-Click this file and "Run as administrator".
-)
+powershell -ExecutionPolicy Bypass -File "%~dp0setup_daily_task.ps1"
 echo.
 pause
