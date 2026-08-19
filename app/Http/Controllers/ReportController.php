@@ -1440,20 +1440,19 @@ class ReportController extends Controller
         $startTime = microtime(true);
 
         try {
-            // Execute on MS SQL connection
-            $results = \Illuminate\Support\Facades\DB::connection('sqlsrv')->select($query);
+            $pdo = $this->getMssqlConnection();
+            $stmt = $pdo->query($query);
+            $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             $executionTime = round((microtime(true) - $startTime) * 1000, 2);
 
             $rows = [];
             $columns = [];
 
             if (!empty($results)) {
-                // Extract column names from first item
-                $firstObj = (array)$results[0];
-                $columns = array_keys($firstObj);
+                $columns = array_keys($results[0]);
 
                 foreach ($results as $res) {
-                    $row = (array)$res;
+                    $row = $res;
                     foreach ($row as $k => $v) {
                         if ($v instanceof \DateTimeInterface) {
                             $row[$k] = $v->format('Y-m-d H:i:s');
@@ -1482,6 +1481,71 @@ class ReportController extends Controller
                 'execution_time_ms' => $executionTime,
             ], 500);
         }
+    }
+
+    /**
+     * Adaptive MS SQL connection supporting sqlsrv, dblib (Linux FreeTDS), and odbc
+     */
+    private function getMssqlConnection(): \PDO
+    {
+        $host = config('database.connections.sqlsrv.host', env('DB_SQLSRV_HOST', '100.108.74.58'));
+        $port = config('database.connections.sqlsrv.port', env('DB_SQLSRV_PORT', '1433'));
+        $db   = config('database.connections.sqlsrv.database', env('DB_SQLSRV_DATABASE', 'LOGICDBSY'));
+        $user = config('database.connections.sqlsrv.username', env('DB_SQLSRV_USERNAME', 'sa'));
+        $pass = config('database.connections.sqlsrv.password', env('DB_SQLSRV_PASSWORD', 'Logic@1234'));
+
+        // 1. Socket Connectivity Check (Provides instant friendly error if remote IP is unreachable)
+        $timeout = 3;
+        $socket = @fsockopen($host, (int)$port, $errno, $errstr, $timeout);
+        if (!$socket) {
+            throw new \Exception("Cannot connect to MS SQL Server at {$host}:{$port} ({$errstr} [{$errno}]). Note: If {$host} is a local/Tailscale VPN IP, Hostinger cloud server cannot reach it directly. Please configure a public IP / port forward or tunnel for port 1433.");
+        }
+        fclose($socket);
+
+        $driverErrors = [];
+
+        // 2. Try pdo_sqlsrv (Windows & Linux with Microsoft ODBC)
+        if (extension_loaded('pdo_sqlsrv')) {
+            try {
+                $dsn = "sqlsrv:Server={$host},{$port};Database={$db};TrustServerCertificate=true";
+                return new \PDO($dsn, $user, $pass, [
+                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                    \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                    \PDO::SQLSRV_ATTR_DIRECT_QUERY => true,
+                ]);
+            } catch (\Exception $e) {
+                $driverErrors[] = "pdo_sqlsrv: " . $e->getMessage();
+            }
+        }
+
+        // 3. Try pdo_dblib (FreeTDS on Linux - Standard on Hostinger/cPanel)
+        if (extension_loaded('pdo_dblib')) {
+            try {
+                $dsn = "dblib:host={$host}:{$port};dbname={$db};charset=utf8";
+                return new \PDO($dsn, $user, $pass, [
+                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                    \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                ]);
+            } catch (\Exception $e) {
+                $driverErrors[] = "pdo_dblib: " . $e->getMessage();
+            }
+        }
+
+        // 4. Try pdo_odbc
+        if (extension_loaded('pdo_odbc')) {
+            try {
+                $dsn = "odbc:Driver={FreeTDS};Server={$host};Port={$port};Database={$db};UID={$user};PWD={$pass};TDS_Version=7.4";
+                return new \PDO($dsn, $user, $pass, [
+                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                    \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                ]);
+            } catch (\Exception $e) {
+                $driverErrors[] = "pdo_odbc: " . $e->getMessage();
+            }
+        }
+
+        $allErrors = implode(' | ', $driverErrors);
+        throw new \Exception("MS SQL Driver Error: " . ($allErrors ?: "No compatible MS SQL PDO extension enabled on this server. Please enable 'pdo_dblib' or 'pdo_sqlsrv' in Hostinger PHP Extensions."));
     }
 
     public function exportSalesQuery(Request $request)
