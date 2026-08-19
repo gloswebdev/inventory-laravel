@@ -365,17 +365,28 @@ async function executeQuery() {
     runBtnText.innerText = "Executing...";
 
     try {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || CSRF_TOKEN;
         const response = await fetch(EXECUTE_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': CSRF_TOKEN,
+                'X-CSRF-TOKEN': token,
+                'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json',
             },
             body: JSON.stringify({ query: query })
         });
 
-        const data = await response.json();
+        if (response.status === 419) {
+            throw new Error('Session expired or CSRF token mismatch. Please refresh the page (F5) and try again.');
+        }
+
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (e) {
+            throw new Error(`Server returned unexpected response (HTTP ${response.status}). Please check server logs or refresh the page.`);
+        }
 
         if (response.ok && data.success) {
             rawColumns = data.columns || [];
