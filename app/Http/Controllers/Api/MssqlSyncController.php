@@ -1,0 +1,139 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
+use App\Models\MssqlSalesRecord;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class MssqlSyncController extends Controller
+{
+    /**
+     * Ingest batch of MS SQL sales records from local sync agent
+     */
+    public function ingestSales(Request $request)
+    {
+        @set_time_limit(300);
+
+        $token = $request->input('token') ?: $request->bearerToken();
+        $validToken = AppSetting::get('mssql_sync_token', 'invoflow_mssql_sync_secret_2026');
+
+        if (empty($token) || $token !== $validToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized sync token.',
+            ], 403);
+        }
+
+        $records = $request->input('records', []);
+        $shouldTruncate = $request->boolean('truncate', false);
+
+        if (!is_array($records)) {
+            return response()->json(['success' => false, 'message' => 'Records must be an array.'], 422);
+        }
+
+        try {
+            if ($shouldTruncate) {
+                DB::table('mssql_sales_records')->truncate();
+            }
+
+            if (!empty($records)) {
+                $now = now();
+                $insertData = [];
+
+                foreach ($records as $r) {
+                    $vouchDate = null;
+                    if (!empty($r['vouch_date'])) {
+                        try {
+                            $vouchDate = \Carbon\Carbon::parse($r['vouch_date'])->format('Y-m-d');
+                        } catch (\Exception $e) {
+                            $vouchDate = null;
+                        }
+                    }
+
+                    $insertData[] = [
+                        'branch_name'     => $r['branch_name'] ?? null,
+                        'branch_code'     => isset($r['branch_code']) ? (int)$r['branch_code'] : null,
+                        'vouch_date'      => $vouchDate,
+                        'vouch_time'      => isset($r['vouch_time']) ? substr((string)$r['vouch_time'], 0, 30) : null,
+                        'vouch_num'       => $r['vouch_num'] ?? null,
+                        'act_name'        => $r['act_name'] ?? null,
+                        'act_code'        => isset($r['act_code']) ? (int)$r['act_code'] : null,
+                        'item_det_code'   => isset($r['item_det_code']) ? (int)$r['item_det_code'] : null,
+                        'tot_qty'         => (float)($r['tot_qty'] ?? $r['Tot_qty'] ?? 0),
+                        'calc_net_amt_n'  => (float)($r['calc_net_amt_n'] ?? 0),
+                        'free_qty'        => (float)($r['free_qty'] ?? $r['Free_Qty'] ?? 0),
+                        'rate'            => (float)($r['rate'] ?? 0),
+                        'calc_tax_1'      => (float)($r['calc_tax_1'] ?? $r['Calc_Tax_1'] ?? 0),
+                        'calc_tax_2'      => (float)($r['calc_tax_2'] ?? $r['Calc_Tax_2'] ?? 0),
+                        'calc_tax_3'      => (float)($r['calc_tax_3'] ?? $r['Calc_Tax_3'] ?? 0),
+                        'discount_rs'     => (float)($r['discount_rs'] ?? $r['Discount_Rs'] ?? 0),
+                        'calc_scheme_rs'  => (float)($r['calc_scheme_rs'] ?? $r['Calc_Scheme_Rs'] ?? 0),
+                        'calc_gross_amt'  => (float)($r['calc_gross_amt'] ?? $r['Calc_Gross_Amt'] ?? 0),
+                        'calc_net_amt'    => (float)($r['calc_net_amt'] ?? $r['Calc_Net_Amt'] ?? 0),
+                        'sale_or_sr'      => $r['sale_or_sr'] ?? null,
+                        'user_code'       => $r['user_code'] ?? $r['User_Code'] ?? null,
+                        'weight_per_unit' => (float)($r['weight_per_unit'] ?? $r['Weight_Per_Unit'] ?? 0),
+                        'cf_1'            => (float)($r['cf_1'] ?? 0),
+                        'item_hd_code'    => isset($r['item_hd_code']) ? (int)$r['item_hd_code'] : null,
+                        'item_hd_name'    => $r['item_hd_name'] ?? null,
+                        'lot_number'      => $r['lot_number'] ?? null,
+                        'lot_code'        => isset($r['lot_code']) ? (int)$r['lot_code'] : null,
+                        'pur_rate'        => (float)($r['pur_rate'] ?? 0),
+                        'basic_rate'      => (float)($r['basic_rate'] ?? 0),
+                        'mobile_no'       => isset($r['mobile_no']) ? (string)$r['mobile_no'] : null,
+                        'cust_hd_code'    => isset($r['cust_hd_code']) ? (int)$r['cust_hd_code'] : null,
+                        'customer_name'   => $r['customer_name'] ?? $r['CustomerName'] ?? null,
+                        'cashier_name'    => $r['cashier_name'] ?? $r['Cashier_name'] ?? null,
+                        'group_name'      => $r['group_name'] ?? null,
+                        'pack_name'       => $r['pack_name'] ?? $r['Pack_Name'] ?? null,
+                        'series'          => $r['series'] ?? null,
+                        'created_at'      => $now,
+                        'updated_at'      => $now,
+                    ];
+                }
+
+                foreach (array_chunk($insertData, 250) as $chunk) {
+                    DB::table('mssql_sales_records')->insert($chunk);
+                }
+            }
+
+            $totalCount = DB::table('mssql_sales_records')->count();
+            AppSetting::set('last_mssql_sales_sync', now()->format('Y-m-d H:i:s'));
+            AppSetting::set('total_mssql_sales_records', (string)$totalCount);
+
+            return response()->json([
+                'success'      => true,
+                'batch_size'   => count($records),
+                'total_synced' => $totalCount,
+                'message'      => 'Batch processed successfully.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('MS SQL Ingest Error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get sync stats
+     */
+    public function getSyncStatus(Request $request)
+    {
+        $lastSync = AppSetting::get('last_mssql_sales_sync', 'Never');
+        $totalCount = DB::table('mssql_sales_records')->count();
+        $dateRange = DB::table('mssql_sales_records')
+            ->selectRaw('MIN(vouch_date) as min_date, MAX(vouch_date) as max_date')
+            ->first();
+
+        return response()->json([
+            'success'     => true,
+            'total_rows'  => $totalCount,
+            'last_sync'   => $lastSync,
+            'min_date'    => $dateRange->min_date ?? null,
+            'max_date'    => $dateRange->max_date ?? null,
+        ]);
+    }
+}

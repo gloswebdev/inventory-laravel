@@ -1312,99 +1312,60 @@ class ReportController extends Controller
 
     public function salesReport(Request $request)
     {
-        $defaultQuery = "SELECT TOP 50\n" .
-            "    BM.branch_name,\n" .
-            "    HD.vouch_date,\n" .
-            "    HD.Vouch_Time,\n" .
-            "    HD.vouch_num,\n" .
-            "    ACT.act_name,\n" .
-            "    TXN.item_det_code,\n" .
-            "    CASE\n" .
-            "        WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1\n" .
-            "        ELSE TXN.Tot_Qty\n" .
-            "    END AS Tot_qty,\n" .
-            "    CASE\n" .
-            "        WHEN TXN.sale_or_sr = 'SR' THEN txn.Calc_Net_Amt * -1\n" .
-            "        ELSE TXN.Calc_Net_Amt\n" .
-            "    END AS calc_net_amt_n,\n" .
-            "    TXN.Free_Qty,\n" .
-            "    TXN.rate,\n" .
-            "    TXN.Calc_Tax_1,\n" .
-            "    TXN.Calc_Tax_2,\n" .
-            "    TXN.Calc_Tax_3,\n" .
-            "    TXN.calc_commission AS Discount_Rs,\n" .
-            "    TXN.Calc_Scheme_Rs,\n" .
-            "    TXN.Calc_Gross_Amt,\n" .
-            "    TXN.Calc_Net_Amt,\n" .
-            "    TXN.sale_or_sr,\n" .
-            "    IMD.User_Code,\n" .
-            "    IMD.Weight_Per_Unit,\n" .
-            "    IMD.Item_Det_Code,\n" .
-            "    IMD.cf_1,\n" .
-            "    IMD.Item_Hd_Code,\n" .
-            "    IMH.item_hd_name,\n" .
-            "    LM.lot_number,\n" .
-            "    LM.lot_code,\n" .
-            "    LM.pur_rate,\n" .
-            "    LM.basic_rate,\n" .
-            "    CMH.Mobile_no,\n" .
-            "    CMD.cust_hd_code,\n" .
-            "    CMD.First_name AS CustomerName,\n" .
-            "    ACT.act_code,\n" .
-            "    BM.branch_code,\n" .
-            "    CM.Cashier_name,\n" .
-            "    GM1.group_name,\n" .
-            "    PM.Pack_Name,\n" .
-            "    BS.series\n" .
-            "FROM\n" .
-            "    Sl_Txn20252026 AS TXN\n" .
-            "INNER JOIN\n" .
-            "    Sl_Head20252026 AS HD\n" .
-            "    ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0\n" .
-            "LEFT JOIN\n" .
-            "    It_Mst_Det AS IMD\n" .
-            "    ON TXN.Item_Det_Code = IMD.Item_Det_Code\n" .
-            "LEFT JOIN\n" .
-            "    It_Mst_Hd AS IMH\n" .
-            "    ON IMD.Item_Hd_Code = IMH.Item_Hd_Code\n" .
-            "LEFT JOIN\n" .
-            "    Pack_Mst AS PM\n" .
-            "    ON IMD.Pack_Code = PM.Pack_Code\n" .
-            "LEFT JOIN\n" .
-            "    Lot_Mst AS LM\n" .
-            "    ON TXN.Lot_Code = LM.Lot_Code\n" .
-            "LEFT JOIN\n" .
-            "    Group_Mst AS GM1\n" .
-            "    ON IMH.Group_Code = GM1.Group_Code\n" .
-            "LEFT JOIN\n" .
-            "    Cust_Mst_Hd AS CMH\n" .
-            "    ON HD.Member_Code = CMH.Cust_Hd_Code\n" .
-            "LEFT JOIN\n" .
-            "    Cust_Mst_Det AS CMD\n" .
-            "    ON CMH.Cust_Hd_Code = CMD.Cust_Hd_Code\n" .
-            "LEFT JOIN\n" .
-            "    Accounts AS ACT\n" .
-            "    ON HD.cust_code = ACT.act_code\n" .
-            "LEFT JOIN\n" .
-            "    Branch_Mst AS BM\n" .
-            "    ON HD.Branch_Code = BM.Branch_Code\n" .
-            "LEFT JOIN\n" .
-            "    SL_Cashier_Mst AS CM\n" .
-            "    ON HD.Cashier_Code = CM.Code\n" .
-            "LEFT JOIN\n" .
-            "    Bill_Ser AS BS\n" .
-            "    ON HD.series_code = BS.series_code\n" .
-            "LEFT JOIN\n" .
-            "    Agents_Brokers AS AG\n" .
-            "    ON HD.agent_code=AG.Code\n" .
-            "LEFT JOIN\n" .
-            "    AccountGroups AS ACG\n" .
-            "    ON ACT.Grp_Code1=ACG.grp_code;";
+        $totalSyncedRecords = DB::table('mssql_sales_records')->count();
+        $lastSyncTime = \App\Models\AppSetting::get('last_mssql_sales_sync', 'Not Synced Yet');
+
+        if ($totalSyncedRecords > 0) {
+            $defaultQuery = "SELECT \n" .
+                "    branch_name,\n" .
+                "    vouch_date,\n" .
+                "    vouch_time,\n" .
+                "    vouch_num,\n" .
+                "    act_name,\n" .
+                "    item_hd_name,\n" .
+                "    user_code,\n" .
+                "    tot_qty,\n" .
+                "    rate,\n" .
+                "    calc_net_amt_n,\n" .
+                "    discount_rs,\n" .
+                "    calc_tax_1,\n" .
+                "    group_name,\n" .
+                "    customer_name,\n" .
+                "    cashier_name\n" .
+                "FROM mssql_sales_records\n" .
+                "ORDER BY vouch_date DESC\n" .
+                "LIMIT 50;";
+        } else {
+            $defaultQuery = "SELECT TOP 50\n" .
+                "    BM.branch_name,\n" .
+                "    HD.vouch_date,\n" .
+                "    HD.Vouch_Time,\n" .
+                "    HD.vouch_num,\n" .
+                "    ACT.act_name,\n" .
+                "    TXN.item_det_code,\n" .
+                "    CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS Tot_qty,\n" .
+                "    CASE WHEN TXN.sale_or_sr = 'SR' THEN txn.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
+                "    TXN.Free_Qty,\n" .
+                "    TXN.rate,\n" .
+                "    TXN.Calc_Tax_1,\n" .
+                "    TXN.calc_commission AS Discount_Rs,\n" .
+                "    IMD.User_Code,\n" .
+                "    IMH.item_hd_name,\n" .
+                "    GM1.group_name,\n" .
+                "    BM.branch_code\n" .
+                "FROM Sl_Txn20252026 AS TXN\n" .
+                "INNER JOIN Sl_Head20252026 AS HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0\n" .
+                "LEFT JOIN It_Mst_Det AS IMD ON TXN.Item_Det_Code = IMD.Item_Det_Code\n" .
+                "LEFT JOIN It_Mst_Hd AS IMH ON IMD.Item_Hd_Code = IMH.Item_Hd_Code\n" .
+                "LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code\n" .
+                "LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code\n" .
+                "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code;";
+        }
 
         $dbHost = config('database.connections.sqlsrv.host', '100.108.74.58');
         $dbName = config('database.connections.sqlsrv.database', 'LOGICDBSY');
 
-        return view('reports.sales_report', compact('defaultQuery', 'dbHost', 'dbName'));
+        return view('reports.sales_report', compact('defaultQuery', 'dbHost', 'dbName', 'totalSyncedRecords', 'lastSyncTime'));
     }
 
     public function executeSalesQuery(Request $request)
@@ -1422,7 +1383,7 @@ class ReportController extends Controller
         // Security check: Only allow SELECT or WITH queries (Read-Only)
         $cleanQuery = ltrim($query);
         $firstWord = strtoupper(strtok($cleanQuery, " \t\n\r"));
-        if (!in_array($firstWord, ['SELECT', 'WITH', 'EXEC', 'EXECUTE', 'SET'])) {
+        if (!in_array($firstWord, ['SELECT', 'WITH', 'EXEC', 'EXECUTE', 'SET', 'SHOW', 'DESCRIBE', 'EXPLAIN'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Security Error: Only SELECT queries are permitted in this module.'
@@ -1440,6 +1401,44 @@ class ReportController extends Controller
         $startTime = microtime(true);
 
         try {
+            $isMssqlDirect = preg_match('/\b(Sl_Txn|Sl_Head|It_Mst|Accounts|Cust_Mst|Branch_Mst|Lot_Mst|Pack_Mst|Bill_Ser)\b/i', $query);
+
+            if (!$isMssqlDirect || stripos($query, 'mssql_sales_records') !== false) {
+                // Execute directly on MySQL (Synced Records)
+                $results = DB::select($query);
+                $executionTime = round((microtime(true) - $startTime) * 1000, 2);
+
+                $rows = [];
+                $columns = [];
+
+                if (!empty($results)) {
+                    $firstObj = (array)$results[0];
+                    $columns = array_keys($firstObj);
+
+                    foreach ($results as $res) {
+                        $row = (array)$res;
+                        foreach ($row as $k => $v) {
+                            if ($v instanceof \DateTimeInterface) {
+                                $row[$k] = $v->format('Y-m-d H:i:s');
+                            } elseif (is_null($v)) {
+                                $row[$k] = null;
+                            }
+                        }
+                        $rows[] = $row;
+                    }
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'columns' => $columns,
+                    'rows' => $rows,
+                    'count' => count($rows),
+                    'execution_time_ms' => $executionTime,
+                    'source' => 'MySQL Synced Data',
+                ]);
+            }
+
+            // Direct MS SQL Query execution (when on Local or Tunnel)
             $pdo = $this->getMssqlConnection();
             $stmt = $pdo->query($query);
             $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -1470,10 +1469,11 @@ class ReportController extends Controller
                 'rows' => $rows,
                 'count' => count($rows),
                 'execution_time_ms' => $executionTime,
+                'source' => 'MS SQL Direct',
             ]);
         } catch (\Exception $e) {
             $executionTime = round((microtime(true) - $startTime) * 1000, 2);
-            Log::error('MS SQL Sales Query Error: ' . $e->getMessage(), ['query' => $query]);
+            Log::error('Sales Query Error: ' . $e->getMessage(), ['query' => $query]);
 
             return response()->json([
                 'success' => false,

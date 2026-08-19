@@ -17,14 +17,25 @@
                 </div>
                 <div>
                     <div class="flex items-center gap-2.5">
-                        <h1 class="text-2xl font-black tracking-tight text-white">Sales Report Query Engine</h1>
+                        <h1 class="text-2xl font-black tracking-tight text-white">Sales Report Engine</h1>
+                        @if(($totalSyncedRecords ?? 0) > 0)
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                            MS SQL Live
+                            {{ number_format($totalSyncedRecords) }} Records Synced
                         </span>
+                        @else
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            Direct / Ready to Sync
+                        </span>
+                        @endif
                     </div>
                     <p class="text-indigo-200/70 text-xs font-semibold mt-0.5">
-                        Direct connection to <span class="text-white font-mono font-bold">{{ $dbName }}</span> ({{ $dbHost }}:1433)
+                        @if(($totalSyncedRecords ?? 0) > 0)
+                        Fast Cloud Database &middot; Last Synced: <span class="text-white font-mono font-bold">{{ $lastSyncTime }}</span>
+                        @else
+                        Database: <span class="text-white font-mono font-bold">{{ $dbName }}</span> ({{ $dbHost }}:1433)
+                        @endif
                     </p>
                 </div>
             </div>
@@ -57,136 +68,122 @@
                 <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
                 <div class="h-4 w-px bg-slate-800 mx-1"></div>
                 <i class="fas fa-terminal text-indigo-400 text-xs"></i>
-                <span class="text-xs font-black uppercase tracking-wider text-slate-300">MS SQL Query Window</span>
-                <span class="text-[10px] text-slate-500 font-mono hidden sm:inline">(Press <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">Ctrl</kbd> + <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">Enter</kbd> to run)</span>
+                <span class="text-xs font-black uppercase tracking-wider text-slate-300">SQL Query Window</span>
             </div>
 
-            <div class="flex items-center gap-2">
-                {{-- Quick Presets --}}
-                <select id="queryPresetSelect" onchange="loadPresetQuery()"
-                    class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                    <option value="default">📋 Sale Report Query (Default)</option>
-                    <option value="top10">⚡ Top 10 Records</option>
-                    <option value="top100">📊 Top 100 Records</option>
-                    <option value="branch_summary">🏢 Branch-Wise Sales Summary</option>
-                    <option value="party_summary">👥 Party-Wise Sales Summary</option>
-                    <option value="item_summary">📦 Item-Wise Sales Summary</option>
-                </select>
-
-                {{-- Limit modifier --}}
-                <select id="limitSelector" onchange="applyLimitToQuery()"
-                    class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                    <option value="TOP 50" selected>TOP 50</option>
-                    <option value="TOP 10">TOP 10</option>
-                    <option value="TOP 100">TOP 100</option>
-                    <option value="TOP 500">TOP 500</option>
-                    <option value="TOP 1000">TOP 1000</option>
-                </select>
-            </div>
-        </div>
-
-        {{-- Query Textarea --}}
-        <div class="relative p-4 bg-slate-900 font-mono text-xs">
-            <textarea id="sqlQueryTextarea" rows="9" spellcheck="false"
-                class="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-4 font-mono text-[12px] leading-relaxed text-indigo-100 placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y transition shadow-inner"
-                placeholder="Enter SQL SELECT query here...">{{ $defaultQuery }}</textarea>
-        </div>
-
-        {{-- Editor Action Bar --}}
-        <div class="bg-slate-950 px-5 py-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <button type="button" onclick="executeQuery()" id="runQueryBtn"
-                    class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold py-2 px-5 rounded-xl text-xs flex items-center gap-2 transition shadow-lg shadow-indigo-600/30">
-                    <i class="fas fa-play text-[10px]" id="runIcon"></i>
-                    <span id="runBtnText">Execute Query</span>
-                </button>
-
-                <button type="button" onclick="resetToDefaultQuery()"
-                    class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition">
-                    <i class="fas fa-rotate-left text-[11px]"></i>
-                    <span>Reset</span>
-                </button>
-
-                <button type="button" onclick="copyQuery()"
-                    class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition" title="Copy SQL to Clipboard">
-                    <i class="fas fa-copy text-[11px]"></i>
-                    <span id="copyText">Copy SQL</span>
-                </button>
-            </div>
-
-            <div class="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-                <span id="queryStats" class="flex items-center gap-1.5 text-slate-400">
-                    <i class="fas fa-circle-check text-emerald-400 text-xs"></i>
-                    Ready to execute
-                </span>
-            </div>
-        </div>
-    </div>
-
-    {{-- Error Banner (Hidden by default) --}}
-    <div id="errorAlert" class="hidden bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl p-4 flex items-start gap-3 text-xs font-semibold shadow-sm">
-        <i class="fas fa-triangle-exclamation text-rose-500 text-base mt-0.5 shrink-0"></i>
-        <div class="flex-1">
-            <div class="font-bold text-rose-900 text-sm mb-0.5">Execution Failed</div>
-            <div id="errorMessage" class="font-mono break-all text-[11px] text-rose-700"></div>
-        </div>
-        <button type="button" onclick="document.getElementById('errorAlert').classList.add('hidden')" class="text-rose-400 hover:text-rose-600">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
-
-    {{-- Results Container Card --}}
-    <div id="resultsCard" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        
-        {{-- Results Header & Filter Bar --}}
-        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                    <i class="fas fa-table-list text-sm"></i>
-                </div>
-                <div>
-                    <h3 class="text-xs font-black uppercase tracking-wider text-slate-700">Query Results</h3>
-                    <div class="text-[11px] text-slate-500 font-medium" id="resultMeta">
-                        No query executed yet
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-                {{-- Live Search Filter --}}
+            <div class="flex flex-wrap items-center gap-2">
+                {{-- Query Presets --}}
                 <div class="relative">
-                    <input type="text" id="tableFilterInput" onkeyup="filterTableResults()" placeholder="Search in results..."
-                        class="w-64 border border-slate-200 rounded-xl py-1.5 pl-8 pr-3 text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition bg-white">
-                    <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                </div>
-
-                {{-- Page size selector --}}
-                <div class="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
-                    <span class="text-[11px]">Rows:</span>
-                    <select id="pageSize" onchange="changePageSize()"
-                        class="border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-400 outline-none bg-white">
-                        <option value="15">15</option>
-                        <option value="25">25</option>
-                        <option value="50" selected>50</option>
-                        <option value="100">100</option>
-                        <option value="500">500</option>
-                        <option value="999999">All</option>
+                    <select id="queryPresetSelect" onchange="loadPreset(this.value)"
+                        class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium">
+                        <option value="default">⚡ Default Sales Report (50 Rows)</option>
+                        <option value="all">📊 All Synced Sales (Full 2025-2026)</option>
+                        <option value="branch_summary">🏢 Branch Wise Sales Summary</option>
+                        <option value="party_summary">👤 Party Wise Sales Summary</option>
+                        <option value="item_summary">📦 Item Wise Sales Summary</option>
+                        <option value="group_summary">🏷️ Group Wise Sales Summary</option>
                     </select>
                 </div>
+
+                {{-- Limit quick selector --}}
+                <div class="relative">
+                    <select id="limitSelect" onchange="applyLimit(this.value)"
+                        class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-mono">
+                        <option value="50">Limit 50</option>
+                        <option value="100">Limit 100</option>
+                        <option value="500">Limit 500</option>
+                        <option value="1000">Limit 1000</option>
+                        <option value="5000">Limit 5000</option>
+                    </select>
+                </div>
+
+                <button type="button" onclick="copyQuery()" 
+                    class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-1.5 px-3 rounded-xl transition flex items-center gap-1.5" title="Copy SQL">
+                    <i class="fas fa-copy"></i>
+                    <span class="hidden sm:inline">Copy</span>
+                </button>
+
+                <button type="button" onclick="resetQuery()" 
+                    class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-1.5 px-3 rounded-xl transition flex items-center gap-1.5" title="Reset Default Query">
+                    <i class="fas fa-rotate-left"></i>
+                    <span class="hidden sm:inline">Reset</span>
+                </button>
             </div>
         </div>
 
-        {{-- Loading Overlay / Skeleton --}}
-        <div id="tableLoading" class="hidden p-12 text-center text-slate-500">
-            <div class="inline-block w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-            <div class="text-xs font-bold uppercase tracking-wider text-slate-600">Querying MS SQL Database...</div>
-            <div class="text-[11px] text-slate-400 mt-1 font-mono">Fetching rows from LOGICDBSY</div>
+        {{-- Textarea SQL Editor --}}
+        <div class="p-4 bg-slate-950">
+            <textarea id="sqlQueryTextarea" rows="8" spellcheck="false"
+                class="w-full bg-slate-950 text-emerald-400 font-mono text-xs p-3 rounded-xl border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none leading-relaxed resize-y selection:bg-indigo-600 selection:text-white"
+                placeholder="Write your SELECT SQL query here...">{{ $defaultQuery }}</textarea>
+            <div class="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-1">
+                <span><i class="fas fa-keyboard mr-1 text-slate-600"></i> Press <strong>Ctrl + Enter</strong> to execute</span>
+                <span id="queryLength"></span>
+            </div>
+        </div>
+
+        {{-- Execution Footer Bar --}}
+        <div class="bg-slate-900 px-5 py-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 text-xs text-slate-400" id="queryStats">
+                <i class="fas fa-circle-info text-indigo-400"></i>
+                <span>Ready to execute SQL query</span>
+            </div>
+
+            <button type="button" onclick="executeQuery()" id="runQueryBtn"
+                class="bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-95 text-white font-black py-2.5 px-6 rounded-xl text-xs flex items-center gap-2 transition shadow-lg shadow-indigo-600/30">
+                <i class="fas fa-play text-[10px]" id="runIcon"></i>
+                <span id="runBtnText">Execute Query</span>
+            </button>
+        </div>
+    </div>
+
+    {{-- Error Alert Banner --}}
+    <div id="errorAlert" class="hidden rounded-2xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-xs">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-triangle-exclamation text-red-400 text-base mt-0.5"></i>
+            <div class="space-y-1">
+                <div class="font-bold text-red-200">Execution Failed</div>
+                <div id="errorMessage" class="font-mono text-[11px] break-all leading-relaxed"></div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Results Table Section --}}
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden" id="resultsCard">
+        
+        {{-- Results Header --}}
+        <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm">
+                    <i class="fas fa-table-cells"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-black text-slate-800">Query Results</h2>
+                    <div class="text-[11px] text-slate-400 font-medium" id="resultMeta">No query executed yet</div>
+                </div>
+            </div>
+
+            {{-- Table Search Filter --}}
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="tableFilterInput" oninput="filterResults(this.value)" placeholder="Search in results..."
+                        class="bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl pl-8 pr-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 sm:w-64 font-medium transition">
+                </div>
+            </div>
+        </div>
+
+        {{-- Loading Spinner --}}
+        <div id="tableLoading" class="hidden p-16 text-center text-slate-400">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent mb-3"></div>
+            <div class="text-xs font-bold text-slate-600">Executing Query...</div>
+            <div class="text-[11px] text-slate-400 mt-1">Please wait while results are processed</div>
         </div>
 
         {{-- Table Container --}}
-        <div id="tableContainer" class="overflow-x-auto max-h-[65vh] overflow-y-auto content-scroll relative">
-            <table class="w-full text-left border-collapse text-xs" id="resultsTable">
-                <thead class="sticky top-0 z-20 bg-slate-100 shadow-sm before:content-[''] before:absolute before:bottom-0 before:left-0 before:w-full before:h-px before:bg-slate-300" id="tableHead">
+        <div id="tableContainer" class="hidden overflow-x-auto max-h-[600px] border-b border-slate-100">
+            <table class="w-full text-xs text-left border-collapse" id="resultsTable">
+                <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200" id="tableHead">
                     {{-- Dynamically generated columns --}}
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-slate-700" id="tableBody">
@@ -196,22 +193,16 @@
         </div>
 
         {{-- Empty State Placeholder --}}
-        <div id="emptyPlaceholder" class="p-12 text-center text-slate-400">
-            <i class="fas fa-file-lines text-4xl mb-3 block text-slate-300"></i>
-            <span class="font-bold text-sm text-slate-600">Click "Execute Query" above to fetch sales records</span>
-            <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                You can modify the SQL query or select preset queries from the toolbar above.
-            </p>
+        <div id="emptyPlaceholder" class="p-16 text-center text-slate-400">
+            <i class="fas fa-file-lines text-4xl mb-3 block text-slate-200"></i>
+            <span class="font-bold text-sm text-slate-600">No data found</span>
+            <p class="text-xs mt-1">Execute a query to see your results here.</p>
         </div>
 
-        {{-- Pagination & Footer Info --}}
-        <div id="paginationBar" class="hidden px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div class="text-slate-500 font-medium" id="paginationInfo">
-                Showing 0 to 0 of 0 entries
-            </div>
-            <div class="flex items-center gap-1" id="paginationButtons">
-                {{-- Dynamic pagination buttons --}}
-            </div>
+        {{-- Pagination & Footer --}}
+        <div id="paginationBar" class="hidden px-6 py-4 bg-slate-50 flex items-center justify-between text-xs font-medium text-slate-500">
+            <div id="paginationInfo">Showing 0 of 0 entries</div>
+            <div class="flex items-center gap-1" id="paginationButtons"></div>
         </div>
 
     </div>
@@ -235,47 +226,46 @@ let sortDirection = 'asc';
 // Presets mapping
 const PRESETS = {
     default: DEFAULT_QUERY,
-    top10: DEFAULT_QUERY.replace(/TOP\s+\d+/i, 'TOP 10'),
-    top100: DEFAULT_QUERY.replace(/TOP\s+\d+/i, 'TOP 100'),
+    all: "SELECT * FROM mssql_sales_records ORDER BY vouch_date DESC LIMIT 500;",
     branch_summary: `SELECT 
-    BM.branch_name,
-    COUNT(DISTINCT HD.vouch_code) AS total_bills,
-    SUM(CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END) AS total_qty,
-    SUM(CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END) AS total_net_amount
-FROM Sl_Txn20252026 AS TXN
-INNER JOIN Sl_Head20252026 AS HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0
-LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code
-GROUP BY BM.branch_name
+    branch_name,
+    COUNT(DISTINCT vouch_num) AS total_bills,
+    SUM(tot_qty) AS total_qty,
+    SUM(calc_net_amt_n) AS total_net_amount
+FROM mssql_sales_records
+GROUP BY branch_name
 ORDER BY total_net_amount DESC;`,
-    party_summary: `SELECT TOP 50
-    ACT.act_name,
-    COUNT(DISTINCT HD.vouch_code) AS total_bills,
-    SUM(CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END) AS total_qty,
-    SUM(CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END) AS total_net_amount
-FROM Sl_Txn20252026 AS TXN
-INNER JOIN Sl_Head20252026 AS HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0
-LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code
-GROUP BY ACT.act_name
-ORDER BY total_net_amount DESC;`,
-    item_summary: `SELECT TOP 50
-    IMD.User_Code,
-    IMH.item_hd_name,
-    PM.Pack_Name,
-    GM1.group_name,
-    SUM(CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END) AS total_qty,
-    SUM(CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END) AS total_net_amount
-FROM Sl_Txn20252026 AS TXN
-INNER JOIN Sl_Head20252026 AS HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0
-LEFT JOIN It_Mst_Det AS IMD ON TXN.Item_Det_Code = IMD.Item_Det_Code
-LEFT JOIN It_Mst_Hd AS IMH ON IMD.Item_Hd_Code = IMH.Item_Hd_Code
-LEFT JOIN Pack_Mst AS PM ON IMD.Pack_Code = PM.Pack_Code
-LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code
-GROUP BY IMD.User_Code, IMH.item_hd_name, PM.Pack_Name, GM1.group_name
-ORDER BY total_net_amount DESC;`
+    party_summary: `SELECT 
+    act_name,
+    COUNT(DISTINCT vouch_num) AS total_bills,
+    SUM(tot_qty) AS total_qty,
+    SUM(calc_net_amt_n) AS total_net_amount
+FROM mssql_sales_records
+GROUP BY act_name
+ORDER BY total_net_amount DESC
+LIMIT 100;`,
+    item_summary: `SELECT 
+    item_hd_name,
+    user_code,
+    group_name,
+    SUM(tot_qty) AS total_qty_sold,
+    SUM(calc_net_amt_n) AS total_net_amount,
+    AVG(rate) AS avg_rate
+FROM mssql_sales_records
+GROUP BY item_hd_name, user_code, group_name
+ORDER BY total_net_amount DESC
+LIMIT 100;`,
+    group_summary: `SELECT 
+    group_name,
+    COUNT(DISTINCT item_hd_name) AS total_items,
+    SUM(tot_qty) AS total_qty_sold,
+    SUM(calc_net_amt_n) AS total_revenue
+FROM mssql_sales_records
+GROUP BY group_name
+ORDER BY total_revenue DESC;`
 };
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Enable Ctrl + Enter to run query
     const textarea = document.getElementById('sqlQueryTextarea');
     textarea.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -288,25 +278,25 @@ document.addEventListener('DOMContentLoaded', function () {
     executeQuery();
 });
 
-function loadPresetQuery() {
-    const val = document.getElementById('queryPresetSelect').value;
+function loadPreset(val) {
     if (PRESETS[val]) {
         document.getElementById('sqlQueryTextarea').value = PRESETS[val];
     }
 }
 
-function applyLimitToQuery() {
-    const limit = document.getElementById('limitSelector').value;
+function applyLimit(limit) {
     let query = document.getElementById('sqlQueryTextarea').value;
-    if (/SELECT\s+TOP\s+\d+/i.test(query)) {
-        query = query.replace(/SELECT\s+TOP\s+\d+/i, `SELECT ${limit}`);
-    } else if (/^SELECT\s+/i.test(query.trim())) {
-        query = query.trim().replace(/^SELECT\s+/i, `SELECT ${limit} `);
+    if (/LIMIT\s+\d+/i.test(query)) {
+        query = query.replace(/LIMIT\s+\d+/i, `LIMIT ${limit}`);
+    } else if (/SELECT\s+TOP\s+\d+/i.test(query)) {
+        query = query.replace(/SELECT\s+TOP\s+\d+/i, `SELECT TOP ${limit}`);
+    } else {
+        query = query.trim().replace(/;?\s*$/, ` LIMIT ${limit};`);
     }
     document.getElementById('sqlQueryTextarea').value = query;
 }
 
-function resetToDefaultQuery() {
+function resetQuery() {
     document.getElementById('sqlQueryTextarea').value = DEFAULT_QUERY;
     document.getElementById('queryPresetSelect').value = 'default';
 }
@@ -314,9 +304,7 @@ function resetToDefaultQuery() {
 function copyQuery() {
     const query = document.getElementById('sqlQueryTextarea').value;
     navigator.clipboard.writeText(query).then(() => {
-        const copyText = document.getElementById('copyText');
-        copyText.innerText = 'Copied!';
-        setTimeout(() => { copyText.innerText = 'Copy SQL'; }, 2000);
+        alert('SQL query copied to clipboard!');
     });
 }
 

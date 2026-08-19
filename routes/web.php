@@ -275,5 +275,10 @@ Route::middleware(['auth'])->group(function () {
 // Secure External Cron Job Endpoint (for Hostinger hPanel cron)
 Route::get('/cron/database-backup', [SystemController::class, 'cronBackup'])->name('cron.database-backup');
 
+// MS SQL Sales Sync API Endpoints
+use App\Http\Controllers\Api\MssqlSyncController;
+Route::post('/api/sync/mssql-sales', [MssqlSyncController::class, 'ingestSales'])->name('api.sync.mssql-sales');
+Route::get('/api/sync/mssql-sales/status', [MssqlSyncController::class, 'getSyncStatus'])->name('api.sync.mssql-sales.status');
+
 require __DIR__.'/auth.php';
 

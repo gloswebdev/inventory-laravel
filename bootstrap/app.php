@@ -116,6 +116,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'interface' => \App\Http\Middleware\EnforceInterface::class,
         ]);
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+            'cron/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
