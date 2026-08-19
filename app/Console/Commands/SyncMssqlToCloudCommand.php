@@ -189,7 +189,9 @@ class SyncMssqlToCloudCommand extends Command
             }
 
             if (!$success) {
-                $this->error("\n❌ Failed to push batch " . ($index + 1) . " to cloud endpoint.");
+                $errBody = isset($response) ? substr($response->body(), 0, 300) : 'No response';
+                $statusCode = isset($response) ? $response->status() : 'Error';
+                $this->error("\n❌ Failed to push batch " . ($index + 1) . " (HTTP {$statusCode}). Response: {$errBody}");
                 return 1;
             }
 

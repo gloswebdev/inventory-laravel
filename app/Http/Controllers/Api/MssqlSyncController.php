@@ -7,6 +7,8 @@ use App\Models\AppSetting;
 use App\Models\MssqlSalesRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Log;
 
 class MssqlSyncController extends Controller
@@ -24,7 +26,7 @@ class MssqlSyncController extends Controller
         if (empty($token) || $token !== $validToken) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized sync token.',
+                'message' => 'Unauthorized sync token: ' . ($token ?: 'None'),
             ], 403);
         }
 
@@ -36,6 +38,8 @@ class MssqlSyncController extends Controller
         }
 
         try {
+            $this->ensureTableExists();
+
             if ($shouldTruncate) {
                 DB::table('mssql_sales_records')->truncate();
             }
@@ -118,22 +122,51 @@ class MssqlSyncController extends Controller
     }
 
     /**
-     * Get sync stats
+     * Auto create table if it does not exist on target database
      */
-    public function getSyncStatus(Request $request)
+    private function ensureTableExists(): void
     {
-        $lastSync = AppSetting::get('last_mssql_sales_sync', 'Never');
-        $totalCount = DB::table('mssql_sales_records')->count();
-        $dateRange = DB::table('mssql_sales_records')
-            ->selectRaw('MIN(vouch_date) as min_date, MAX(vouch_date) as max_date')
-            ->first();
-
-        return response()->json([
-            'success'     => true,
-            'total_rows'  => $totalCount,
-            'last_sync'   => $lastSync,
-            'min_date'    => $dateRange->min_date ?? null,
-            'max_date'    => $dateRange->max_date ?? null,
-        ]);
+        if (!Schema::hasTable('mssql_sales_records')) {
+            Schema::create('mssql_sales_records', function (Blueprint $table) {
+                $table->id();
+                $table->string('branch_name')->nullable()->index();
+                $table->integer('branch_code')->nullable()->index();
+                $table->date('vouch_date')->nullable()->index();
+                $table->string('vouch_time')->nullable();
+                $table->string('vouch_num')->nullable()->index();
+                $table->string('act_name')->nullable()->index();
+                $table->integer('act_code')->nullable()->index();
+                $table->integer('item_det_code')->nullable()->index();
+                $table->decimal('tot_qty', 15, 4)->default(0);
+                $table->decimal('calc_net_amt_n', 15, 4)->default(0);
+                $table->decimal('free_qty', 15, 4)->default(0);
+                $table->decimal('rate', 15, 4)->default(0);
+                $table->decimal('calc_tax_1', 15, 4)->default(0);
+                $table->decimal('calc_tax_2', 15, 4)->default(0);
+                $table->decimal('calc_tax_3', 15, 4)->default(0);
+                $table->decimal('discount_rs', 15, 4)->default(0);
+                $table->decimal('calc_scheme_rs', 15, 4)->default(0);
+                $table->decimal('calc_gross_amt', 15, 4)->default(0);
+                $table->decimal('calc_net_amt', 15, 4)->default(0);
+                $table->string('sale_or_sr', 10)->nullable();
+                $table->string('user_code', 50)->nullable()->index();
+                $table->decimal('weight_per_unit', 15, 4)->default(0);
+                $table->decimal('cf_1', 15, 4)->default(0);
+                $table->integer('item_hd_code')->nullable()->index();
+                $table->string('item_hd_name')->nullable()->index();
+                $table->string('lot_number')->nullable();
+                $table->integer('lot_code')->nullable();
+                $table->decimal('pur_rate', 15, 4)->default(0);
+                $table->decimal('basic_rate', 15, 4)->default(0);
+                $table->string('mobile_no')->nullable();
+                $table->integer('cust_hd_code')->nullable();
+                $table->string('customer_name')->nullable();
+                $table->string('cashier_name')->nullable();
+                $table->string('group_name')->nullable()->index();
+                $table->string('pack_name')->nullable();
+                $table->string('series', 30)->nullable();
+                $table->timestamps();
+            });
+        }
     }
 }
