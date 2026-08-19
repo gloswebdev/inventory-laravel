@@ -1312,162 +1312,238 @@ class ReportController extends Controller
 
     public function salesReport(Request $request)
     {
-        // --- Default values ---
-        $baseUrl  = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
-        $apiKey   = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+        $defaultQuery = "SELECT TOP 50\n" .
+            "    BM.branch_name,\n" .
+            "    HD.vouch_date,\n" .
+            "    HD.Vouch_Time,\n" .
+            "    HD.vouch_num,\n" .
+            "    ACT.act_name,\n" .
+            "    TXN.item_det_code,\n" .
+            "    CASE\n" .
+            "        WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1\n" .
+            "        ELSE TXN.Tot_Qty\n" .
+            "    END AS Tot_qty,\n" .
+            "    CASE\n" .
+            "        WHEN TXN.sale_or_sr = 'SR' THEN txn.Calc_Net_Amt * -1\n" .
+            "        ELSE TXN.Calc_Net_Amt\n" .
+            "    END AS calc_net_amt_n,\n" .
+            "    TXN.Free_Qty,\n" .
+            "    TXN.rate,\n" .
+            "    TXN.Calc_Tax_1,\n" .
+            "    TXN.Calc_Tax_2,\n" .
+            "    TXN.Calc_Tax_3,\n" .
+            "    TXN.calc_commission AS Discount_Rs,\n" .
+            "    TXN.Calc_Scheme_Rs,\n" .
+            "    TXN.Calc_Gross_Amt,\n" .
+            "    TXN.Calc_Net_Amt,\n" .
+            "    TXN.sale_or_sr,\n" .
+            "    IMD.User_Code,\n" .
+            "    IMD.Weight_Per_Unit,\n" .
+            "    IMD.Item_Det_Code,\n" .
+            "    IMD.cf_1,\n" .
+            "    IMD.Item_Hd_Code,\n" .
+            "    IMH.item_hd_name,\n" .
+            "    LM.lot_number,\n" .
+            "    LM.lot_code,\n" .
+            "    LM.pur_rate,\n" .
+            "    LM.basic_rate,\n" .
+            "    CMH.Mobile_no,\n" .
+            "    CMD.cust_hd_code,\n" .
+            "    CMD.First_name AS CustomerName,\n" .
+            "    ACT.act_code,\n" .
+            "    BM.branch_code,\n" .
+            "    CM.Cashier_name,\n" .
+            "    GM1.group_name,\n" .
+            "    PM.Pack_Name,\n" .
+            "    BS.series\n" .
+            "FROM\n" .
+            "    Sl_Txn20252026 AS TXN\n" .
+            "INNER JOIN\n" .
+            "    Sl_Head20252026 AS HD\n" .
+            "    ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0\n" .
+            "LEFT JOIN\n" .
+            "    It_Mst_Det AS IMD\n" .
+            "    ON TXN.Item_Det_Code = IMD.Item_Det_Code\n" .
+            "LEFT JOIN\n" .
+            "    It_Mst_Hd AS IMH\n" .
+            "    ON IMD.Item_Hd_Code = IMH.Item_Hd_Code\n" .
+            "LEFT JOIN\n" .
+            "    Pack_Mst AS PM\n" .
+            "    ON IMD.Pack_Code = PM.Pack_Code\n" .
+            "LEFT JOIN\n" .
+            "    Lot_Mst AS LM\n" .
+            "    ON TXN.Lot_Code = LM.Lot_Code\n" .
+            "LEFT JOIN\n" .
+            "    Group_Mst AS GM1\n" .
+            "    ON IMH.Group_Code = GM1.Group_Code\n" .
+            "LEFT JOIN\n" .
+            "    Cust_Mst_Hd AS CMH\n" .
+            "    ON HD.Member_Code = CMH.Cust_Hd_Code\n" .
+            "LEFT JOIN\n" .
+            "    Cust_Mst_Det AS CMD\n" .
+            "    ON CMH.Cust_Hd_Code = CMD.Cust_Hd_Code\n" .
+            "LEFT JOIN\n" .
+            "    Accounts AS ACT\n" .
+            "    ON HD.cust_code = ACT.act_code\n" .
+            "LEFT JOIN\n" .
+            "    Branch_Mst AS BM\n" .
+            "    ON HD.Branch_Code = BM.Branch_Code\n" .
+            "LEFT JOIN\n" .
+            "    SL_Cashier_Mst AS CM\n" .
+            "    ON HD.Cashier_Code = CM.Code\n" .
+            "LEFT JOIN\n" .
+            "    Bill_Ser AS BS\n" .
+            "    ON HD.series_code = BS.series_code\n" .
+            "LEFT JOIN\n" .
+            "    Agents_Brokers AS AG\n" .
+            "    ON HD.agent_code=AG.Code\n" .
+            "LEFT JOIN\n" .
+            "    AccountGroups AS ACG\n" .
+            "    ON ACT.Grp_Code1=ACG.grp_code;";
 
-        // FY auto-dates
-        $now      = now();
-        $fyStart  = $now->month >= 4
-            ? $now->year . '-04-01'
-            : ($now->year - 1) . '-04-01';
-        $fyEnd    = $now->month >= 4
-            ? ($now->year + 1) . '-03-31'
-            : $now->year . '-03-31';
+        $dbHost = config('database.connections.sqlsrv.host', '100.108.74.58');
+        $dbName = config('database.connections.sqlsrv.database', 'LOGICDBSY');
 
-        $defaults = [
-            'from_date'  => $fyStart,
-            'to_date'    => $fyEnd,
-            'act_code'   => AppSetting::get('sales_api_actcode', 'ALL') ?: 'ALL',
-            'agent_code' => AppSetting::get('sales_api_agentcode', 'ALL') ?: 'ALL',
-            'item'       => AppSetting::get('sales_api_item', 'ALL') ?: 'ALL',
-            'usercode'   => AppSetting::get('sales_api_usercode', 'ALL') ?: 'ALL',
-            'branch'     => AppSetting::get('sales_api_branch', 'ALL') ?: 'ALL',
-        ];
+        return view('reports.sales_report', compact('defaultQuery', 'dbHost', 'dbName'));
+    }
 
-        $fromDate  = $request->input('from_date', $defaults['from_date']);
-        $toDate    = $request->input('to_date', $defaults['to_date']);
-        $actCode   = $request->input('act_code', $defaults['act_code']);
-        $agentCode = $request->input('agent_code', $defaults['agent_code']);
-        $item      = $request->input('item', $defaults['item']);
-        $usercode  = $request->input('usercode', $defaults['usercode']);
-        $branch    = $request->input('branch', $defaults['branch']);
+    public function executeSalesQuery(Request $request)
+    {
+        @set_time_limit(180);
+        $query = trim($request->input('query', ''));
 
-        $totalDbCount = \App\Models\SalesRegister::count();
-
-        // If no filter values and no DB records, we just load view with empty report
-        if (!$request->hasAny(['from_date', 'to_date', 'act_code', 'agent_code', 'item', 'usercode', 'branch']) && $totalDbCount == 0) {
-            $reportData = [];
-            $pivotData = [];
-            $activeBranches = [];
-            return view('reports.sales_report', compact('defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'totalDbCount', 'pivotData', 'activeBranches'));
+        if (empty($query)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please enter a valid SQL query to execute.'
+            ], 422);
         }
 
-        // Search the DB table
-        $query = \App\Models\SalesRegister::query();
-
-        if ($fromDate) {
-            $query->whereDate('vouch_date', '>=', $fromDate);
-        }
-        if ($toDate) {
-            $query->whereDate('vouch_date', '<=', $toDate);
-        }
-        if ($actCode && strtoupper($actCode) !== 'ALL') {
-            $query->where('act_code', $actCode);
-        }
-        if ($agentCode && strtoupper($agentCode) !== 'ALL') {
-            $query->where('agent_code', $agentCode);
-        }
-        if ($item && strtoupper($item) !== 'ALL') {
-            $query->where('item_code', $item);
-        }
-        if ($branch && strtoupper($branch) !== 'ALL') {
-            $query->where('branch', $branch);
+        // Security check: Only allow SELECT or WITH queries (Read-Only)
+        $cleanQuery = ltrim($query);
+        $firstWord = strtoupper(strtok($cleanQuery, " \t\n\r"));
+        if (!in_array($firstWord, ['SELECT', 'WITH', 'EXEC', 'EXECUTE', 'SET'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Security Error: Only SELECT queries are permitted in this module.'
+            ], 403);
         }
 
-        $records = $query->orderBy('vouch_date')->get();
+        // Check for forbidden keywords (prevent destructive SQL)
+        if (preg_match('/\b(DROP|TRUNCATE|DELETE\s+FROM|UPDATE\s+\w+\s+SET|ALTER\s+TABLE|INSERT\s+INTO|CREATE\s+TABLE)\b/i', $query)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Security Error: Modifying queries (DROP/DELETE/UPDATE/INSERT/ALTER) are strictly blocked.'
+            ], 403);
+        }
 
-        $branchMap = \App\Models\Branch::pluck('name', 'code')->toArray();
-        $partyMasterMap = $this->getPartyMasterMap($baseUrl, $apiKey);
+        $startTime = microtime(true);
 
-        // Map database records and join with Party Master & Branch Names
-        $reportData = [];
-        $pivotRows = [];
-        $activeBranches = [];
+        try {
+            // Execute on MS SQL connection
+            $results = \Illuminate\Support\Facades\DB::connection('sqlsrv')->select($query);
+            $executionTime = round((microtime(true) - $startTime) * 1000, 2);
 
-        foreach ($records as $record) {
-            $row = $record->raw_data ?: [];
-            
-            $branchCode = trim($record->branch);
-            $actCodeVal = trim($record->act_code);
-            $agentCodeVal = trim($record->agent_code);
-            
-            // Map branch display name
-            $branchName = $branchMap[$branchCode] ?? $branchMap[(int)$branchCode] ?? $row['Branch'] ?? $branchCode;
-            $activeBranches[$branchName] = $branchName;
-            
-            // Map party and agent display names from party master map
-            $partyName = '';
-            $agentName = '';
-            if (isset($partyMasterMap[$actCodeVal])) {
-                $partyName = $partyMasterMap[$actCodeVal]['PartyName'] ?? '';
-                $agentName = $partyMasterMap[$actCodeVal]['AgentName'] ?? '';
-                if (empty($agentCodeVal)) {
-                    $agentCodeVal = $partyMasterMap[$actCodeVal]['AgentCode'] ?? '';
+            $rows = [];
+            $columns = [];
+
+            if (!empty($results)) {
+                // Extract column names from first item
+                $firstObj = (array)$results[0];
+                $columns = array_keys($firstObj);
+
+                foreach ($results as $res) {
+                    $row = (array)$res;
+                    foreach ($row as $k => $v) {
+                        if ($v instanceof \DateTimeInterface) {
+                            $row[$k] = $v->format('Y-m-d H:i:s');
+                        } elseif (is_null($v)) {
+                            $row[$k] = null;
+                        }
+                    }
+                    $rows[] = $row;
                 }
             }
-            if (empty($partyName)) {
-                $partyName = $record->act_name ?: $row['PartyName'] ?? $row['ActName'] ?? '';
-            }
-            if (empty($agentName)) {
-                $agentName = $record->agent_name ?: $row['AgentName'] ?? '';
-            }
 
-            $mappedRow = [
-                'branch_code' => $branchCode,
-                'branch_name' => $branchName,
-                'vouch_date'  => $record->vouch_date ? $record->vouch_date->format('d/m/Y') : ($row['Date'] ?? $row['Vouch_Date'] ?? ''),
-                'act_code'    => $actCodeVal,
-                'act_name'    => $partyName,
-                'agent_code'  => $agentCodeVal,
-                'agent_name'  => $agentName,
-                'item_code'   => $record->item_code ?: $row['User_Code'] ?? $row['ProductCode'] ?? '',
-                'item_name'   => $record->item_name ?: $row['Item_Hd_Name'] ?? $row['ProductName'] ?? '',
-                'pack_name'   => $row['Pack_Name'] ?? $row['PackName'] ?? $row['Packing'] ?? '—',
-                'mrp'         => (float)($row['MRP'] ?? $row['Mrp'] ?? 0),
-                'qty'         => (float)$record->qty,
-                'rate'        => (float)($row['Rate'] ?? 0),
-                'amount'      => (float)$record->amount,
-            ];
+            return response()->json([
+                'success' => true,
+                'columns' => $columns,
+                'rows' => $rows,
+                'count' => count($rows),
+                'execution_time_ms' => $executionTime,
+            ]);
+        } catch (\Exception $e) {
+            $executionTime = round((microtime(true) - $startTime) * 1000, 2);
+            Log::error('MS SQL Sales Query Error: ' . $e->getMessage(), ['query' => $query]);
 
-            $reportData[] = $mappedRow;
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'execution_time_ms' => $executionTime,
+            ], 500);
+        }
+    }
 
-            // Aggregate into Pivot rows
-            $itemKey = $mappedRow['item_code'] . '||' . $mappedRow['pack_name'] . '||' . $mappedRow['mrp'];
-            if (!isset($pivotRows[$itemKey])) {
-                $pivotRows[$itemKey] = [
-                    'item_code' => $mappedRow['item_code'],
-                    'item_name' => $mappedRow['item_name'],
-                    'pack_name' => $mappedRow['pack_name'],
-                    'mrp'       => $mappedRow['mrp'],
-                    'branches'  => [],
-                    'total_qty' => 0,
-                    'total_amt' => 0,
-                ];
-            }
+    public function exportSalesQuery(Request $request)
+    {
+        @set_time_limit(300);
+        $query = trim($request->input('query', ''));
 
-            if (!isset($pivotRows[$itemKey]['branches'][$branchName])) {
-                $pivotRows[$itemKey]['branches'][$branchName] = [
-                    'qty' => 0,
-                    'amt' => 0,
-                ];
-            }
-
-            $pivotRows[$itemKey]['branches'][$branchName]['qty'] += $mappedRow['qty'];
-            $pivotRows[$itemKey]['branches'][$branchName]['amt'] += $mappedRow['amount'];
-            
-            $pivotRows[$itemKey]['total_qty'] += $mappedRow['qty'];
-            $pivotRows[$itemKey]['total_amt'] += $mappedRow['amount'];
+        if (empty($query)) {
+            return back()->with('error', 'No query provided to export.');
         }
 
-        $activeBranches = array_values($activeBranches);
-        sort($activeBranches);
-        $pivotData = array_values($pivotRows);
+        // Security check
+        $cleanQuery = ltrim($query);
+        $firstWord = strtoupper(strtok($cleanQuery, " \t\n\r"));
+        if (!in_array($firstWord, ['SELECT', 'WITH'])) {
+            return back()->with('error', 'Only SELECT queries can be exported.');
+        }
 
-        $error = null;
-        return view('reports.sales_report', compact(
-            'defaults', 'fromDate', 'toDate', 'actCode', 'agentCode', 'item', 'usercode', 'branch', 'reportData', 'error', 'totalDbCount', 'pivotData', 'activeBranches'
-        ));
+        try {
+            $results = \Illuminate\Support\Facades\DB::connection('sqlsrv')->select($query);
+            if (empty($results)) {
+                return back()->with('error', 'Query returned 0 rows to export.');
+            }
+
+            $firstObj = (array)$results[0];
+            $columns = array_keys($firstObj);
+
+            $filename = 'Sales_Report_' . now()->format('Y-m-d_His') . '.csv';
+
+            $headers = [
+                'Content-Type' => 'text/csv; charset=utf-8',
+                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                'Pragma' => 'no-cache',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+                'Expires' => '0',
+            ];
+
+            $callback = function () use ($results, $columns) {
+                $file = fopen('php://output', 'w');
+                // UTF-8 BOM for Excel compatibility
+                fputs($file, "\xEF\xBB\xBF");
+                fputcsv($file, $columns);
+
+                foreach ($results as $item) {
+                    $row = (array)$item;
+                    $line = [];
+                    foreach ($columns as $col) {
+                        $val = $row[$col] ?? '';
+                        if ($val instanceof \DateTimeInterface) {
+                            $val = $val->format('Y-m-d H:i:s');
+                        }
+                        $line[] = $val;
+                    }
+                    fputcsv($file, $line);
+                }
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Query Export Error: ' . $e->getMessage());
+        }
     }
 
     public function syncSalesReport(Request $request)
