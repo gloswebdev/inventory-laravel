@@ -262,12 +262,18 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
 // System Management (Admin Only)
 use App\Http\Controllers\SystemController;
 Route::middleware(['auth'])->group(function () {
-    Route::get('/system',                [SystemController::class, 'index'])->name('system.index');
-    Route::get('/system/backup/download',[SystemController::class, 'backupDownload'])->name('system.backup.download');
-    Route::post('/system/restore',       [SystemController::class, 'restoreUpload'])->name('system.restore.upload');
-    Route::post('/system/update',        [SystemController::class, 'applyUpdate'])->name('system.update.apply');
-    Route::post('/system/cache/clear',   [SystemController::class, 'clearCache'])->name('system.cache.clear');
+    Route::get('/system',                         [SystemController::class, 'index'])->name('system.index');
+    Route::get('/system/backup/download',         [SystemController::class, 'backupDownload'])->name('system.backup.download');
+    Route::get('/system/backup/download-file/{file}', [SystemController::class, 'downloadSpecificBackup'])->name('system.backup.download-file');
+    Route::post('/system/backup/settings',        [SystemController::class, 'saveBackupSettings'])->name('system.backup.settings');
+    Route::post('/system/backup/send-email',      [SystemController::class, 'triggerEmailBackup'])->name('system.backup.send-email');
+    Route::post('/system/restore',                [SystemController::class, 'restoreUpload'])->name('system.restore.upload');
+    Route::post('/system/update',                 [SystemController::class, 'applyUpdate'])->name('system.update.apply');
+    Route::post('/system/cache/clear',            [SystemController::class, 'clearCache'])->name('system.cache.clear');
 });
+
+// Secure External Cron Job Endpoint (for Hostinger hPanel cron)
+Route::get('/cron/database-backup', [SystemController::class, 'cronBackup'])->name('cron.database-backup');
 
 require __DIR__.'/auth.php';
 

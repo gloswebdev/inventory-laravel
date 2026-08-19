@@ -2,12 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
+use App\Services\DatabaseBackupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class SystemController extends Controller
 {
+    protected $backupService;
+
+    public function __construct(DatabaseBackupService $backupService)
+    {
+        $this->backupService = $backupService;
+    }
+
     /**
      * Admin-only access check
      */
@@ -80,7 +89,106 @@ class SystemController extends Controller
             ],
         ];
 
-        return view('system.index', compact('version', 'dbSizeBytes', 'tableCount', 'storageSize', 'cacheStats'));
+        // Backup & Email settings
+        $backupEmail       = AppSetting::get('backup_email', 'admin@example.com');
+        $backupAutoEnabled = AppSetting::get('backup_auto_enabled', '1');
+        $backupCronToken   = AppSetting::get('backup_cron_token', 'invoflow_backup_key_2026');
+        $recentBackups     = $this->backupService->listBackups();
+
+        return view('system.index', compact(
+            'version', 'dbSizeBytes', 'tableCount', 'storageSize', 'cacheStats',
+            'backupEmail', 'backupAutoEnabled', 'backupCronToken', 'recentBackups'
+        ));
+    }
+
+    /**
+     * Save Auto Backup Email Settings
+     */
+    public function saveBackupSettings(Request $request)
+    {
+        $this->adminOnly();
+
+        $request->validate([
+            'backup_email' => 'required|email',
+            'backup_cron_token' => 'required|string|min:6',
+        ]);
+
+        AppSetting::set('backup_email', trim($request->backup_email));
+        AppSetting::set('backup_auto_enabled', $request->has('backup_auto_enabled') ? '1' : '0');
+        AppSetting::set('backup_cron_token', trim($request->backup_cron_token));
+
+        return back()->with('system_success', '✅ Backup & Email settings saved successfully!');
+    }
+
+    /**
+     * Trigger manual DB backup and email it immediately
+     */
+    public function triggerEmailBackup(Request $request)
+    {
+        $this->adminOnly();
+
+        $email = $request->input('target_email');
+        $result = $this->backupService->createBackup(true, $email);
+
+        if ($result['success']) {
+            if ($result['email_sent']) {
+                return back()->with('system_success', "✅ Database backup ({$result['file_size']}) created and emailed successfully to {$result['email_recipient']}!");
+            } else {
+                return back()->with('system_success', "⚠️ Backup created ({$result['file_size']}), but email sending failed: {$result['email_error']}. Make sure Mail SMTP credentials are set in .env.");
+            }
+        }
+
+        return back()->with('system_error', 'Failed to generate database backup.');
+    }
+
+    /**
+     * Download specific historical backup file
+     */
+    public function downloadSpecificBackup($filename)
+    {
+        $this->adminOnly();
+
+        $safeName = basename($filename);
+        $filePath = storage_path('app/backups/' . $safeName);
+
+        if (!file_exists($filePath)) {
+            abort(404, 'Backup file not found.');
+        }
+
+        return response()->download($filePath, $safeName);
+    }
+
+    /**
+     * Public secure Cron endpoint for Hostinger / cPanel Cron jobs
+     */
+    public function cronBackup(Request $request)
+    {
+        $token = $request->query('token');
+        $validToken = AppSetting::get('backup_cron_token', 'invoflow_backup_key_2026');
+
+        if (empty($token) || $token !== $validToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized cron token.',
+            ], 403);
+        }
+
+        $autoEnabled = AppSetting::get('backup_auto_enabled', '1');
+        if ($autoEnabled !== '1') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Auto backup is disabled in settings.',
+            ]);
+        }
+
+        $result = $this->backupService->createBackup(true);
+
+        return response()->json([
+            'success'   => $result['success'],
+            'message'   => 'Automated daily database backup executed.',
+            'details'   => $result,
+            'timestamp' => now()->toDateTimeString(),
+        ]);
     }
 
     /**
