@@ -58,7 +58,15 @@ class MssqlSyncController extends Controller
                         }
                     }
 
+                    $financialYear = $r['financial_year'] ?? null;
+                    if (!$financialYear && $vouchDate) {
+                        $dt = \Carbon\Carbon::parse($vouchDate);
+                        $startYear = $dt->month >= 4 ? $dt->year : $dt->year - 1;
+                        $financialYear = $startYear . '-' . ($startYear + 1);
+                    }
+
                     $insertData[] = [
+                        'financial_year'  => $financialYear,
                         'branch_name'     => $r['branch_name'] ?? null,
                         'branch_code'     => isset($r['branch_code']) ? (int)$r['branch_code'] : null,
                         'vouch_date'      => $vouchDate,
@@ -129,6 +137,7 @@ class MssqlSyncController extends Controller
         if (!Schema::hasTable('mssql_sales_records')) {
             Schema::create('mssql_sales_records', function (Blueprint $table) {
                 $table->id();
+                $table->string('financial_year', 15)->nullable()->index();
                 $table->string('branch_name')->nullable()->index();
                 $table->integer('branch_code')->nullable()->index();
                 $table->date('vouch_date')->nullable()->index();
@@ -166,6 +175,10 @@ class MssqlSyncController extends Controller
                 $table->string('pack_name')->nullable();
                 $table->string('series', 30)->nullable();
                 $table->timestamps();
+            });
+        } elseif (!Schema::hasColumn('mssql_sales_records', 'financial_year')) {
+            Schema::table('mssql_sales_records', function (Blueprint $table) {
+                $table->string('financial_year', 15)->nullable()->index()->after('id');
             });
         }
     }

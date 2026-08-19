@@ -76,8 +76,10 @@
                 <div class="relative">
                     <select id="queryPresetSelect" onchange="loadPreset(this.value)"
                         class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium">
-                        <option value="default">⚡ Default Sales Report (50 Rows)</option>
-                        <option value="all">📊 All Synced Sales (Full 2025-2026)</option>
+                        <option value="default">⚡ Default Sales Report (Latest 50)</option>
+                        <option value="fy2627">🟢 Current Year Sales (FY 2026-2027)</option>
+                        <option value="fy2526">📅 Previous Year Sales (FY 2025-2026)</option>
+                        <option value="year_comparison">📈 Year-on-Year Growth Comparison</option>
                         <option value="branch_summary">🏢 Branch Wise Sales Summary</option>
                         <option value="party_summary">👤 Party Wise Sales Summary</option>
                         <option value="item_summary">📦 Item Wise Sales Summary</option>
@@ -226,15 +228,55 @@ let sortDirection = 'asc';
 // Presets mapping
 const PRESETS = {
     default: DEFAULT_QUERY,
-    all: "SELECT * FROM mssql_sales_records ORDER BY vouch_date DESC LIMIT 500;",
+    fy2627: `SELECT 
+    branch_name,
+    vouch_date,
+    vouch_num,
+    act_name,
+    item_hd_name,
+    user_code,
+    tot_qty,
+    rate,
+    calc_net_amt_n,
+    group_name,
+    customer_name
+FROM mssql_sales_records
+WHERE financial_year = '2026-2027'
+ORDER BY vouch_date DESC
+LIMIT 100;`,
+    fy2526: `SELECT 
+    branch_name,
+    vouch_date,
+    vouch_num,
+    act_name,
+    item_hd_name,
+    user_code,
+    tot_qty,
+    rate,
+    calc_net_amt_n,
+    group_name,
+    customer_name
+FROM mssql_sales_records
+WHERE financial_year = '2025-2026'
+ORDER BY vouch_date DESC
+LIMIT 100;`,
+    year_comparison: `SELECT 
+    financial_year,
+    COUNT(DISTINCT vouch_num) AS total_invoices,
+    SUM(tot_qty) AS total_quantity_sold,
+    SUM(calc_net_amt_n) AS total_revenue_rs
+FROM mssql_sales_records
+GROUP BY financial_year
+ORDER BY financial_year DESC;`,
     branch_summary: `SELECT 
+    financial_year,
     branch_name,
     COUNT(DISTINCT vouch_num) AS total_bills,
     SUM(tot_qty) AS total_qty,
     SUM(calc_net_amt_n) AS total_net_amount
 FROM mssql_sales_records
-GROUP BY branch_name
-ORDER BY total_net_amount DESC;`,
+GROUP BY financial_year, branch_name
+ORDER BY financial_year DESC, total_net_amount DESC;`,
     party_summary: `SELECT 
     act_name,
     COUNT(DISTINCT vouch_num) AS total_bills,
