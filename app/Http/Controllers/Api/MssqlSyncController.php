@@ -40,8 +40,17 @@ class MssqlSyncController extends Controller
         try {
             $this->ensureTableExists();
 
-            if ($shouldTruncate) {
+            $financialYearParam = $request->input('financial_year');
+            $truncateAll = $request->boolean('truncate_all', false);
+
+            if ($truncateAll) {
                 DB::table('mssql_sales_records')->truncate();
+            } elseif ($shouldTruncate) {
+                if (!empty($financialYearParam)) {
+                    DB::table('mssql_sales_records')->where('financial_year', $financialYearParam)->delete();
+                } else {
+                    DB::table('mssql_sales_records')->truncate();
+                }
             }
 
             if (!empty($records)) {

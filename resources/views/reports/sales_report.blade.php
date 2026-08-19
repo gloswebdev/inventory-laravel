@@ -79,7 +79,8 @@
                         <option value="default">⚡ Default Sales Report (Latest 50)</option>
                         <option value="fy2627">🟢 Current Year Sales (FY 2026-2027)</option>
                         <option value="fy2526">📅 Previous Year Sales (FY 2025-2026)</option>
-                        <option value="year_comparison">📈 Year-on-Year Growth Comparison</option>
+                        <option value="fy2425">🏛️ Historical Year Sales (FY 2024-2025)</option>
+                        <option value="year_comparison">📈 3-Year Growth Comparison (2024-2027)</option>
                         <option value="branch_summary">🏢 Branch Wise Sales Summary</option>
                         <option value="party_summary">👤 Party Wise Sales Summary</option>
                         <option value="item_summary">📦 Item Wise Sales Summary</option>
@@ -258,6 +259,22 @@ LIMIT 100;`,
     customer_name
 FROM mssql_sales_records
 WHERE financial_year = '2025-2026'
+ORDER BY vouch_date DESC
+LIMIT 100;`,
+    fy2425: `SELECT 
+    branch_name,
+    vouch_date,
+    vouch_num,
+    act_name,
+    item_hd_name,
+    user_code,
+    tot_qty,
+    rate,
+    calc_net_amt_n,
+    group_name,
+    customer_name
+FROM mssql_sales_records
+WHERE financial_year = '2024-2025'
 ORDER BY vouch_date DESC
 LIMIT 100;`,
     year_comparison: `SELECT 

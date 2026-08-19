@@ -45,7 +45,7 @@ class SyncMssqlToCloudCommand extends Command
 
         $yearsToSync = [];
         if ($yearParam === 'all') {
-            $yearsToSync = ['20262027', '20252026'];
+            $yearsToSync = ['20262027', '20252026', '20242025'];
         } else {
             $yearsToSync = explode(',', $yearParam);
         }
