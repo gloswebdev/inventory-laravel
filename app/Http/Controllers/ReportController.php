@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\Branch;
 use App\Models\ProductType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -1312,7 +1314,7 @@ class ReportController extends Controller
 
     public function salesReport(Request $request)
     {
-        $totalSyncedRecords = DB::table('mssql_sales_records')->count();
+        $totalSyncedRecords = Schema::hasTable('mssql_sales_records') ? DB::table('mssql_sales_records')->count() : 0;
         $lastSyncTime = \App\Models\AppSetting::get('last_mssql_sales_sync', 'Not Synced Yet');
 
         if ($totalSyncedRecords > 0) {
