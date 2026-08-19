@@ -16,8 +16,8 @@ class SyncMssqlToCloudCommand extends Command
      * @var string
      */
     protected $signature = 'mssql:sync-to-cloud 
-                            {--year=all : Financial Year suffix (e.g. 20262027, 20252026, or "all")}
-                            {--url= : Cloud App URL (default: https://invoflow2.sagarkhandar.in)} 
+                            {--year=all : Financial Year suffix (e.g. 20262027, 20252026, 20242025, or "all")}
+                            {--url= : Cloud App URL (default: https://invoflow.gloswebdev.in)} 
                             {--token= : Sync Token (default from settings)} 
                             {--truncate : Truncate and perform fresh sync}
                             {--batch=1000 : Number of rows per HTTP request}';
@@ -27,7 +27,7 @@ class SyncMssqlToCloudCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Fetch sales records for 2026-2027 and 2025-2026 from local MS SQL Server (via Tailscale) and push to Cloud MySQL database';
+    protected $description = 'Fetch sales records for 2024 to 2027 from local MS SQL Server (via Tailscale) and push to Cloud MySQL database';
 
     /**
      * Execute the console command.
@@ -37,7 +37,7 @@ class SyncMssqlToCloudCommand extends Command
         @set_time_limit(900);
         @ini_set('memory_limit', '1024M');
 
-        $cloudUrl = rtrim($this->option('url') ?: AppSetting::get('cloud_app_url', env('CLOUD_APP_URL', 'https://invoflow2.sagarkhandar.in')), '/');
+        $cloudUrl = rtrim($this->option('url') ?: AppSetting::get('cloud_app_url', env('CLOUD_APP_URL', 'https://invoflow.gloswebdev.in')), '/');
         $token = $this->option('token') ?: AppSetting::get('mssql_sync_token', 'invoflow_mssql_sync_secret_2026');
         $batchSize = (int)$this->option('batch') ?: 1000;
         $shouldTruncate = $this->option('truncate') || true; // fresh sync
