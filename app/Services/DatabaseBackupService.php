@@ -31,53 +31,77 @@ class DatabaseBackupService
         if (!$handle) {
             return [
                 'success' => false,
-                'error'   => 'Could not create backup file in storage directory.',
+                'error'   => 'Could not create backup file in storage directory. Check storage folder write permissions.',
             ];
         }
 
-        // 1. Generate SQL Dump Content directly to disk stream (Low memory footprint)
-        fwrite($handle, "-- ========================================================\n");
-        fwrite($handle, "-- InvoFlow Automated Database Backup\n");
-        fwrite($handle, "-- Database: {$dbName}\n");
-        fwrite($handle, "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n");
-        fwrite($handle, "-- Server: " . (gethostname() ?: 'Localhost') . "\n");
-        fwrite($handle, "-- ========================================================\n\n");
-        fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
-        fwrite($handle, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
+        try {
+            // 1. Generate SQL Dump Content directly to disk stream (Low memory footprint)
+            fwrite($handle, "-- ========================================================\n");
+            fwrite($handle, "-- InvoFlow Automated Database Backup\n");
+            fwrite($handle, "-- Database: {$dbName}\n");
+            fwrite($handle, "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n");
+            fwrite($handle, "-- Server: " . (gethostname() ?: 'Localhost') . "\n");
+            fwrite($handle, "-- ========================================================\n\n");
+            fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
+            fwrite($handle, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
 
-        $tables = DB::select('SHOW TABLES');
-        $tableKey = 'Tables_in_' . $dbName;
-        $totalTables = count($tables);
+            $tables = DB::select('SHOW TABLES');
+            $tableKey = 'Tables_in_' . $dbName;
+            $totalTables = count($tables);
 
-        foreach ($tables as $tableObj) {
-            $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
-            if (empty($table)) continue;
+            foreach ($tables as $tableObj) {
+                $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
+                if (empty($table)) continue;
 
-            // CREATE TABLE Statement
-            $create = DB::select("SHOW CREATE TABLE `{$table}`");
-            $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1] ?? null;
-            if ($createSql) {
-                fwrite($handle, "DROP TABLE IF EXISTS `{$table}`;\n");
-                fwrite($handle, $createSql . ";\n\n");
-            }
+                // CREATE TABLE Statement
+                try {
+                    $create = DB::select("SHOW CREATE TABLE `{$table}`");
+                    $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1] ?? null;
+                    if ($createSql) {
+                        fwrite($handle, "DROP TABLE IF EXISTS `{$table}`;\n");
+                        fwrite($handle, $createSql . ";\n\n");
+                    }
+                } catch (\Throwable $te) {
+                    Log::warning("Could not get create table for {$table}: " . $te->getMessage());
+                    continue;
+                }
 
-            // INSERT DATA using cursor (streaming chunk-by-chunk directly to disk)
-            $batch = [];
-            foreach (DB::table($table)->cursor() as $row) {
-                $batch[] = $row;
-                if (count($batch) >= 100) {
-                    $this->writeInsertBatch($handle, $table, $batch);
+                // INSERT DATA using cursor (streaming chunk-by-chunk directly to disk)
+                try {
                     $batch = [];
+                    foreach (DB::table($table)->cursor() as $row) {
+                        $batch[] = $row;
+                        if (count($batch) >= 100) {
+                            $this->writeInsertBatch($handle, $table, $batch);
+                            $batch = [];
+                        }
+                    }
+                    if (!empty($batch)) {
+                        $this->writeInsertBatch($handle, $table, $batch);
+                        $batch = [];
+                    }
+                } catch (\Throwable $de) {
+                    Log::warning("Could not dump rows for {$table}: " . $de->getMessage());
                 }
             }
-            if (!empty($batch)) {
-                $this->writeInsertBatch($handle, $table, $batch);
-                $batch = [];
-            }
-        }
 
-        fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
-        fclose($handle);
+            fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
+            fclose($handle);
+            $handle = null;
+        } catch (\Throwable $e) {
+            if ($handle) {
+                fclose($handle);
+            }
+            if (file_exists($sqlFile)) {
+                @unlink($sqlFile);
+            }
+            Log::error("Database backup failed: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return [
+                'success' => false,
+                'error'   => $e->getMessage(),
+            ];
+        }
 
         // 2. Compress into ZIP if ZipArchive is enabled (saves 85%+ disk space & avoids timeout)
         $finalPath = $sqlFile;

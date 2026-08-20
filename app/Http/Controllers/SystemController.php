@@ -198,16 +198,21 @@ class SystemController extends Controller
     {
         $this->adminOnly();
 
-        @set_time_limit(300);
+        @set_time_limit(600);
         @ini_set('memory_limit', '512M');
 
-        $result = $this->backupService->createBackup(false);
+        try {
+            $result = $this->backupService->createBackup(false);
 
-        if (!$result['success'] || !file_exists($result['file_path'])) {
-            return back()->with('system_error', 'Backup generate karne me error aaya: ' . ($result['error'] ?? 'Unknown error'));
+            if (!$result['success'] || empty($result['file_path']) || !file_exists($result['file_path'])) {
+                return back()->with('system_error', 'Backup generate karne me error aaya: ' . ($result['error'] ?? 'Unknown error'));
+            }
+
+            return response()->download($result['file_path'], $result['file_name']);
+        } catch (\Throwable $e) {
+            \Log::error('Backup download error: ' . $e->getMessage());
+            return back()->with('system_error', 'Backup error: ' . $e->getMessage());
         }
-
-        return response()->download($result['file_path'], $result['file_name']);
     }
 
     /**
