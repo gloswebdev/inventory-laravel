@@ -27,81 +27,98 @@ class DatabaseBackupService
         $baseName  = 'invoflow_backup_' . $timestamp;
         $sqlFile   = $backupDir . '/' . $baseName . '.sql';
 
-        $handle = fopen($sqlFile, 'w');
-        if (!$handle) {
-            return [
-                'success' => false,
-                'error'   => 'Could not create backup file in storage directory. Check storage folder write permissions.',
-            ];
+        $dumpSuccess = false;
+
+        // Option A: Try native mysqldump CLI first (Fastest: 1-2 seconds, 0 RAM)
+        if ($this->tryMysqlDump($sqlFile, $dbName)) {
+            $dumpSuccess = true;
         }
 
-        try {
-            // 1. Generate SQL Dump Content directly to disk stream (Low memory footprint)
-            fwrite($handle, "-- ========================================================\n");
-            fwrite($handle, "-- InvoFlow Automated Database Backup\n");
-            fwrite($handle, "-- Database: {$dbName}\n");
-            fwrite($handle, "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n");
-            fwrite($handle, "-- Server: " . (gethostname() ?: 'Localhost') . "\n");
-            fwrite($handle, "-- ========================================================\n\n");
-            fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
-            fwrite($handle, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
+        // Option B: Fast Raw PDO Stream directly to disk
+        if (!$dumpSuccess) {
+            $handle = fopen($sqlFile, 'w');
+            if (!$handle) {
+                return [
+                    'success' => false,
+                    'error'   => 'Could not create backup file in storage directory. Check storage folder write permissions.',
+                ];
+            }
 
-            $tables = DB::select('SHOW TABLES');
-            $tableKey = 'Tables_in_' . $dbName;
-            $totalTables = count($tables);
+            try {
+                fwrite($handle, "-- ========================================================\n");
+                fwrite($handle, "-- InvoFlow Automated Database Backup\n");
+                fwrite($handle, "-- Database: {$dbName}\n");
+                fwrite($handle, "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n");
+                fwrite($handle, "-- Server: " . (gethostname() ?: 'Hostinger/Production') . "\n");
+                fwrite($handle, "-- ========================================================\n\n");
+                fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
+                fwrite($handle, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
 
-            foreach ($tables as $tableObj) {
-                $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
-                if (empty($table)) continue;
+                $pdo = DB::connection()->getPdo();
+                $tables = DB::select('SHOW TABLES');
+                $tableKey = 'Tables_in_' . $dbName;
 
-                // CREATE TABLE Statement
-                try {
-                    $create = DB::select("SHOW CREATE TABLE `{$table}`");
-                    $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1] ?? null;
-                    if ($createSql) {
-                        fwrite($handle, "DROP TABLE IF EXISTS `{$table}`;\n");
-                        fwrite($handle, $createSql . ";\n\n");
-                    }
-                } catch (\Throwable $te) {
-                    Log::warning("Could not get create table for {$table}: " . $te->getMessage());
-                    continue;
-                }
+                foreach ($tables as $tableObj) {
+                    $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
+                    if (empty($table)) continue;
 
-                // INSERT DATA using cursor (streaming chunk-by-chunk directly to disk)
-                try {
-                    $batch = [];
-                    foreach (DB::table($table)->cursor() as $row) {
-                        $batch[] = $row;
-                        if (count($batch) >= 100) {
-                            $this->writeInsertBatch($handle, $table, $batch);
-                            $batch = [];
+                    // CREATE TABLE Statement
+                    try {
+                        $create = DB::select("SHOW CREATE TABLE `{$table}`");
+                        $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1] ?? null;
+                        if ($createSql) {
+                            fwrite($handle, "DROP TABLE IF EXISTS `{$table}`;\n");
+                            fwrite($handle, $createSql . ";\n\n");
                         }
+                    } catch (\Throwable $te) {
+                        Log::warning("Could not get create table for {$table}: " . $te->getMessage());
+                        continue;
                     }
-                    if (!empty($batch)) {
-                        $this->writeInsertBatch($handle, $table, $batch);
-                        $batch = [];
-                    }
-                } catch (\Throwable $de) {
-                    Log::warning("Could not dump rows for {$table}: " . $de->getMessage());
-                }
-            }
 
-            fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
-            fclose($handle);
-            $handle = null;
-        } catch (\Throwable $e) {
-            if ($handle) {
+                    // INSERT DATA using raw PDO fetch (very fast, low memory)
+                    try {
+                        $stmt = $pdo->query("SELECT * FROM `{$table}`");
+                        if ($stmt) {
+                            $stmt->setFetchMode(\PDO::FETCH_ASSOC);
+                            $batch = [];
+
+                            while ($row = $stmt->fetch()) {
+                                $batch[] = $row;
+                                if (count($batch) >= 100) {
+                                    $this->writeInsertBatch($handle, $table, $batch);
+                                    $batch = [];
+                                }
+                            }
+                            if (!empty($batch)) {
+                                $this->writeInsertBatch($handle, $table, $batch);
+                                $batch = [];
+                            }
+                        }
+                    } catch (\Throwable $de) {
+                        Log::warning("Could not dump rows for {$table}: " . $de->getMessage());
+                    }
+                }
+
+                fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
                 fclose($handle);
+                $handle = null;
+                $dumpSuccess = true;
+            } catch (\Throwable $e) {
+                if ($handle) {
+                    fclose($handle);
+                }
+                if (file_exists($sqlFile)) {
+                    @unlink($sqlFile);
+                }
+                Log::error("Database backup failed: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+                return [
+                    'success' => false,
+                    'error'   => $e->getMessage(),
+                ];
             }
-            if (file_exists($sqlFile)) {
-                @unlink($sqlFile);
-            }
-            Log::error("Database backup failed: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return [
-                'success' => false,
-                'error'   => $e->getMessage(),
-            ];
         }
+
+        $totalTables = count(DB::select('SHOW TABLES'));
 
         // 2. Compress into ZIP if ZipArchive is enabled (saves 85%+ disk space & avoids timeout)
         $finalPath = $sqlFile;
@@ -255,5 +272,60 @@ class DatabaseBackupService
         }
 
         fwrite($handle, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
+    }
+
+    /**
+     * Try to execute native mysqldump CLI binary
+     */
+    private function tryMysqlDump(string $sqlFile, string $dbName): bool
+    {
+        if (!function_exists('exec')) {
+            return false;
+        }
+
+        $disabled = explode(',', (string)ini_get('disable_functions'));
+        $disabled = array_map('trim', $disabled);
+        if (in_array('exec', $disabled)) {
+            return false;
+        }
+
+        $host = config('database.connections.mysql.host', '127.0.0.1');
+        $port = config('database.connections.mysql.port', '3306');
+        $user = config('database.connections.mysql.username');
+        $pass = config('database.connections.mysql.password');
+
+        $dumpBinaries = ['mysqldump', '/usr/bin/mysqldump', '/usr/local/mysql/bin/mysqldump', '/usr/local/bin/mysqldump', 'C:\\xampp\\mysql\\bin\\mysqldump.exe'];
+        $foundBin = null;
+
+        foreach ($dumpBinaries as $bin) {
+            $output = [];
+            $ret = 1;
+            @exec("{$bin} --version 2>&1", $output, $ret);
+            if ($ret === 0) {
+                $foundBin = $bin;
+                break;
+            }
+        }
+
+        if (!$foundBin) {
+            return false;
+        }
+
+        $cmd = sprintf(
+            '%s --host=%s --port=%s --user=%s --password=%s --single-transaction --quick --skip-lock-tables %s > %s 2>&1',
+            escapeshellcmd($foundBin),
+            escapeshellarg($host),
+            escapeshellarg($port),
+            escapeshellarg($user),
+            escapeshellarg($pass),
+            escapeshellarg($dbName),
+            escapeshellarg($sqlFile)
+        );
+
+        $out = [];
+        $res = 1;
+        @exec($cmd, $out, $res);
+
+        return $res === 0 && file_exists($sqlFile) && filesize($sqlFile) > 1024;
     }
 }

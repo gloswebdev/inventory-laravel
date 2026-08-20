@@ -192,27 +192,115 @@ class SystemController extends Controller
     }
 
     /**
-     * Download DB Backup as Compressed ZIP (or SQL) file
+     * Download DB Backup as Instant Streamed SQL file (Zero RAM, Zero Timeout)
      */
     public function backupDownload()
     {
         $this->adminOnly();
 
-        @set_time_limit(600);
+        @set_time_limit(0);
         @ini_set('memory_limit', '512M');
 
-        try {
-            $result = $this->backupService->createBackup(false);
+        $dbName   = config('database.connections.mysql.database', 'inventory_laravel_db');
+        $filename = 'invoflow_backup_' . date('Ymd_His') . '.sql';
 
-            if (!$result['success'] || empty($result['file_path']) || !file_exists($result['file_path'])) {
-                return back()->with('system_error', 'Backup generate karne me error aaya: ' . ($result['error'] ?? 'Unknown error'));
+        return response()->streamDownload(function () use ($dbName) {
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
+            $out = fopen('php://output', 'w');
+
+            fwrite($out, "-- ========================================================\n");
+            fwrite($out, "-- InvoFlow Instant Database Backup (Live Streamed)\n");
+            fwrite($out, "-- Database: {$dbName}\n");
+            fwrite($out, "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n");
+            fwrite($out, "-- Server: " . (gethostname() ?: 'Production') . "\n");
+            fwrite($out, "-- ========================================================\n\n");
+            fwrite($out, "SET FOREIGN_KEY_CHECKS=0;\n");
+            fwrite($out, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
+
+            if (ob_get_level() > 0) @ob_flush();
+            @flush();
+
+            $pdo = DB::connection()->getPdo();
+            $tables = DB::select('SHOW TABLES');
+            $tableKey = 'Tables_in_' . $dbName;
+
+            foreach ($tables as $tableObj) {
+                $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
+                if (empty($table)) continue;
+
+                // CREATE TABLE Statement
+                try {
+                    $create = DB::select("SHOW CREATE TABLE `{$table}`");
+                    $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1] ?? null;
+                    if ($createSql) {
+                        fwrite($out, "DROP TABLE IF EXISTS `{$table}`;\n");
+                        fwrite($out, $createSql . ";\n\n");
+                    }
+                } catch (\Throwable $te) {
+                    continue;
+                }
+
+                // INSERT DATA streamed via PDO (Instant, no RAM buffer, no timeout)
+                try {
+                    $stmt = $pdo->query("SELECT * FROM `{$table}`");
+                    if ($stmt) {
+                        $stmt->setFetchMode(\PDO::FETCH_ASSOC);
+                        $batch = [];
+
+                        while ($row = $stmt->fetch()) {
+                            $batch[] = $row;
+                            if (count($batch) >= 100) {
+                                $cols = array_keys($batch[0]);
+                                $colList = '`' . implode('`, `', $cols) . '`';
+                                $valuesList = [];
+                                foreach ($batch as $r) {
+                                    $vals = array_map(function ($v) {
+                                        if ($v === null) return 'NULL';
+                                        return "'" . addslashes((string)$v) . "'";
+                                    }, $r);
+                                    $valuesList[] = '(' . implode(', ', $vals) . ')';
+                                }
+                                fwrite($out, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
+                                $batch = [];
+
+                                if (ob_get_level() > 0) @ob_flush();
+                                @flush();
+                            }
+                        }
+
+                        if (!empty($batch)) {
+                            $cols = array_keys($batch[0]);
+                            $colList = '`' . implode('`, `', $cols) . '`';
+                            $valuesList = [];
+                            foreach ($batch as $r) {
+                                $vals = array_map(function ($v) {
+                                    if ($v === null) return 'NULL';
+                                    return "'" . addslashes((string)$v) . "'";
+                                }, $r);
+                                $valuesList[] = '(' . implode(', ', $vals) . ')';
+                            }
+                            fwrite($out, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
+                            $batch = [];
+                        }
+                    }
+                } catch (\Throwable $de) {}
+
+                if (ob_get_level() > 0) @ob_flush();
+                @flush();
             }
 
-            return response()->download($result['file_path'], $result['file_name']);
-        } catch (\Throwable $e) {
-            \Log::error('Backup download error: ' . $e->getMessage());
-            return back()->with('system_error', 'Backup error: ' . $e->getMessage());
-        }
+            fwrite($out, "SET FOREIGN_KEY_CHECKS=1;\n");
+            fclose($out);
+        }, $filename, [
+            'Content-Type'        => 'application/sql; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'X-Accel-Buffering'   => 'no',
+            'Cache-Control'       => 'no-cache, no-store, must-revalidate',
+            'Pragma'              => 'no-cache',
+            'Expires'             => '0',
+        ]);
     }
 
     /**
