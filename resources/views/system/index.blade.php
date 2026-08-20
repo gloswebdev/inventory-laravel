@@ -234,7 +234,7 @@
                 </div>
                 <div>
                     <div class="text-base font-black text-slate-800">Manual DB Backup</div>
-                    <div class="text-xs text-slate-400">SQL file download karo</div>
+                    <div class="text-xs text-slate-400">Compressed .zip file download karo</div>
                 </div>
             </div>
         </div>
@@ -249,7 +249,7 @@
                         <i class="fas fa-check text-emerald-500 text-[10px]"></i> Sari data rows (INSERT)
                     </li>
                     <li class="flex items-center gap-2">
-                        <i class="fas fa-check text-emerald-500 text-[10px]"></i> .sql format (import-ready)
+                        <i class="fas fa-check text-emerald-500 text-[10px]"></i> Fast Compressed (.zip) format
                     </li>
                 </ul>
             </div>
@@ -263,11 +263,12 @@
                     @endif
                 </span> data
             </div>
-            <a href="{{ route('system.backup.download') }}"
-               class="w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90 active:scale-95"
+            <a href="{{ route('system.backup.download') }}" id="instantBackupBtn"
+               onclick="this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Generating Zip Backup...'; this.style.pointerEvents='none';"
+               class="w-full flex items-center justify-center gap-2.5 py-3 rounded-2xl font-black text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-lg shadow-emerald-600/20"
                style="background:linear-gradient(135deg,#10b981,#059669)">
                 <i class="fas fa-download"></i>
-                Download Instant SQL (.sql)
+                Download Instant Backup (.zip)
             </a>
         </div>
     </div>
@@ -282,7 +283,7 @@
                 </div>
                 <div>
                     <div class="text-base font-black text-slate-800">Database Restore</div>
-                    <div class="text-xs text-slate-400">SQL backup se restore karo</div>
+                    <div class="text-xs text-slate-400">SQL ya ZIP backup se restore karo</div>
                 </div>
             </div>
         </div>
@@ -299,14 +300,14 @@
                   onsubmit="return confirm('Are you sure? Current database data will be overwritten!')">
                 @csrf
                 <label class="block mb-3">
-                    <div class="text-xs font-bold text-slate-600 mb-2">SQL Backup File Select Karo:</div>
+                    <div class="text-xs font-bold text-slate-600 mb-2">Backup File (.zip / .sql) Select Karo:</div>
                     <div class="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center cursor-pointer hover:border-amber-300 transition-colors"
                          onclick="document.getElementById('sqlFile').click()">
-                        <i class="fas fa-file-code text-2xl text-slate-300 mb-2 block"></i>
-                        <div class="text-xs font-bold text-slate-500" id="sqlFileName">Click to select .sql file</div>
-                        <div class="text-[10px] text-slate-400 mt-1">Max: 50MB</div>
+                        <i class="fas fa-file-zipper text-2xl text-slate-300 mb-2 block"></i>
+                        <div class="text-xs font-bold text-slate-500" id="sqlFileName">Click to select .zip or .sql file</div>
+                        <div class="text-[10px] text-slate-400 mt-1">Max: 100MB</div>
                     </div>
-                    <input type="file" id="sqlFile" name="sql_file" accept=".sql,.txt" class="hidden"
+                    <input type="file" id="sqlFile" name="sql_file" accept=".zip,.sql,.txt" class="hidden"
                            onchange="document.getElementById('sqlFileName').textContent = this.files[0]?.name || 'No file selected'">
                 </label>
                 <button type="submit"

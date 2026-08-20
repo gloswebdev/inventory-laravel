@@ -192,77 +192,65 @@ class SystemController extends Controller
     }
 
     /**
-     * Download DB Backup as SQL file
+     * Download DB Backup as Compressed ZIP (or SQL) file
      */
     public function backupDownload()
     {
         $this->adminOnly();
 
-        $dbName   = config('database.connections.mysql.database');
-        $filename = 'invoflow_backup_' . date('Ymd_His') . '.sql';
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
 
-        $sql  = "-- InvoFlow Database Backup\n";
-        $sql .= "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n";
-        $sql .= "-- Database: $dbName\n\n";
-        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+        $result = $this->backupService->createBackup(false);
 
-        $tables = DB::select('SHOW TABLES');
-        $tableKey = 'Tables_in_' . $dbName;
-
-        foreach ($tables as $tableObj) {
-            $table = $tableObj->$tableKey;
-
-            // CREATE TABLE
-            $create = DB::select("SHOW CREATE TABLE `$table`");
-            $createSql = $create[0]->{'Create Table'};
-            $sql .= "DROP TABLE IF EXISTS `$table`;\n";
-            $sql .= $createSql . ";\n\n";
-
-            // INSERT DATA
-            $rows = DB::table($table)->get();
-            if ($rows->count() > 0) {
-                $cols = array_keys((array) $rows->first());
-                $colList = '`' . implode('`, `', $cols) . '`';
-
-                $chunks = $rows->chunk(100);
-                foreach ($rows->chunk(100) as $chunk) {
-                    $values = $chunk->map(function ($row) {
-                        $vals = array_map(function ($v) {
-                            if ($v === null) return 'NULL';
-                            return "'" . addslashes((string)$v) . "'";
-                        }, (array) $row);
-                        return '(' . implode(', ', $vals) . ')';
-                    })->implode(",\n");
-                    $sql .= "INSERT INTO `$table` ($colList) VALUES\n$values;\n\n";
-                }
-            }
+        if (!$result['success'] || !file_exists($result['file_path'])) {
+            return back()->with('system_error', 'Backup generate karne me error aaya: ' . ($result['error'] ?? 'Unknown error'));
         }
 
-        $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
-
-        return response($sql, 200, [
-            'Content-Type'        => 'application/octet-stream',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
-            'Content-Length'      => strlen($sql),
-        ]);
+        return response()->download($result['file_path'], $result['file_name']);
     }
 
     /**
-     * Restore DB from uploaded SQL file
+     * Restore DB from uploaded SQL or ZIP file
      */
     public function restoreUpload(Request $request)
     {
         $this->adminOnly();
 
+        @set_time_limit(600);
+        @ini_set('memory_limit', '512M');
+
         $request->validate([
-            'sql_file' => 'required|file|mimes:sql,txt|max:51200', // 50MB
+            'sql_file' => 'required|file|max:102400', // 100MB max
         ]);
 
-        $file    = $request->file('sql_file');
-        $content = file_get_contents($file->getRealPath());
+        $file = $request->file('sql_file');
+        $ext  = strtolower($file->getClientOriginalExtension());
+        $content = '';
+
+        if ($ext === 'zip') {
+            if (!class_exists('ZipArchive')) {
+                return back()->with('system_error', 'PHP Zip extension server par available nahi hai.');
+            }
+            $zip = new \ZipArchive();
+            if ($zip->open($file->getRealPath()) === true) {
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $stat = $zip->statIndex($i);
+                    if (str_ends_with(strtolower($stat['name']), '.sql')) {
+                        $content = $zip->getFromIndex($i);
+                        break;
+                    }
+                }
+                $zip->close();
+            } else {
+                return back()->with('system_error', 'Uploaded ZIP file corrupt hai ya open nahi hui.');
+            }
+        } else {
+            $content = file_get_contents($file->getRealPath());
+        }
 
         if (empty(trim($content))) {
-            return back()->with('system_error', 'SQL file khali hai!');
+            return back()->with('system_error', 'SQL / ZIP file khali hai ya usme koi valid .sql file nahi mili!');
         }
 
         // Safety check

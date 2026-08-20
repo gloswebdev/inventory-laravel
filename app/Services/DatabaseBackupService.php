@@ -27,15 +27,23 @@ class DatabaseBackupService
         $baseName  = 'invoflow_backup_' . $timestamp;
         $sqlFile   = $backupDir . '/' . $baseName . '.sql';
 
-        // 1. Generate SQL Dump Content
-        $sql  = "-- ========================================================\n";
-        $sql .= "-- InvoFlow Automated Database Backup\n";
-        $sql .= "-- Database: {$dbName}\n";
-        $sql .= "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n";
-        $sql .= "-- Server: " . (gethostname() ?: 'Localhost') . "\n";
-        $sql .= "-- ========================================================\n\n";
-        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n";
-        $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n";
+        $handle = fopen($sqlFile, 'w');
+        if (!$handle) {
+            return [
+                'success' => false,
+                'error'   => 'Could not create backup file in storage directory.',
+            ];
+        }
+
+        // 1. Generate SQL Dump Content directly to disk stream (Low memory footprint)
+        fwrite($handle, "-- ========================================================\n");
+        fwrite($handle, "-- InvoFlow Automated Database Backup\n");
+        fwrite($handle, "-- Database: {$dbName}\n");
+        fwrite($handle, "-- Generated: " . now()->format('Y-m-d H:i:s') . "\n");
+        fwrite($handle, "-- Server: " . (gethostname() ?: 'Localhost') . "\n");
+        fwrite($handle, "-- ========================================================\n\n");
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
+        fwrite($handle, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n\n");
 
         $tables = DB::select('SHOW TABLES');
         $tableKey = 'Tables_in_' . $dbName;
@@ -43,36 +51,35 @@ class DatabaseBackupService
 
         foreach ($tables as $tableObj) {
             $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
+            if (empty($table)) continue;
 
             // CREATE TABLE Statement
             $create = DB::select("SHOW CREATE TABLE `{$table}`");
-            $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1];
-            $sql .= "DROP TABLE IF EXISTS `{$table}`;\n";
-            $sql .= $createSql . ";\n\n";
+            $createSql = $create[0]->{'Create Table'} ?? array_values((array)$create[0])[1] ?? null;
+            if ($createSql) {
+                fwrite($handle, "DROP TABLE IF EXISTS `{$table}`;\n");
+                fwrite($handle, $createSql . ";\n\n");
+            }
 
-            // INSERT DATA in chunks
-            $rows = DB::table($table)->get();
-            if ($rows->count() > 0) {
-                $cols = array_keys((array) $rows->first());
-                $colList = '`' . implode('`, `', $cols) . '`';
-
-                foreach ($rows->chunk(100) as $chunk) {
-                    $values = $chunk->map(function ($row) {
-                        $vals = array_map(function ($v) {
-                            if ($v === null) return 'NULL';
-                            return "'" . addslashes((string)$v) . "'";
-                        }, (array) $row);
-                        return '(' . implode(', ', $vals) . ')';
-                    })->implode(",\n");
-
-                    $sql .= "INSERT INTO `{$table}` ({$colList}) VALUES\n{$values};\n\n";
+            // INSERT DATA using cursor (streaming chunk-by-chunk directly to disk)
+            $batch = [];
+            foreach (DB::table($table)->cursor() as $row) {
+                $batch[] = $row;
+                if (count($batch) >= 100) {
+                    $this->writeInsertBatch($handle, $table, $batch);
+                    $batch = [];
                 }
+            }
+            if (!empty($batch)) {
+                $this->writeInsertBatch($handle, $table, $batch);
+                $batch = [];
             }
         }
 
-        $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
+        fclose($handle);
 
-        // 2. Compress into ZIP if ZipArchive is enabled (saves 85%+ disk space & email size)
+        // 2. Compress into ZIP if ZipArchive is enabled (saves 85%+ disk space & avoids timeout)
         $finalPath = $sqlFile;
         $finalName = $baseName . '.sql';
 
@@ -80,15 +87,12 @@ class DatabaseBackupService
             $zipFile = $backupDir . '/' . $baseName . '.zip';
             $zip = new \ZipArchive();
             if ($zip->open($zipFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
-                $zip->addFromString($baseName . '.sql', $sql);
+                $zip->addFile($sqlFile, $baseName . '.sql');
                 $zip->close();
+                @unlink($sqlFile); // remove uncompressed raw sql to save server disk
                 $finalPath = $zipFile;
                 $finalName = $baseName . '.zip';
-            } else {
-                file_put_contents($sqlFile, $sql);
             }
-        } else {
-            file_put_contents($sqlFile, $sql);
         }
 
         $fileSizeBytes = filesize($finalPath);
@@ -205,5 +209,27 @@ class DatabaseBackupService
         }
 
         return $list;
+    }
+
+    /**
+     * Write an insert statement batch directly to file stream
+     */
+    private function writeInsertBatch($handle, string $table, array $batch): void
+    {
+        if (empty($batch)) return;
+
+        $cols = array_keys((array) $batch[0]);
+        $colList = '`' . implode('`, `', $cols) . '`';
+
+        $valuesList = [];
+        foreach ($batch as $row) {
+            $vals = array_map(function ($v) {
+                if ($v === null) return 'NULL';
+                return "'" . addslashes((string)$v) . "'";
+            }, (array) $row);
+            $valuesList[] = '(' . implode(', ', $vals) . ')';
+        }
+
+        fwrite($handle, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
     }
 }
