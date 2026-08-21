@@ -61,8 +61,9 @@
                 @php
                     $presets = [
                         'all_time'   => '⚡ All Time',
-                        'this_fy'    => '🟢 Current FY',
-                        'prev_fy'    => '📅 Prev FY',
+                        'this_fy'    => '🟢 FY 26-27 (Current)',
+                        'prev_fy'    => '📅 FY 25-26',
+                        'fy_24_25'   => '📜 FY 24-25',
                         'this_month' => '📆 This Month',
                         'last_month' => '⏮️ Last Month',
                         'today'      => '⭐ Today',

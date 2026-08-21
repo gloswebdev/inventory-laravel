@@ -35,11 +35,11 @@ class QueryExecutorController extends Controller
     {
         $this->adminOnly();
 
-        // Auto-seed standard presets if empty
-        if (SavedQuery::count() === 0) {
-            SavedQuery::create([
+        // Auto-seed / Ensure standard FY presets exist
+        $standardPresets = [
+            [
                 'title'        => '⚡ Current Year Sales (FY 2026-2027) [Exact ERP Match]',
-                'description'  => 'Pure sales & returns (excludes stock transfers) matching Logic ERP exact figures',
+                'description'  => 'Current FY 2026-2027 full sales data (Replaces only 26-27, keeps 24-25 & 25-26 safe)',
                 'target_table' => 'mssql_sales_records',
                 'is_favorite'  => true,
                 'query_sql'    => "SELECT \n" .
@@ -72,13 +72,12 @@ class QueryExecutorController extends Controller
                     "  AND BS.type IN ('SL', 'SR')\n" .
                     "  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')\n" .
                     "ORDER BY HD.vouch_date DESC;"
-            ]);
-
-            SavedQuery::create([
-                'title'        => '📅 Previous Year Sales (FY 2025-2026)',
-                'description'  => 'FY 2025-2026 sales & returns history',
+            ],
+            [
+                'title'        => '📅 Previous Year Sales (FY 2025-2026) [Permanent Historical]',
+                'description'  => 'Permanent historical sales for FY 2025-2026 (Replaces only 25-26 records)',
                 'target_table' => 'mssql_sales_records',
-                'is_favorite'  => false,
+                'is_favorite'  => true,
                 'query_sql'    => "SELECT \n" .
                     "    BM.branch_name,\n" .
                     "    HD.vouch_date,\n" .
@@ -107,8 +106,49 @@ class QueryExecutorController extends Controller
                     "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code\n" .
                     "WHERE BS.Stock_Trans = 0\n" .
                     "  AND BS.type IN ('SL', 'SR')\n" .
+                    "  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')\n" .
                     "ORDER BY HD.vouch_date DESC;"
-            ]);
+            ],
+            [
+                'title'        => '📜 Historical Sales (FY 2024-2025) [Permanent Historical]',
+                'description'  => 'Permanent historical sales for FY 2024-2025 (Replaces only 24-25 records)',
+                'target_table' => 'mssql_sales_records',
+                'is_favorite'  => false,
+                'query_sql'    => "SELECT \n" .
+                    "    BM.branch_name,\n" .
+                    "    HD.vouch_date,\n" .
+                    "    HD.Vouch_Time,\n" .
+                    "    HD.vouch_num,\n" .
+                    "    BS.series,\n" .
+                    "    ACT.act_name,\n" .
+                    "    TXN.item_det_code,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
+                    "    TXN.Free_Qty,\n" .
+                    "    TXN.rate,\n" .
+                    "    TXN.Calc_Tax_1,\n" .
+                    "    TXN.calc_commission AS discount_rs,\n" .
+                    "    IMD.User_Code,\n" .
+                    "    IMH.item_hd_name,\n" .
+                    "    GM1.group_name,\n" .
+                    "    BM.branch_code\n" .
+                    "FROM Sl_Txn20242025 AS TXN\n" .
+                    "INNER JOIN Sl_Head20242025 AS HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0\n" .
+                    "INNER JOIN Bill_Ser AS BS ON HD.Series_Code = BS.Series_Code\n" .
+                    "LEFT JOIN It_Mst_Det AS IMD ON TXN.Item_Det_Code = IMD.Item_Det_Code\n" .
+                    "LEFT JOIN It_Mst_Hd AS IMH ON IMD.Item_Hd_Code = IMH.Item_Hd_Code\n" .
+                    "LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code\n" .
+                    "LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code\n" .
+                    "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code\n" .
+                    "WHERE BS.Stock_Trans = 0\n" .
+                    "  AND BS.type IN ('SL', 'SR')\n" .
+                    "  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')\n" .
+                    "ORDER BY HD.vouch_date DESC;"
+            ],
+        ];
+
+        foreach ($standardPresets as $preset) {
+            SavedQuery::firstOrCreate(['title' => $preset['title']], $preset);
         }
 
         $savedQueries = SavedQuery::orderByDesc('is_favorite')
@@ -295,14 +335,9 @@ class QueryExecutorController extends Controller
         $tableColumns = Schema::getColumnListing($targetTable);
         $insertedCount = 0;
         $batch = [];
+        $processedRecords = [];
 
         try {
-            if ($truncateOld) {
-                DB::table($targetTable)->delete();
-            }
-
-            DB::beginTransaction();
-
             foreach ($rows as $row) {
                 $record = [];
 
@@ -345,19 +380,37 @@ class QueryExecutorController extends Controller
                 }
 
                 if (!empty($record)) {
-                    $batch[] = $record;
-                }
-
-                if (count($batch) >= 500) {
-                    DB::table($targetTable)->insert($batch);
-                    $insertedCount += count($batch);
-                    $batch = [];
+                    $processedRecords[] = $record;
                 }
             }
 
-            if (!empty($batch)) {
-                DB::table($targetTable)->insert($batch);
-                $insertedCount += count($batch);
+            if (empty($processedRecords)) {
+                return response()->json(['success' => false, 'message' => 'No valid records to import.'], 422);
+            }
+
+            DB::beginTransaction();
+
+            // Smart FY / Date-Scoped Replacement for mssql_sales_records
+            if ($targetTable === 'mssql_sales_records') {
+                $incomingDates = array_values(array_filter(array_unique(array_column($processedRecords, 'vouch_date'))));
+                if (!empty($incomingDates)) {
+                    if ($truncateOld) {
+                        // Replaces ONLY the date range / FY of the incoming batch (Leaves historical years 24-25, 25-26 100% intact!)
+                        $minDate = min($incomingDates);
+                        $maxDate = max($incomingDates);
+                        DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
+                    } else {
+                        // Delete only specific incoming dates
+                        DB::table($targetTable)->whereIn('vouch_date', $incomingDates)->delete();
+                    }
+                }
+            } elseif ($truncateOld) {
+                DB::table($targetTable)->delete();
+            }
+
+            foreach (array_chunk($processedRecords, 500) as $chunk) {
+                DB::table($targetTable)->insert($chunk);
+                $insertedCount += count($chunk);
             }
 
             if (DB::transactionLevel() > 0) {

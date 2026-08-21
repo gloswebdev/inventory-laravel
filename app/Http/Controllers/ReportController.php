@@ -1349,6 +1349,9 @@ class ReportController extends Controller
         } elseif ($datePreset === 'prev_fy') {
             $fromDate = ($fyStartYear - 1) . "-04-01";
             $toDate = "{$fyStartYear}-03-31";
+        } elseif ($datePreset === 'fy_24_25') {
+            $fromDate = "2024-04-01";
+            $toDate = "2025-03-31";
         }
 
         $selectedBranch = $request->get('branch');
