@@ -295,10 +295,10 @@ Route::get('/api/sync/mssql-sales/status', [MssqlSyncController::class, 'getSync
 // Python Local MSSQL Bridge Agent API (Zero-XAMPP Bridge)
 use App\Http\Controllers\Api\BridgeApiController;
 Route::prefix('api/v1/bridge')->group(function () {
-    Route::get('/poll', [BridgeApiController::class, 'poll'])->name('api.bridge.poll');
+    Route::match(['get', 'post'], '/poll', [BridgeApiController::class, 'poll'])->name('api.bridge.poll');
     Route::post('/submit', [BridgeApiController::class, 'submit'])->name('api.bridge.submit');
     Route::post('/push-sync', [BridgeApiController::class, 'pushSync'])->name('api.bridge.push-sync');
-    Route::get('/heartbeat', [BridgeApiController::class, 'heartbeat'])->name('api.bridge.heartbeat');
+    Route::match(['get', 'post'], '/heartbeat', [BridgeApiController::class, 'heartbeat'])->name('api.bridge.heartbeat');
 });
 
 require __DIR__.'/auth.php';
