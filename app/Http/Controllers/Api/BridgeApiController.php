@@ -169,6 +169,7 @@ class BridgeApiController extends Controller
 
         $targetTable = $request->input('target_table', 'mssql_sales_records');
         $rows = $request->input('rows', []);
+        $syncMode = $request->input('sync_mode', 'full');
         $truncateOld = $request->boolean('truncate_old', false);
         $chunkIndex = (int)$request->input('chunk_index', 0);
 
@@ -181,11 +182,11 @@ class BridgeApiController extends Controller
         $batch = [];
 
         try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
             if ($truncateOld && $chunkIndex === 0) {
                 \Illuminate\Support\Facades\DB::table($targetTable)->delete();
             }
-
-            \Illuminate\Support\Facades\DB::beginTransaction();
 
             foreach ($rows as $row) {
                 $record = [];
@@ -235,6 +236,13 @@ class BridgeApiController extends Controller
                 if (!empty($record)) $batch[] = $record;
 
                 if (count($batch) >= 500) {
+                    // Incremental mode: delete existing records matching incoming batch dates before insert
+                    if (!$truncateOld && $chunkIndex === 0 && $insertedCount === 0) {
+                        $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
+                        if (!empty($batchDates)) {
+                            \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
+                        }
+                    }
                     \Illuminate\Support\Facades\DB::table($targetTable)->insert($batch);
                     $insertedCount += count($batch);
                     $batch = [];
@@ -242,6 +250,13 @@ class BridgeApiController extends Controller
             }
 
             if (!empty($batch)) {
+                // Incremental mode: delete existing records matching incoming batch dates before insert
+                if (!$truncateOld && $chunkIndex === 0 && $insertedCount === 0) {
+                    $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
+                    if (!empty($batchDates)) {
+                        \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
+                    }
+                }
                 \Illuminate\Support\Facades\DB::table($targetTable)->insert($batch);
                 $insertedCount += count($batch);
             }

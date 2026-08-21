@@ -43,10 +43,17 @@ except ImportError:
     import pyodbc
 
 
-AGENT_VERSION = "2.1.0"
+AGENT_VERSION = "2.2.0"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bridge_config.json")
 
-AUTO_SYNC_QUERY = """
+
+def build_auto_sync_query(sync_mode: str = "incremental", days: int = 7) -> str:
+    """Build MSSQL Sales Sync Query (Full Year or Rolling Incremental Days)"""
+    date_filter = ""
+    if sync_mode == "incremental" and days > 0:
+        date_filter = f"  AND HD.vouch_date >= DATEADD(day, -{days}, CAST(GETDATE() AS DATE))\n"
+
+    return f"""
 SELECT 
     BM.branch_name,
     HD.vouch_date,
@@ -76,7 +83,7 @@ LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code
 WHERE BS.Stock_Trans = 0
   AND BS.type IN ('SL', 'SR')
   AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')
-ORDER BY HD.vouch_date DESC;
+{date_filter}ORDER BY HD.vouch_date DESC;
 """
 
 
@@ -186,17 +193,20 @@ class InvoFlowBridge:
         # Auto sync settings
         self.auto_sync_cfg = self.config.get("auto_sync", {})
         self.auto_sync_enabled = self.auto_sync_cfg.get("enabled", True)
+        self.sync_mode = self.auto_sync_cfg.get("sync_mode", "incremental") # "incremental" or "full"
+        self.incremental_days = int(self.auto_sync_cfg.get("incremental_days", 7))
         self.sync_interval_hours = float(self.auto_sync_cfg.get("sync_interval_hours", 1))
         self.sync_interval_seconds = self.sync_interval_hours * 3600
         self.last_auto_sync = 0 if self.auto_sync_cfg.get("sync_on_startup", True) else time.time()
 
     def print_banner(self):
+        mode_desc = f"Incremental (Last {self.incremental_days} Days)" if self.sync_mode == "incremental" else "Full Year"
         print("=" * 70, flush=True)
         print(f"  [+] InvoFlow Local MSSQL Bridge Agent v{AGENT_VERSION}", flush=True)
         print(f"  [*] Target MSSQL DB:   {self.db_name}", flush=True)
         print(f"  [*] Cloud API URL:     {self.base_url}", flush=True)
         print(f"  [*] Web Poll Interval: {self.poll_interval}s", flush=True)
-        print(f"  [*] Auto-Sync:         {'ENABLED (Every ' + str(self.sync_interval_hours) + 'h)' if self.auto_sync_enabled else 'DISABLED'}", flush=True)
+        print(f"  [*] Auto-Sync:         {'ENABLED (Every ' + str(self.sync_interval_hours) + 'h) [' + mode_desc + ']' if self.auto_sync_enabled else 'DISABLED'}", flush=True)
         print("=" * 70, flush=True)
 
     def test_mssql(self) -> bool:
@@ -350,14 +360,20 @@ class InvoFlowBridge:
     def perform_auto_sync(self):
         """Perform automatic scheduled background push-sync to InvoFlow"""
         now_str = datetime.datetime.now().strftime("%H:%M:%S")
-        print(f"\n[{now_str}] [AUTO-SYNC] Running scheduled background sales sync...", flush=True)
+        mode_desc = f"Incremental (Last {self.incremental_days} Days)" if self.sync_mode == "incremental" else "Full Year"
+        print(f"\n[{now_str}] [AUTO-SYNC] Running scheduled background sales sync ({mode_desc})...", flush=True)
 
-        success, columns, rows, elapsed, error = self.execute_query(AUTO_SYNC_QUERY)
+        query = build_auto_sync_query(self.sync_mode, self.incremental_days)
+        success, columns, rows, elapsed, error = self.execute_query(query)
         if not success:
             print(f"[{now_str}] [AUTO-SYNC ERROR] MSSQL query failed: {error}", flush=True)
             return False
 
         print(f"[{now_str}] [AUTO-SYNC] Fetched {len(rows)} rows from MSSQL in {elapsed}s", flush=True)
+
+        if len(rows) == 0:
+            print(f"[{now_str}] [AUTO-SYNC] No new/modified records in this window. Sync complete.", flush=True)
+            return True
 
         url = f"{self.base_url}/push-sync"
         chunk_size = 2500
@@ -368,7 +384,8 @@ class InvoFlowBridge:
             payload = {
                 "target_table": "mssql_sales_records",
                 "rows": chunk_rows,
-                "truncate_old": (i == 0),
+                "sync_mode": self.sync_mode,
+                "truncate_old": (self.sync_mode == "full" and i == 0),
                 "chunk_index": i,
                 "total_chunks": total_chunks
             }

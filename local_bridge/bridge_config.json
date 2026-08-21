@@ -14,6 +14,8 @@
     },
     "auto_sync": {
         "enabled": true,
+        "sync_mode": "incremental",
+        "incremental_days": 7,
         "sync_interval_hours": 1,
         "sync_on_startup": true
     }
