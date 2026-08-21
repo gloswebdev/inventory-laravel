@@ -437,6 +437,9 @@
                     <a href="{{ route('reports.party-master') }}" class="sub-nav-link {{ request()->routeIs('reports.party-master') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Party Master
                     </a>
+                    <a href="{{ route('reports.query-executor.index') }}" class="sub-nav-link {{ request()->routeIs('reports.query-executor.*') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> <span class="text-amber-300 font-bold flex items-center gap-1.5"><i class="fas fa-terminal text-[10px]"></i> Query Executor</span>
+                    </a>
                     @endif
                 </div>
             </div>

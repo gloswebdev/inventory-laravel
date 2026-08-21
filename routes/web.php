@@ -146,6 +146,18 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::post('reports/agent-targets', [ReportController::class, 'agentTargetsStore'])->name('reports.agent-targets.store');
     Route::post('reports/team-targets', [ReportController::class, 'teamTargetsStore'])->name('reports.team-targets.store');
 
+    // Query Executor Module (Admin only)
+    Route::prefix('reports/query-executor')->name('reports.query-executor.')->group(function() {
+        Route::get('/', [App\Http\Controllers\QueryExecutorController::class, 'index'])->name('index');
+        Route::post('/dispatch', [App\Http\Controllers\QueryExecutorController::class, 'dispatchJob'])->name('dispatch');
+        Route::get('/status/{token}', [App\Http\Controllers\QueryExecutorController::class, 'checkStatus'])->name('status');
+        Route::post('/import', [App\Http\Controllers\QueryExecutorController::class, 'importSelected'])->name('import');
+        Route::post('/save-template', [App\Http\Controllers\QueryExecutorController::class, 'saveTemplate'])->name('save-template');
+        Route::delete('/template/{id}', [App\Http\Controllers\QueryExecutorController::class, 'deleteTemplate'])->name('delete-template');
+        Route::post('/bridge-settings', [App\Http\Controllers\QueryExecutorController::class, 'updateBridgeSettings'])->name('bridge-settings');
+        Route::get('/export-csv/{token}', [App\Http\Controllers\QueryExecutorController::class, 'exportCsv'])->name('export-csv');
+    });
+
     // Settings
     Route::get('settings/branches', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.branches.index');
     Route::post('settings/api', [App\Http\Controllers\SettingController::class, 'updateApiSettings'])->name('settings.api.update');
@@ -279,6 +291,15 @@ Route::get('/cron/database-backup', [SystemController::class, 'cronBackup'])->na
 use App\Http\Controllers\Api\MssqlSyncController;
 Route::post('/api/sync/mssql-sales', [MssqlSyncController::class, 'ingestSales'])->name('api.sync.mssql-sales');
 Route::get('/api/sync/mssql-sales/status', [MssqlSyncController::class, 'getSyncStatus'])->name('api.sync.mssql-sales.status');
+
+// Python Local MSSQL Bridge Agent API (Zero-XAMPP Bridge)
+use App\Http\Controllers\Api\BridgeApiController;
+Route::prefix('api/v1/bridge')->group(function () {
+    Route::get('/poll', [BridgeApiController::class, 'poll'])->name('api.bridge.poll');
+    Route::post('/submit', [BridgeApiController::class, 'submit'])->name('api.bridge.submit');
+    Route::post('/push-sync', [BridgeApiController::class, 'pushSync'])->name('api.bridge.push-sync');
+    Route::get('/heartbeat', [BridgeApiController::class, 'heartbeat'])->name('api.bridge.heartbeat');
+});
 
 require __DIR__.'/auth.php';
 

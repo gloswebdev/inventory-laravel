@@ -1314,60 +1314,222 @@ class ReportController extends Controller
 
     public function salesReport(Request $request)
     {
-        $totalSyncedRecords = Schema::hasTable('mssql_sales_records') ? DB::table('mssql_sales_records')->count() : 0;
-        $lastSyncTime = \App\Models\AppSetting::get('last_mssql_sales_sync', 'Not Synced Yet');
+        // 1. Determine active data table
+        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
+        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
 
-        if ($totalSyncedRecords > 0) {
-            $defaultQuery = "SELECT \n" .
-                "    branch_name,\n" .
-                "    vouch_date,\n" .
-                "    vouch_time,\n" .
-                "    vouch_num,\n" .
-                "    act_name,\n" .
-                "    item_hd_name,\n" .
-                "    user_code,\n" .
-                "    tot_qty,\n" .
-                "    rate,\n" .
-                "    calc_net_amt_n,\n" .
-                "    discount_rs,\n" .
-                "    calc_tax_1,\n" .
-                "    group_name,\n" .
-                "    customer_name,\n" .
-                "    cashier_name\n" .
-                "FROM mssql_sales_records\n" .
-                "ORDER BY vouch_date DESC\n" .
-                "LIMIT 50;";
-        } else {
-            $defaultQuery = "SELECT TOP 50\n" .
-                "    BM.branch_name,\n" .
-                "    HD.vouch_date,\n" .
-                "    HD.Vouch_Time,\n" .
-                "    HD.vouch_num,\n" .
-                "    ACT.act_name,\n" .
-                "    TXN.item_det_code,\n" .
-                "    CASE WHEN TXN.sale_or_sr = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS Tot_qty,\n" .
-                "    CASE WHEN TXN.sale_or_sr = 'SR' THEN txn.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
-                "    TXN.Free_Qty,\n" .
-                "    TXN.rate,\n" .
-                "    TXN.Calc_Tax_1,\n" .
-                "    TXN.calc_commission AS Discount_Rs,\n" .
-                "    IMD.User_Code,\n" .
-                "    IMH.item_hd_name,\n" .
-                "    GM1.group_name,\n" .
-                "    BM.branch_code\n" .
-                "FROM Sl_Txn20252026 AS TXN\n" .
-                "INNER JOIN Sl_Head20252026 AS HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0\n" .
-                "LEFT JOIN It_Mst_Det AS IMD ON TXN.Item_Det_Code = IMD.Item_Det_Code\n" .
-                "LEFT JOIN It_Mst_Hd AS IMH ON IMD.Item_Hd_Code = IMH.Item_Hd_Code\n" .
-                "LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code\n" .
-                "LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code\n" .
-                "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code;";
+        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
+        $totalSyncedRecords = $tableName ? DB::table($tableName)->count() : 0;
+        $lastSyncTime = \App\Models\AppSetting::get('last_mssql_sales_sync', 'Live Synced');
+
+        // Date Range logic
+        $datePreset = $request->get('date_range', 'all_time');
+        $fromDate = $request->get('from_date');
+        $toDate = $request->get('to_date');
+
+        $now = now();
+        $currentYear = $now->year;
+        $fyStartYear = $now->month >= 4 ? $currentYear : $currentYear - 1;
+
+        if ($datePreset === 'today') {
+            $fromDate = $now->toDateString();
+            $toDate = $now->toDateString();
+        } elseif ($datePreset === 'this_month') {
+            $fromDate = $now->copy()->startOfMonth()->toDateString();
+            $toDate = $now->copy()->endOfMonth()->toDateString();
+        } elseif ($datePreset === 'last_month') {
+            $fromDate = $now->copy()->subMonth()->startOfMonth()->toDateString();
+            $toDate = $now->copy()->subMonth()->endOfMonth()->toDateString();
+        } elseif ($datePreset === 'this_fy') {
+            $fromDate = "{$fyStartYear}-04-01";
+            $toDate = ($fyStartYear + 1) . "-03-31";
+        } elseif ($datePreset === 'prev_fy') {
+            $fromDate = ($fyStartYear - 1) . "-04-01";
+            $toDate = "{$fyStartYear}-03-31";
         }
 
-        $dbHost = config('database.connections.sqlsrv.host', '100.108.74.58');
-        $dbName = config('database.connections.sqlsrv.database', 'LOGICDBSY');
+        $selectedBranch = $request->get('branch');
+        $searchQuery = trim($request->get('search', ''));
 
-        return view('reports.sales_report', compact('defaultQuery', 'dbHost', 'dbName', 'totalSyncedRecords', 'lastSyncTime'));
+        $branchSummary = [];
+        $grandTotalSales = 0;
+        $grandTotalQty = 0;
+        $grandTotalInvoices = 0;
+        $allBranchNames = [];
+        $monthlyTrend = [];
+        $topProducts = [];
+        $topParties = [];
+
+        if ($tableName) {
+            // Distinct branch names for dropdown
+            $branchCol = $useMssqlTable ? 'branch_name' : 'branch';
+            $allBranchNames = DB::table($tableName)
+                ->whereNotNull($branchCol)
+                ->where($branchCol, '!=', '')
+                ->distinct()
+                ->pluck($branchCol)
+                ->sort()
+                ->values();
+
+            // Build base query
+            $amtField = $useMssqlTable ? 'calc_net_amt_n' : 'amount';
+            $qtyField = $useMssqlTable ? 'tot_qty' : 'qty';
+            $vouchField = $useMssqlTable ? 'vouch_num' : 'id';
+            $itemField = $useMssqlTable ? 'item_hd_name' : 'item_name';
+            $actField = 'act_name';
+
+            $query = DB::table($tableName);
+
+            if ($fromDate) {
+                $query->where('vouch_date', '>=', $fromDate);
+            }
+            if ($toDate) {
+                $query->where('vouch_date', '<=', $toDate);
+            }
+            if (!empty($selectedBranch)) {
+                $query->where($branchCol, $selectedBranch);
+            }
+            if (!empty($searchQuery)) {
+                $query->where(function($q) use ($searchQuery, $branchCol, $itemField, $actField) {
+                    $q->where($branchCol, 'like', "%{$searchQuery}%")
+                      ->orWhere($itemField, 'like', "%{$searchQuery}%")
+                      ->orWhere($actField, 'like', "%{$searchQuery}%");
+                });
+            }
+
+            // Exclude Stock Transfer Series if series column is present
+            if ($useMssqlTable && Schema::hasColumn('mssql_sales_records', 'series')) {
+                $query->where(function($q) {
+                    $q->whereNull('series')
+                      ->orWhere(function($sq) {
+                          $sq->where('series', 'not like', '%ST%')
+                             ->where('series', 'not like', '%TR%')
+                             ->where('series', '!=', 'ISCR');
+                      });
+                });
+            }
+
+            // 1. Consolidated Branch Grouping
+            $rawBranches = (clone $query)
+                ->select(
+                    DB::raw("COALESCE({$branchCol}, 'HEAD OFFICE') as branch_name"),
+                    DB::raw("SUM({$amtField}) as total_sales"),
+                    DB::raw("SUM({$qtyField}) as total_qty"),
+                    DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices"),
+                    DB::raw("COUNT(*) as total_lines"),
+                    DB::raw("MIN(vouch_date) as min_date"),
+                    DB::raw("MAX(vouch_date) as max_date")
+                )
+                ->groupBy(DB::raw("COALESCE({$branchCol}, 'HEAD OFFICE')"))
+                ->orderByDesc('total_sales')
+                ->get();
+
+            $grandTotalSales = $rawBranches->sum('total_sales');
+            $grandTotalQty = $rawBranches->sum('total_qty');
+            $grandTotalInvoices = $rawBranches->sum('total_invoices');
+
+            $rank = 1;
+            foreach ($rawBranches as $b) {
+                $sales = (float)$b->total_sales;
+                $invoices = (int)$b->total_invoices;
+                $share = $grandTotalSales > 0 ? ($sales / $grandTotalSales) * 100 : 0;
+                $aov = $invoices > 0 ? $sales / $invoices : 0;
+
+                $branchSummary[] = [
+                    'rank'               => $rank++,
+                    'branch_name'        => trim($b->branch_name),
+                    'total_sales'        => $sales,
+                    'total_qty'          => (float)$b->total_qty,
+                    'total_invoices'     => $invoices,
+                    'total_lines'        => (int)$b->total_lines,
+                    'share_percent'      => round($share, 1),
+                    'avg_order_value'    => round($aov, 2),
+                    'formatted_sales'    => self::formatIndianCurrency($sales),
+                    'formatted_aov'      => self::formatIndianCurrency($aov),
+                    'min_date'           => $b->min_date,
+                    'max_date'           => $b->max_date,
+                ];
+            }
+
+            // 2. Top 8 Selling Items overall
+            $topProducts = (clone $query)
+                ->select(
+                    DB::raw("COALESCE({$itemField}, 'Unknown Item') as item_name"),
+                    DB::raw("SUM({$amtField}) as total_sales"),
+                    DB::raw("SUM({$qtyField}) as total_qty")
+                )
+                ->groupBy(DB::raw("COALESCE({$itemField}, 'Unknown Item')"))
+                ->orderByDesc('total_sales')
+                ->limit(8)
+                ->get()
+                ->map(fn($item) => [
+                    'item_name'       => $item->item_name,
+                    'total_sales'     => (float)$item->total_sales,
+                    'total_qty'       => (float)$item->total_qty,
+                    'formatted_sales' => self::formatIndianCurrency($item->total_sales),
+                ]);
+
+            // 3. Top 8 Customers / Parties overall
+            $topParties = (clone $query)
+                ->select(
+                    DB::raw("COALESCE({$actField}, 'Direct Customer') as party_name"),
+                    DB::raw("COALESCE({$branchCol}, '-') as branch_name"),
+                    DB::raw("SUM({$amtField}) as total_sales"),
+                    DB::raw("COUNT(DISTINCT {$vouchField}) as invoice_count")
+                )
+                ->groupBy(DB::raw("COALESCE({$actField}, 'Direct Customer')"), DB::raw("COALESCE({$branchCol}, '-')"))
+                ->orderByDesc('total_sales')
+                ->limit(8)
+                ->get()
+                ->map(fn($party) => [
+                    'party_name'      => $party->party_name,
+                    'branch_name'     => $party->branch_name,
+                    'total_sales'     => (float)$party->total_sales,
+                    'invoice_count'   => (int)$party->invoice_count,
+                    'formatted_sales' => self::formatIndianCurrency($party->total_sales),
+                ]);
+        }
+
+        $formattedGrandSales = self::formatIndianCurrency($grandTotalSales);
+        $topBranch = count($branchSummary) > 0 ? $branchSummary[0] : null;
+
+        return view('reports.sales_report', compact(
+            'branchSummary',
+            'grandTotalSales',
+            'formattedGrandSales',
+            'grandTotalQty',
+            'grandTotalInvoices',
+            'topBranch',
+            'allBranchNames',
+            'totalSyncedRecords',
+            'lastSyncTime',
+            'datePreset',
+            'fromDate',
+            'toDate',
+            'selectedBranch',
+            'searchQuery',
+            'topProducts',
+            'topParties'
+        ));
+    }
+
+    /**
+     * Format number as Indian Currency (Crores, Lakhs, Thousands)
+     */
+    public static function formatIndianCurrency($num): string
+    {
+        $num = (float)$num;
+        $abs = abs($num);
+        $sign = $num < 0 ? '-' : '';
+
+        if ($abs >= 10000000) { // >= 1 Crore (100 Lakhs)
+            return $sign . '₹ ' . number_format($abs / 10000000, 2) . ' Cr';
+        } elseif ($abs >= 100000) { // >= 1 Lakh
+            return $sign . '₹ ' . number_format($abs / 100000, 2) . ' L';
+        } elseif ($abs >= 1000) {
+            return $sign . '₹ ' . number_format($abs / 1000, 1) . ' K';
+        }
+        return $sign . '₹ ' . number_format($abs, 2);
     }
 
     public function executeSalesQuery(Request $request)
