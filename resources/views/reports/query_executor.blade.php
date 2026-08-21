@@ -793,7 +793,7 @@ function filterResultGrid() {
     renderCurrentPage();
 }
 
-// Database Import Execution
+// Database Import Execution (Chunked for Large Datasets)
 async function executeDatabaseImport() {
     if (selectedRowIndexes.size === 0) {
         alert('Please select at least 1 row to import into database.');
@@ -809,7 +809,6 @@ async function executeDatabaseImport() {
 
     const btn = document.getElementById('importBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
 
     // Extract selected rows
     const selectedRows = [];
@@ -819,29 +818,48 @@ async function executeDatabaseImport() {
         }
     });
 
-    try {
-        const res = await fetch(IMPORT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({
-                target_table: targetTable,
-                rows: selectedRows,
-                truncate_old: truncateOld ? 1 : 0
-            })
-        });
+    const totalSelected = selectedRows.length;
+    const chunkSize = 1500;
+    const totalChunks = Math.ceil(totalSelected / chunkSize);
+    let totalImported = 0;
 
-        const data = await res.json();
+    try {
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkRows = selectedRows.slice(i * chunkSize, (i + 1) * chunkSize);
+            const isFirstChunk = (i === 0);
+            const percent = Math.round(((i + 1) / totalChunks) * 100);
+
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Importing ${Math.min((i + 1) * chunkSize, totalSelected).toLocaleString()} / ${totalSelected.toLocaleString()} (${percent}%)...`;
+
+            const res = await fetch(IMPORT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    target_table: targetTable,
+                    rows: chunkRows,
+                    truncate_old: (isFirstChunk && truncateOld) ? 1 : 0,
+                    chunk_index: i,
+                    total_chunks: totalChunks
+                })
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-cloud-arrow-down"></i> Insert Selected to Database';
+                alert(`Import failed on chunk ${i + 1}/${totalChunks}: ` + data.message);
+                return;
+            }
+            totalImported += (data.count || chunkRows.length);
+        }
+
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-cloud-arrow-down"></i> Insert Selected to Database';
+        alert(`🎉 Successfully imported all ${totalImported.toLocaleString()} rows into '${targetTable}'!`);
 
-        if (data.success) {
-            alert('🎉 ' + data.message);
-        } else {
-            alert('Import Error: ' + data.message);
-        }
     } catch (err) {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-cloud-arrow-down"></i> Insert Selected to Database';

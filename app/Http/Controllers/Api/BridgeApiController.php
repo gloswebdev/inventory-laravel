@@ -88,7 +88,7 @@ class BridgeApiController extends Controller
     }
 
     /**
-     * Submit query result from Python Bridge Agent
+     * Submit query result from Python Bridge Agent (Supports Chunking for Large Datasets)
      */
     public function submit(Request $request)
     {
@@ -101,7 +101,7 @@ class BridgeApiController extends Controller
 
         $request->validate([
             'job_token' => 'required|string',
-            'status'    => 'required|string|in:completed,failed',
+            'status'    => 'required|string|in:completed,failed,in_progress',
         ]);
 
         $job = QueryJob::where('job_token', $request->job_token)->first();
@@ -112,29 +112,79 @@ class BridgeApiController extends Controller
             ], 404);
         }
 
-        $isSuccess = $request->status === 'completed';
+        $status = $request->status;
         $rows = $request->input('rows', []);
         $columns = $request->input('columns', []);
+        $isChunked = $request->boolean('is_chunked', false);
+        $chunkIndex = (int)$request->input('chunk_index', 0);
+        $totalChunks = (int)$request->input('total_chunks', 1);
 
-        // Encode rows to string
-        $encodedRows = is_array($rows) ? json_encode($rows, JSON_UNESCAPED_UNICODE) : (string)$rows;
+        if ($status === 'in_progress') {
+            if ($chunkIndex === 0) {
+                $job->result_columns = $columns ?: [];
+                $job->result_rows = json_encode($rows, JSON_UNESCAPED_UNICODE);
+                $job->row_count = (int)$request->input('row_count', count($rows));
+                $job->status = 'running';
+            } else {
+                $existing = json_decode($job->result_rows, true) ?: [];
+                $merged = array_merge($existing, $rows);
+                $job->result_rows = json_encode($merged, JSON_UNESCAPED_UNICODE);
+                $job->status = 'running';
+            }
+            $job->save();
 
+            AppSetting::set('bridge_agent_last_seen', now()->toDateTimeString());
+
+            return response()->json([
+                'status'      => 'success',
+                'message'     => "Chunk {$chunkIndex}/{$totalChunks} received.",
+                'chunk_index' => $chunkIndex,
+            ]);
+        }
+
+        if ($status === 'completed') {
+            if ($isChunked && $chunkIndex > 0) {
+                $existing = json_decode($job->result_rows, true) ?: [];
+                $merged = array_merge($existing, $rows);
+                $encodedRows = json_encode($merged, JSON_UNESCAPED_UNICODE);
+                $finalCount = (int)$request->input('row_count', count($merged));
+            } else {
+                $encodedRows = is_array($rows) ? json_encode($rows, JSON_UNESCAPED_UNICODE) : (string)$rows;
+                $finalCount = (int)$request->input('row_count', is_array($rows) ? count($rows) : 0);
+            }
+
+            $job->update([
+                'status'            => 'completed',
+                'result_columns'    => $columns ?: $job->result_columns ?: [],
+                'result_rows'       => $encodedRows,
+                'row_count'         => $finalCount,
+                'execution_seconds' => (float)$request->input('execution_seconds', 0),
+                'error_message'     => '',
+                'completed_at'      => now(),
+            ]);
+
+            AppSetting::set('bridge_agent_last_seen', now()->toDateTimeString());
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Query job completed successfully.',
+                'job_id'  => $job->id,
+            ]);
+        }
+
+        // Failed
         $job->update([
-            'status'            => $isSuccess ? 'completed' : 'failed',
-            'result_columns'    => $columns ?: [],
-            'result_rows'       => $encodedRows,
-            'row_count'         => is_array($rows) ? count($rows) : (int)$request->input('row_count', 0),
+            'status'            => 'failed',
+            'error_message'     => $request->input('error_message', 'Query execution failed on MSSQL.'),
             'execution_seconds' => (float)$request->input('execution_seconds', 0),
-            'error_message'     => $request->input('error_message'),
             'completed_at'      => now(),
         ]);
 
-        // Keep last-seen fresh
         AppSetting::set('bridge_agent_last_seen', now()->toDateTimeString());
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Query job updated successfully.',
+            'message' => 'Query job marked as failed.',
             'job_id'  => $job->id,
         ]);
     }
@@ -184,10 +234,6 @@ class BridgeApiController extends Controller
         try {
             \Illuminate\Support\Facades\DB::beginTransaction();
 
-            if ($truncateOld && $chunkIndex === 0) {
-                \Illuminate\Support\Facades\DB::table($targetTable)->delete();
-            }
-
             foreach ($rows as $row) {
                 $record = [];
                 $lowerRowKeys = [];
@@ -236,11 +282,21 @@ class BridgeApiController extends Controller
                 if (!empty($record)) $batch[] = $record;
 
                 if (count($batch) >= 500) {
-                    // Incremental mode: delete existing records matching incoming batch dates before insert
-                    if (!$truncateOld && $chunkIndex === 0 && $insertedCount === 0) {
-                        $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
-                        if (!empty($batchDates)) {
-                            \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
+                    // Safe Scoped Deletion on Chunk 0 First Batch
+                    if ($chunkIndex === 0 && $insertedCount === 0) {
+                        if ($targetTable === 'mssql_sales_records') {
+                            $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
+                            if (!empty($batchDates)) {
+                                if ($truncateOld) {
+                                    $minDate = min($batchDates);
+                                    $maxDate = max($batchDates);
+                                    \Illuminate\Support\Facades\DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
+                                } else {
+                                    \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
+                                }
+                            }
+                        } elseif ($truncateOld) {
+                            \Illuminate\Support\Facades\DB::table($targetTable)->delete();
                         }
                     }
                     \Illuminate\Support\Facades\DB::table($targetTable)->insert($batch);
@@ -250,11 +306,21 @@ class BridgeApiController extends Controller
             }
 
             if (!empty($batch)) {
-                // Incremental mode: delete existing records matching incoming batch dates before insert
-                if (!$truncateOld && $chunkIndex === 0 && $insertedCount === 0) {
-                    $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
-                    if (!empty($batchDates)) {
-                        \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
+                // Safe Scoped Deletion on Chunk 0 First Batch (if < 500 rows total)
+                if ($chunkIndex === 0 && $insertedCount === 0) {
+                    if ($targetTable === 'mssql_sales_records') {
+                        $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
+                        if (!empty($batchDates)) {
+                            if ($truncateOld) {
+                                $minDate = min($batchDates);
+                                $maxDate = max($batchDates);
+                                \Illuminate\Support\Facades\DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
+                            } else {
+                                \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
+                            }
+                        }
+                    } elseif ($truncateOld) {
+                        \Illuminate\Support\Facades\DB::table($targetTable)->delete();
                     }
                 }
                 \Illuminate\Support\Facades\DB::table($targetTable)->insert($batch);

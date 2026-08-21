@@ -324,6 +324,8 @@ class QueryExecutorController extends Controller
         $rows = $request->rows;
         $mapping = $request->mapping ?: [];
         $truncateOld = (bool)$request->truncate_old;
+        $chunkIndex = (int)$request->input('chunk_index', 0);
+        $totalChunks = (int)$request->input('total_chunks', 1);
 
         if (!Schema::hasTable($targetTable)) {
             return response()->json([
@@ -390,22 +392,24 @@ class QueryExecutorController extends Controller
 
             DB::beginTransaction();
 
-            // Smart FY / Date-Scoped Replacement for mssql_sales_records
-            if ($targetTable === 'mssql_sales_records') {
-                $incomingDates = array_values(array_filter(array_unique(array_column($processedRecords, 'vouch_date'))));
-                if (!empty($incomingDates)) {
-                    if ($truncateOld) {
-                        // Replaces ONLY the date range / FY of the incoming batch (Leaves historical years 24-25, 25-26 100% intact!)
-                        $minDate = min($incomingDates);
-                        $maxDate = max($incomingDates);
-                        DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
-                    } else {
-                        // Delete only specific incoming dates
-                        DB::table($targetTable)->whereIn('vouch_date', $incomingDates)->delete();
+            // Smart FY / Date-Scoped Replacement on Chunk 0
+            if ($chunkIndex === 0) {
+                if ($targetTable === 'mssql_sales_records') {
+                    $incomingDates = array_values(array_filter(array_unique(array_column($processedRecords, 'vouch_date'))));
+                    if (!empty($incomingDates)) {
+                        if ($truncateOld) {
+                            // Replaces ONLY the date range / FY of the incoming batch (Leaves historical years 24-25, 25-26 100% intact!)
+                            $minDate = min($incomingDates);
+                            $maxDate = max($incomingDates);
+                            DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
+                        } else {
+                            // Delete only specific incoming dates
+                            DB::table($targetTable)->whereIn('vouch_date', $incomingDates)->delete();
+                        }
                     }
+                } elseif ($truncateOld) {
+                    DB::table($targetTable)->delete();
                 }
-            } elseif ($truncateOld) {
-                DB::table($targetTable)->delete();
             }
 
             foreach (array_chunk($processedRecords, 500) as $chunk) {
