@@ -422,7 +422,20 @@
 <script>
 function selectDatePreset(preset) {
     document.getElementById('dateRangeInput').value = preset;
+    if (preset === 'all_time') {
+        const fromInput = document.querySelector('input[name="from_date"]');
+        const toInput = document.querySelector('input[name="to_date"]');
+        if (fromInput) fromInput.value = '';
+        if (toInput) toInput.value = '';
+    }
     document.getElementById('filterForm').submit();
 }
+
+document.querySelectorAll('input[name="from_date"], input[name="to_date"]').forEach(el => {
+    el.addEventListener('change', () => {
+        const dri = document.getElementById('dateRangeInput');
+        if (dri) dri.value = 'custom';
+    });
+});
 </script>
 @endsection

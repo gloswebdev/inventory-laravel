@@ -200,7 +200,30 @@ class BridgeApiController extends Controller
                     if (array_key_exists($normCol, $lowerRowKeys)) {
                         $val = $lowerRowKeys[$normCol];
                         if (str_contains($col, 'date') && $val) {
-                            try { $val = \Carbon\Carbon::parse(trim($val))->format('Y-m-d'); } catch (\Exception $e) { $val = null; }
+                            try {
+                                $cleaned = trim((string)$val);
+                                if (str_contains($cleaned, 'T')) $cleaned = explode('T', $cleaned)[0];
+                                if (str_contains($cleaned, ' ')) $cleaned = explode(' ', $cleaned)[0];
+                                if (str_contains($cleaned, '/')) {
+                                    $parts = explode('/', $cleaned);
+                                    if (count($parts) === 3) {
+                                        if (strlen($parts[0]) === 4) {
+                                            $val = "{$parts[0]}-" . str_pad($parts[1], 2, '0', STR_PAD_LEFT) . "-" . str_pad($parts[2], 2, '0', STR_PAD_LEFT);
+                                        } else {
+                                            $val = "{$parts[2]}-" . str_pad($parts[1], 2, '0', STR_PAD_LEFT) . "-" . str_pad($parts[0], 2, '0', STR_PAD_LEFT);
+                                        }
+                                    }
+                                } elseif (str_contains($cleaned, '-')) {
+                                    $parts = explode('-', $cleaned);
+                                    if (count($parts) === 3 && strlen($parts[0]) !== 4) {
+                                        $val = "{$parts[2]}-" . str_pad($parts[1], 2, '0', STR_PAD_LEFT) . "-" . str_pad($parts[0], 2, '0', STR_PAD_LEFT);
+                                    } else {
+                                        $val = $cleaned;
+                                    }
+                                } else {
+                                    $val = \Carbon\Carbon::parse($cleaned)->format('Y-m-d');
+                                }
+                            } catch (\Throwable $e) { $val = null; }
                         }
                         $record[$col] = $val;
                     }

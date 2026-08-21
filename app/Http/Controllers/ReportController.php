@@ -1331,7 +1331,10 @@ class ReportController extends Controller
         $currentYear = $now->year;
         $fyStartYear = $now->month >= 4 ? $currentYear : $currentYear - 1;
 
-        if ($datePreset === 'today') {
+        if ($datePreset === 'all_time') {
+            $fromDate = null;
+            $toDate = null;
+        } elseif ($datePreset === 'today') {
             $fromDate = $now->toDateString();
             $toDate = $now->toDateString();
         } elseif ($datePreset === 'this_month') {
@@ -1372,28 +1375,28 @@ class ReportController extends Controller
                 ->values();
 
             // Build base query
-            $amtField = $useMssqlTable ? 'calc_net_amt_n' : 'amount';
-            $qtyField = $useMssqlTable ? 'tot_qty' : 'qty';
-            $vouchField = $useMssqlTable ? 'vouch_num' : 'id';
-            $itemField = $useMssqlTable ? 'item_hd_name' : 'item_name';
-            $actField = 'act_name';
+            $amtField = $useMssqlTable ? 'COALESCE(calc_net_amt_n, calc_net_amt, 0)' : 'COALESCE(amount, 0)';
+            $qtyField = $useMssqlTable ? 'COALESCE(tot_qty, 0)' : 'COALESCE(qty, 0)';
+            $vouchField = $useMssqlTable ? 'COALESCE(vouch_num, id)' : 'id';
+            $itemField = $useMssqlTable ? "COALESCE(item_hd_name, user_code, 'Unknown Item')" : "COALESCE(item_name, 'Unknown Item')";
+            $actField = "COALESCE(act_name, 'Direct Customer')";
 
             $query = DB::table($tableName);
 
-            if ($fromDate) {
+            if (!empty($fromDate)) {
                 $query->where('vouch_date', '>=', $fromDate);
             }
-            if ($toDate) {
+            if (!empty($toDate)) {
                 $query->where('vouch_date', '<=', $toDate);
             }
             if (!empty($selectedBranch)) {
                 $query->where($branchCol, $selectedBranch);
             }
             if (!empty($searchQuery)) {
-                $query->where(function($q) use ($searchQuery, $branchCol, $itemField, $actField) {
+                $query->where(function($q) use ($searchQuery, $branchCol) {
                     $q->where($branchCol, 'like', "%{$searchQuery}%")
-                      ->orWhere($itemField, 'like', "%{$searchQuery}%")
-                      ->orWhere($actField, 'like', "%{$searchQuery}%");
+                      ->orWhere('item_hd_name', 'like', "%{$searchQuery}%")
+                      ->orWhere('act_name', 'like', "%{$searchQuery}%");
                 });
             }
 
@@ -1454,11 +1457,11 @@ class ReportController extends Controller
             // 2. Top 8 Selling Items overall
             $topProducts = (clone $query)
                 ->select(
-                    DB::raw("COALESCE({$itemField}, 'Unknown Item') as item_name"),
+                    DB::raw("{$itemField} as item_name"),
                     DB::raw("SUM({$amtField}) as total_sales"),
                     DB::raw("SUM({$qtyField}) as total_qty")
                 )
-                ->groupBy(DB::raw("COALESCE({$itemField}, 'Unknown Item')"))
+                ->groupBy(DB::raw("{$itemField}"))
                 ->orderByDesc('total_sales')
                 ->limit(8)
                 ->get()
@@ -1472,12 +1475,12 @@ class ReportController extends Controller
             // 3. Top 8 Customers / Parties overall
             $topParties = (clone $query)
                 ->select(
-                    DB::raw("COALESCE({$actField}, 'Direct Customer') as party_name"),
+                    DB::raw("{$actField} as party_name"),
                     DB::raw("COALESCE({$branchCol}, '-') as branch_name"),
                     DB::raw("SUM({$amtField}) as total_sales"),
                     DB::raw("COUNT(DISTINCT {$vouchField}) as invoice_count")
                 )
-                ->groupBy(DB::raw("COALESCE({$actField}, 'Direct Customer')"), DB::raw("COALESCE({$branchCol}, '-')"))
+                ->groupBy(DB::raw("{$actField}"), DB::raw("COALESCE({$branchCol}, '-')"))
                 ->orderByDesc('total_sales')
                 ->limit(8)
                 ->get()

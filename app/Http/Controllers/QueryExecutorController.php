@@ -395,11 +395,28 @@ class QueryExecutorController extends Controller
 
         if (str_contains($column, 'date')) {
             try {
-                if (str_contains($val, '/')) {
-                    return Carbon::createFromFormat('d/m/Y', trim($val))->format('Y-m-d');
+                $cleaned = trim((string)$val);
+                if (str_contains($cleaned, 'T')) $cleaned = explode('T', $cleaned)[0];
+                if (str_contains($cleaned, ' ')) $cleaned = explode(' ', $cleaned)[0];
+                if (str_contains($cleaned, '/')) {
+                    $parts = explode('/', $cleaned);
+                    if (count($parts) === 3) {
+                        if (strlen($parts[0]) === 4) {
+                            return "{$parts[0]}-" . str_pad($parts[1], 2, '0', STR_PAD_LEFT) . "-" . str_pad($parts[2], 2, '0', STR_PAD_LEFT);
+                        } else {
+                            return "{$parts[2]}-" . str_pad($parts[1], 2, '0', STR_PAD_LEFT) . "-" . str_pad($parts[0], 2, '0', STR_PAD_LEFT);
+                        }
+                    }
+                } elseif (str_contains($cleaned, '-')) {
+                    $parts = explode('-', $cleaned);
+                    if (count($parts) === 3 && strlen($parts[0]) !== 4) {
+                        return "{$parts[2]}-" . str_pad($parts[1], 2, '0', STR_PAD_LEFT) . "-" . str_pad($parts[0], 2, '0', STR_PAD_LEFT);
+                    } else {
+                        return $cleaned;
+                    }
                 }
-                return Carbon::parse(trim($val))->format('Y-m-d');
-            } catch (\Exception $e) {
+                return Carbon::parse($cleaned)->format('Y-m-d');
+            } catch (\Throwable $e) {
                 return null;
             }
         }
