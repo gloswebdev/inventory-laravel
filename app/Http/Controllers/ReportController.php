@@ -1112,11 +1112,45 @@ class ReportController extends Controller
         // Month filter
         $targetMonth = $request->input('month', date('Y-m'));
 
-        // Load existing targets for this month
+        // The party master is the collection side's source of agents. Anyone who actually
+        // billed this financial year belongs here too, or they could never be given a sales
+        // target -- so both lists are merged.
+        if (Schema::hasTable('mssql_sales_records') && Schema::hasColumn('mssql_sales_records', 'agent_name')) {
+            $fyStart = (now()->month >= 4 ? now()->year : now()->year - 1) . '-04-01';
+
+            $sellingAgents = DB::table('mssql_sales_records')
+                ->selectRaw('DISTINCT TRIM(agent_name) as agent_name')
+                ->whereNotNull('agent_name')
+                ->whereRaw("TRIM(agent_name) <> ''")
+                ->where('vouch_date', '>=', $fyStart)
+                ->pluck('agent_name')
+                ->toArray();
+
+            $agentOptions = collect($agentOptions)->merge($sellingAgents)
+                ->map(fn ($a) => trim($a))
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->toArray();
+        }
+
+        // Collection targets (the original purpose of this screen)
         $targets = \App\Models\AgentTarget::where('target_month', $targetMonth)
             ->get()
             ->pluck('target_amount', 'agent_name')
             ->toArray();
+
+        // Sales targets — a separate table, because an agent's sell number and collect
+        // number are different figures.
+        $salesTargets = Schema::hasTable('agent_sales_targets')
+            ? \App\Models\AgentSalesTarget::where('target_month', $targetMonth)
+                ->get()
+                ->pluck('target_amount', 'agent_name')
+                ->toArray()
+            : [];
+
+        $fyMonths = self::financialYearMonths();
 
         // Load custom teams and their targets
         $dbTeams = \App\Models\Team::all();
@@ -1139,7 +1173,10 @@ class ReportController extends Controller
         $configuredMonths = array_unique(array_merge($configuredAgentMonths, $configuredTeamMonths));
         sort($configuredMonths);
 
-        return view('reports.agent_targets', compact('agentOptions', 'targetMonth', 'targets', 'dbTeams', 'teamTargets', 'configuredMonths'));
+        return view('reports.agent_targets', compact(
+            'agentOptions', 'targetMonth', 'targets', 'salesTargets', 'fyMonths',
+            'dbTeams', 'teamTargets', 'configuredMonths'
+        ));
     }
 
     /**
@@ -1148,35 +1185,64 @@ class ReportController extends Controller
     public function agentTargetsStore(Request $request)
     {
         $request->validate([
-            'month'   => 'required|string',
-            'targets' => 'required|array',
+            'month'         => 'required|string',
+            'targets'       => 'nullable|array',   // collection targets
+            'sales_targets' => 'nullable|array',   // sales targets
         ]);
 
         $month = $request->input('month');
 
-        foreach ($request->input('targets') as $agentName => $amount) {
-            if ($amount === null || $amount === '') {
-                \App\Models\AgentTarget::where('agent_name', $agentName)
-                    ->where('target_month', $month)
-                    ->delete();
-                continue;
-            }
-
-            \App\Models\AgentTarget::updateOrCreate(
-                ['agent_name' => $agentName, 'target_month' => $month],
-                ['target_amount' => (float)$amount]
-            );
+        // Optionally repeat these figures across the rest of the financial year, so a year's
+        // worth of targets does not mean visiting this screen twelve times.
+        $months = [$month];
+        if ($request->boolean('apply_rest_of_fy')) {
+            $months = array_values(array_filter(
+                array_column(self::financialYearMonths(), 'key'),
+                fn ($m) => $m >= $month
+            )) ?: [$month];
         }
 
-        return redirect()->back()->with('success', 'Agent targets updated successfully!');
+        $write = function (string $model, ?array $values) use ($months) {
+            foreach ($values ?? [] as $agentName => $amount) {
+                $agentName = trim((string)$agentName);
+                if ($agentName === '') {
+                    continue;
+                }
+
+                foreach ($months as $m) {
+                    // Blank means "no target", which is not the same as a target of zero --
+                    // so clear the row instead of storing 0.
+                    if ($amount === null || trim((string)$amount) === '') {
+                        $model::where('agent_name', $agentName)->where('target_month', $m)->delete();
+                        continue;
+                    }
+
+                    $model::updateOrCreate(
+                        ['agent_name' => $agentName, 'target_month' => $m],
+                        ['target_amount' => (float)$amount]
+                    );
+                }
+            }
+        };
+
+        $write(\App\Models\AgentTarget::class, $request->input('targets'));
+
+        if (Schema::hasTable('agent_sales_targets')) {
+            $write(\App\Models\AgentSalesTarget::class, $request->input('sales_targets'));
+        }
+
+        $spread = count($months) > 1 ? " (applied to {$months[0]} .. " . end($months) . ')' : '';
+
+        return redirect()->back()->with('success', "Agent targets updated successfully!{$spread}");
     }
 
     public function teamTargetsStore(Request $request)
     {
         $request->validate([
-            'month'         => 'required|string',
-            'targets'       => 'required|array',
-            'agent_targets' => 'nullable|array',
+            'month'               => 'required|string',
+            'targets'             => 'required|array',   // team-level collection goals
+            'agent_targets'       => 'nullable|array',   // member collection targets
+            'agent_sales_targets' => 'nullable|array',   // member sales targets
         ]);
 
         $month = $request->input('month');
@@ -1196,24 +1262,46 @@ class ReportController extends Controller
             );
         }
 
-        // Save Team Members (Agents) targets if provided
-        if ($request->has('agent_targets')) {
-            foreach ($request->input('agent_targets') as $agentName => $amount) {
-                if ($amount === null || $amount === '') {
-                    \App\Models\AgentTarget::where('agent_name', $agentName)
-                        ->where('target_month', $month)
-                        ->delete();
+        // Member targets. Both kinds land in the same tables the Agent Targets tab writes to,
+        // so a member edited here and the same agent edited there are one value, not two.
+        $months = [$month];
+        if ($request->boolean('apply_rest_of_fy')) {
+            $months = array_values(array_filter(
+                array_column(self::financialYearMonths(), 'key'),
+                fn ($m) => $m >= $month
+            )) ?: [$month];
+        }
+
+        $write = function (string $model, ?array $values) use ($months) {
+            foreach ($values ?? [] as $agentName => $amount) {
+                $agentName = trim((string)$agentName);
+                if ($agentName === '') {
                     continue;
                 }
 
-                \App\Models\AgentTarget::updateOrCreate(
-                    ['agent_name' => $agentName, 'target_month' => $month],
-                    ['target_amount' => (float)$amount]
-                );
+                foreach ($months as $m) {
+                    if ($amount === null || trim((string)$amount) === '') {
+                        $model::where('agent_name', $agentName)->where('target_month', $m)->delete();
+                        continue;
+                    }
+
+                    $model::updateOrCreate(
+                        ['agent_name' => $agentName, 'target_month' => $m],
+                        ['target_amount' => (float)$amount]
+                    );
+                }
             }
+        };
+
+        $write(\App\Models\AgentTarget::class, $request->input('agent_targets'));
+
+        if (Schema::hasTable('agent_sales_targets')) {
+            $write(\App\Models\AgentSalesTarget::class, $request->input('agent_sales_targets'));
         }
 
-        return redirect()->back()->with('success', 'Team and Member targets updated successfully!');
+        $spread = count($months) > 1 ? " (applied to {$months[0]} .. " . end($months) . ')' : '';
+
+        return redirect()->back()->with('success', "Team and Member targets updated successfully!{$spread}");
     }
 
     public function teamsSetup()
@@ -1312,6 +1400,150 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Transaction types the sales report can be sliced by.
+     *
+     * Sale vs Sale Return and Stock Transfer come straight from the ERP's own series master
+     * (Bill_Ser.type and Bill_Ser.Stock_Trans, synced as series_type / is_stock_transfer), so
+     * there is no guessing from series names any more.
+     */
+    public const TXN_TYPES = [
+        'sale'           => ['label' => 'Sale',           'icon' => '🧾', 'hint' => 'Cash + credit sales'],
+        'sale_return'    => ['label' => 'Sale Return',    'icon' => '↩️', 'hint' => 'Goods returned by customers'],
+        'credit_note'    => ['label' => 'Credit Note',    'icon' => '📝', 'hint' => 'Rate / scheme adjustments'],
+        'stock_transfer' => ['label' => 'Stock Transfer', 'icon' => '🚚', 'hint' => 'Branch to branch movement'],
+    ];
+
+    /** A sales report shows trade, not internal movement, so transfers are off by default. */
+    public const DEFAULT_TXN_TYPES = ['sale', 'sale_return', 'credit_note'];
+
+    /**
+     * The ERP marks these as returns (Bill_Ser.type = 'SR') but they are credit notes, not
+     * goods coming back. Nothing in Bill_Ser separates the two, so the split is by series.
+     */
+    public const CREDIT_NOTE_SERIES = ['ISCR', 'MDS', 'SPCN', 'CNSW', 'SWCN', 'LKCN'];
+
+    /**
+     * Series lists used only for rows the sync agent has not classified yet (series_type is
+     * NULL). Once a row has been through the agent, series_type / is_stock_transfer decide.
+     */
+    public const LEGACY_RETURN_SERIES = ['AMSR', 'SPSR', 'MSR', 'SWSR', 'LKR', 'LKSR'];
+    public const LEGACY_TRANSFER_SERIES = ['AKST', 'MPST', 'UPST', 'MHST', 'SPST', 'SWPN'];
+
+    /**
+     * Read the requested transaction types, falling back to the default set.
+     */
+    public static function resolveTxnTypes(Request $request): array
+    {
+        $requested = $request->get('txn_types');
+
+        if ($requested === null) {
+            return self::DEFAULT_TXN_TYPES;
+        }
+
+        $types = array_values(array_intersect(
+            array_map('strval', (array)$requested),
+            array_keys(self::TXN_TYPES)
+        ));
+
+        // Everything unticked would produce an empty report, which reads as "no data" rather
+        // than "no filter". Fall back to the default set instead.
+        return $types ?: self::DEFAULT_TXN_TYPES;
+    }
+
+    /**
+     * Narrow a query to the chosen transaction types. No-op when every type is selected, or
+     * when the table predates the series_type / is_stock_transfer columns.
+     */
+    public static function applyTxnTypeFilter($query, array $types, string $tableName)
+    {
+        if (count($types) === count(self::TXN_TYPES)) {
+            return $query;
+        }
+
+        $hasClassification = Schema::hasColumn($tableName, 'series_type')
+            && Schema::hasColumn($tableName, 'is_stock_transfer');
+
+        if (!$hasClassification || !Schema::hasColumn($tableName, 'series')) {
+            return $query;
+        }
+
+        // Series codes come out of the ERP space-padded ("MDS "). MariaDB ignores trailing
+        // spaces on comparison but MySQL 8's default collation does not, so trim explicitly.
+        $series = fn () => DB::raw('TRIM(series)');
+
+        $creditNotes = self::CREDIT_NOTE_SERIES;
+        $returns = self::LEGACY_RETURN_SERIES;
+        $transfers = self::LEGACY_TRANSFER_SERIES;
+        $nonSale = array_merge($creditNotes, $returns, $transfers);
+
+        // Rows the agent has classified are matched on series_type / is_stock_transfer.
+        // Rows it has not reached yet (series_type IS NULL) fall back to the series lists,
+        // so a half-synced table still reports sensibly instead of coming back empty.
+        $classified = [
+            'sale'           => fn ($q) => $q->where('series_type', 'SL')->where('is_stock_transfer', 0),
+            'stock_transfer' => fn ($q) => $q->where('is_stock_transfer', 1),
+            'sale_return'    => fn ($q) => $q->where('series_type', 'SR')->where('is_stock_transfer', 0)
+                                             ->whereNotIn($series(), $creditNotes),
+            'credit_note'    => fn ($q) => $q->where('series_type', 'SR')->where('is_stock_transfer', 0)
+                                             ->whereIn($series(), $creditNotes),
+        ];
+
+        $legacy = [
+            'sale'           => fn ($q) => $q->whereNotIn($series(), $nonSale),
+            'stock_transfer' => fn ($q) => $q->whereIn($series(), $transfers),
+            'sale_return'    => fn ($q) => $q->whereIn($series(), $returns),
+            'credit_note'    => fn ($q) => $q->whereIn($series(), $creditNotes),
+        ];
+
+        return $query->where(function ($outer) use ($types, $classified, $legacy) {
+            foreach ($types as $type) {
+                if (!isset($classified[$type])) {
+                    continue;
+                }
+
+                $outer->orWhere(function ($q) use ($type, $classified) {
+                    $q->whereNotNull('series_type');
+                    $classified[$type]($q);
+                });
+
+                $outer->orWhere(function ($q) use ($type, $legacy) {
+                    $q->whereNull('series_type');
+                    $legacy[$type]($q);
+                });
+            }
+        });
+    }
+
+    /**
+     * Resolve the branch filter into the list of raw values to match on. The table stores
+     * either a numeric branch code or a name depending on which sync wrote the row, so both
+     * forms of every selected branch go into the list.
+     */
+    public static function branchMatchList(array $selectedBranches, array $branchMap): array
+    {
+        $matches = [];
+
+        foreach ($selectedBranches as $selected) {
+            $target = strtoupper(trim((string)$selected));
+            if ($target === '') {
+                continue;
+            }
+
+            $matches[] = $selected;
+            $matches[] = $target;
+
+            foreach ($branchMap as $code => $name) {
+                if (strtoupper($name) === $target || strtoupper((string)$code) === $target) {
+                    $matches[] = (string)$code;
+                    $matches[] = (string)$name;
+                }
+            }
+        }
+
+        return array_values(array_unique($matches));
+    }
+
     public function salesReport(Request $request)
     {
         $user = Auth::user();
@@ -1371,7 +1603,24 @@ class ReportController extends Controller
             // Keep provided $fromDate and $toDate
         }
 
-        $selectedBranch = $request->get('branch');
+        // branches[] is the current form field; `branch` is kept so old bookmarks and the
+        // drill-down links still work.
+        $selectedBranches = array_values(array_filter(
+            array_map('trim', (array)($request->get('branches') ?? $request->get('branch') ?? [])),
+            fn ($b) => $b !== ''
+        ));
+        $selectedBranch = $selectedBranches[0] ?? null;
+
+        // Categories Filter: categories[] or category (supports single click & multi-select)
+        $selectedCategories = array_values(array_filter(
+            array_map('trim', (array)($request->get('categories') ?? $request->get('category') ?? [])),
+            fn ($c) => $c !== '' && strtolower($c) !== 'all'
+        ));
+        $selectedCategory = count($selectedCategories) === 1 ? $selectedCategories[0] : null;
+
+        $selectedTypes = self::resolveTxnTypes($request);
+        $txnTypeOptions = self::TXN_TYPES;
+
         $searchQuery = trim($request->get('search', ''));
 
         $branchSummary = [];
@@ -1379,6 +1628,7 @@ class ReportController extends Controller
         $grandTotalQty = 0;
         $grandTotalInvoices = 0;
         $allBranchNames = [];
+        $allCategories = [];
         $monthlyTrend = [];
         $topProducts = [];
         $topParties = [];
@@ -1416,6 +1666,22 @@ class ReportController extends Controller
                 ->sort()
                 ->values();
 
+            // Distinct product categories for filter bar
+            $categoryCol = Schema::hasColumn($tableName, 'group_name') ? 'group_name' : (Schema::hasColumn($tableName, 'category') ? 'category' : null);
+            if ($categoryCol) {
+                $allCategories = DB::table($tableName)
+                    ->whereNotNull($categoryCol)
+                    ->where($categoryCol, '!=', '')
+                    ->where($categoryCol, '!=', '(NIL)')
+                    ->distinct()
+                    ->orderBy($categoryCol)
+                    ->pluck($categoryCol)
+                    ->map(fn($c) => trim((string)$c))
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+
             // Build base query
             $amtField = $useMssqlTable ? 'COALESCE(calc_net_amt_n, calc_net_amt, 0)' : 'COALESCE(amount, 0)';
             $qtyField = $useMssqlTable ? 'COALESCE(tot_qty, 0)' : 'COALESCE(qty, 0)';
@@ -1431,43 +1697,28 @@ class ReportController extends Controller
             if (!empty($toDate)) {
                 $query->where('vouch_date', '<=', $toDate);
             }
-            if (!empty($selectedBranch)) {
-                $targetName = strtoupper(trim($selectedBranch));
-                $matchList = [$selectedBranch, $targetName];
-                foreach ($branchMap as $code => $name) {
-                    if (strtoupper($name) === $targetName || strtoupper($code) === $targetName) {
-                        $matchList[] = (string)$code;
-                        $matchList[] = (string)$name;
-                    }
-                }
-                $query->whereIn($branchCol, array_unique($matchList));
+            if (!empty($selectedBranches)) {
+                $query->whereIn($branchCol, self::branchMatchList($selectedBranches, $branchMap));
+            }
+            if (!empty($selectedCategories) && $categoryCol) {
+                $query->whereIn($categoryCol, $selectedCategories);
             }
             if (!empty($searchQuery)) {
-                $query->where(function($q) use ($searchQuery, $branchCol) {
-                    $q->where($branchCol, 'like', "%{$searchQuery}%");
-                    if (Schema::hasColumn('mssql_sales_records', 'item_hd_name') || Schema::hasColumn('sales_registers', 'item_hd_name')) {
-                        $q->orWhere('item_hd_name', 'like', "%{$searchQuery}%");
-                    }
-                    if (Schema::hasColumn('sales_registers', 'item_name') || Schema::hasColumn('mssql_sales_records', 'item_name')) {
-                        $q->orWhere('item_name', 'like', "%{$searchQuery}%");
-                    }
-                    if (Schema::hasColumn('sales_registers', 'act_name') || Schema::hasColumn('mssql_sales_records', 'act_name')) {
-                        $q->orWhere('act_name', 'like', "%{$searchQuery}%");
+                // Only search columns that exist on the table actually being queried.
+                $searchable = array_values(array_filter(
+                    [$branchCol, 'item_hd_name', 'item_name', 'act_name', 'agent_name', 'vouch_num', 'user_code', $categoryCol],
+                    fn ($col) => !empty($col) && Schema::hasColumn($tableName, $col)
+                ));
+
+                $query->where(function ($q) use ($searchQuery, $searchable) {
+                    foreach ($searchable as $col) {
+                        $q->orWhere($col, 'like', "%{$searchQuery}%");
                     }
                 });
             }
 
-            // Exclude non-sales Stock Transfers if series column is present
-            if ($useMssqlTable && Schema::hasColumn('mssql_sales_records', 'series')) {
-                $query->where(function($q) {
-                    $q->whereNull('series')
-                      ->orWhere(function($sq) {
-                          $sq->where('series', 'not like', '%ST%')
-                             ->where('series', 'not like', '%TR%')
-                             ->orWhereIn('series', ['AKST', 'MPST', 'UPST', 'SWPN']);
-                      });
-                });
-            }
+            // Transaction type filter
+            self::applyTxnTypeFilter($query, $selectedTypes, $tableName);
 
             // 1. Consolidated Branch Grouping
             $rawBranches = (clone $query)
@@ -1588,6 +1839,21 @@ class ReportController extends Controller
                         'formatted_sales' => self::formatIndianCurrency($party->total_sales),
                     ];
                 });
+            // 4. Multi-Year YoY Comparison (Same period / till date across Current FY, Last FY, 2 Years Ago)
+            $yoyComparison = self::computeYoYComparison(
+                $tableName,
+                $useMssqlTable,
+                $fromDate,
+                $toDate,
+                $datePreset,
+                $selectedBranches,
+                $selectedCategories,
+                $selectedTypes,
+                $searchQuery,
+                $branchMap
+            );
+        } else {
+            $yoyComparison = [];
         }
 
         $formattedGrandSales = self::formatIndianCurrency($grandTotalSales);
@@ -1601,12 +1867,19 @@ class ReportController extends Controller
             'grandTotalInvoices',
             'topBranch',
             'allBranchNames',
+            'allCategories',
+            'selectedCategory',
+            'selectedCategories',
+            'yoyComparison',
             'totalSyncedRecords',
             'lastSyncTime',
             'datePreset',
             'fromDate',
             'toDate',
             'selectedBranch',
+            'selectedBranches',
+            'selectedTypes',
+            'txnTypeOptions',
             'searchQuery',
             'topProducts',
             'topParties'
@@ -1614,37 +1887,340 @@ class ReportController extends Controller
     }
 
     /**
-     * AJAX/JSON API for Interactive Branch Sales Drill-down:
-     * - If 'series' is null: returns Level 1 Series breakdown for requested branch.
-     * - If 'series' is provided: returns Level 2 Product Categories / Groups breakdown for that series.
+     * Compute Year-over-Year (YoY) Multi-Year Sales Comparison for the same date window / till date,
+     * respecting all user filters (branches, category, transaction types, search).
      */
-    public function salesDrilldown(Request $request)
+    public static function computeYoYComparison(
+        string $tableName,
+        bool $useMssqlTable,
+        ?string $fromDate,
+        ?string $toDate,
+        string $datePreset,
+        array $selectedBranches,
+        array $selectedCategories,
+        array $selectedTypes,
+        string $searchQuery,
+        array $branchMap
+    ): array {
+        $amtField   = $useMssqlTable ? 'COALESCE(calc_net_amt_n, calc_net_amt, 0)' : 'COALESCE(amount, 0)';
+        $qtyField   = $useMssqlTable ? 'COALESCE(tot_qty, 0)' : 'COALESCE(qty, 0)';
+        $vouchField = $useMssqlTable ? 'COALESCE(vouch_num, id)' : 'id';
+        $branchCol  = $useMssqlTable ? 'branch_name' : 'branch';
+        $categoryCol = Schema::hasColumn($tableName, 'group_name') ? 'group_name' : (Schema::hasColumn($tableName, 'category') ? 'category' : null);
+
+        $today = now()->format('Y-m-d');
+        $maxDbDate = DB::table($tableName)->max('vouch_date') ?? $today;
+
+        // Base dates for Current Period
+        if (!empty($fromDate) && !empty($toDate) && $datePreset === 'custom') {
+            $curFrom = $fromDate;
+            $curTo   = $toDate;
+        } elseif ($datePreset === 'prev_fy') {
+            $curFrom = '2025-04-01';
+            $curTo   = '2026-03-31';
+        } elseif ($datePreset === 'fy_24_25') {
+            $curFrom = '2024-04-01';
+            $curTo   = '2025-03-31';
+        } else {
+            // Default (this_fy / all_time / today / this_month / etc.):
+            if (!empty($fromDate)) {
+                $curFrom = $fromDate;
+                $curTo   = !empty($toDate) ? $toDate : $maxDbDate;
+            } else {
+                $curFrom = '2026-04-01';
+                $curTo   = min($maxDbDate, $today);
+            }
+        }
+
+        // Calculate equivalent date windows in 1 Year Ago (LY) and 2 Years Ago (LLY)
+        try {
+            $cFromObj = \Carbon\Carbon::parse($curFrom);
+            $cToObj   = \Carbon\Carbon::parse($curTo);
+
+            $lyFrom   = $cFromObj->copy()->subYear()->format('Y-m-d');
+            $lyTo     = $cToObj->copy()->subYear()->format('Y-m-d');
+
+            $llyFrom  = $cFromObj->copy()->subYears(2)->format('Y-m-d');
+            $llyTo    = $cToObj->copy()->subYears(2)->format('Y-m-d');
+        } catch (\Exception $e) {
+            $curFrom = '2026-04-01';
+            $curTo   = $maxDbDate;
+            $lyFrom  = '2025-04-01';
+            $lyTo    = '2025-08-24';
+            $llyFrom = '2024-04-01';
+            $llyTo   = '2024-08-24';
+        }
+
+        // Helper query builder that applies all filters
+        $buildFilteredQuery = function ($startDt, $endDt) use (
+            $tableName, $branchCol, $categoryCol, $selectedBranches, $selectedCategories,
+            $selectedTypes, $searchQuery, $branchMap
+        ) {
+            $q = DB::table($tableName)->whereBetween('vouch_date', [$startDt, $endDt]);
+
+            if (!empty($selectedBranches)) {
+                $q->whereIn($branchCol, self::branchMatchList($selectedBranches, $branchMap));
+            }
+            if (!empty($selectedCategories) && $categoryCol) {
+                $q->whereIn($categoryCol, $selectedCategories);
+            }
+            if (!empty($searchQuery)) {
+                $searchable = array_values(array_filter(
+                    [$branchCol, 'item_hd_name', 'item_name', 'act_name', 'agent_name', 'vouch_num', 'user_code', $categoryCol],
+                    fn ($col) => !empty($col) && Schema::hasColumn($tableName, $col)
+                ));
+                $q->where(function ($sub) use ($searchQuery, $searchable) {
+                    foreach ($searchable as $col) {
+                        $sub->orWhere($col, 'like', "%{$searchQuery}%");
+                    }
+                });
+            }
+            self::applyTxnTypeFilter($q, $selectedTypes, $tableName);
+            return $q;
+        };
+
+        // Query Aggregations for the 3 Periods
+        $curData = $buildFilteredQuery($curFrom, $curTo)->select(
+            DB::raw("COALESCE(SUM({$amtField}), 0) as total_sales"),
+            DB::raw("COALESCE(SUM({$qtyField}), 0) as total_qty"),
+            DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices")
+        )->first();
+
+        $lyData = $buildFilteredQuery($lyFrom, $lyTo)->select(
+            DB::raw("COALESCE(SUM({$amtField}), 0) as total_sales"),
+            DB::raw("COALESCE(SUM({$qtyField}), 0) as total_qty"),
+            DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices")
+        )->first();
+
+        $llyData = $buildFilteredQuery($llyFrom, $llyTo)->select(
+            DB::raw("COALESCE(SUM({$amtField}), 0) as total_sales"),
+            DB::raw("COALESCE(SUM({$qtyField}), 0) as total_qty"),
+            DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices")
+        )->first();
+
+        $curSales = (float)($curData->total_sales ?? 0);
+        $lySales  = (float)($lyData->total_sales ?? 0);
+        $llySales = (float)($llyData->total_sales ?? 0);
+
+        // Growth vs Last Year
+        $lyDiff = $curSales - $lySales;
+        $lyGrowthPct = $lySales > 0 ? round(($lyDiff / $lySales) * 100, 1) : 0;
+
+        // Growth vs 2 Years Ago
+        $llyDiff = $curSales - $llySales;
+        $llyGrowthPct = $llySales > 0 ? round(($llyDiff / $llySales) * 100, 1) : 0;
+
+        $maxVal = max(1.0, $curSales, $lySales, $llySales);
+
+        // Helper function for branch breakdown for any date window
+        $getBranchBreakdown = function ($startDt, $endDt) use ($buildFilteredQuery, $branchCol, $amtField, $qtyField, $vouchField, $branchMap) {
+            $rows = $buildFilteredQuery($startDt, $endDt)
+                ->select(
+                    DB::raw("COALESCE({$branchCol}, 'HEAD OFFICE') as branch_name"),
+                    DB::raw("COALESCE(SUM({$amtField}), 0) as total_sales"),
+                    DB::raw("COALESCE(SUM({$qtyField}), 0) as total_qty"),
+                    DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices")
+                )
+                ->groupBy(DB::raw("COALESCE({$branchCol}, 'HEAD OFFICE')"))
+                ->get();
+
+            $branches = [];
+            foreach ($rows as $r) {
+                $raw = trim((string)$r->branch_name);
+                $mapped = $branchMap[$raw] ?? $raw;
+                if (!isset($branches[$mapped])) {
+                    $branches[$mapped] = [
+                        'name'            => $mapped,
+                        'total_sales'     => 0,
+                        'total_qty'       => 0,
+                        'total_invoices'  => 0,
+                        'formatted_sales' => '₹ 0.00',
+                    ];
+                }
+                $branches[$mapped]['total_sales'] += (float)$r->total_sales;
+                $branches[$mapped]['total_qty'] += (float)$r->total_qty;
+                $branches[$mapped]['total_invoices'] += (int)$r->total_invoices;
+            }
+
+            usort($branches, fn($a, $b) => $b['total_sales'] <=> $a['total_sales']);
+
+            foreach ($branches as &$b) {
+                $b['formatted_sales'] = self::formatIndianCurrency($b['total_sales']);
+            }
+            unset($b);
+
+            return array_values($branches);
+        };
+
+        $curBranches = $getBranchBreakdown($curFrom, $curTo);
+        $lyBranches  = $getBranchBreakdown($lyFrom, $lyTo);
+        $llyBranches = $getBranchBreakdown($llyFrom, $llyTo);
+
+        // Map branches for direct key lookup
+        $curBranchMap = array_column($curBranches, null, 'name');
+        $lyBranchMap  = array_column($lyBranches, null, 'name');
+        $llyBranchMap = array_column($llyBranches, null, 'name');
+
+        // All distinct branch names across the 3 periods
+        $allBranchNamesList = array_values(array_unique(array_merge(
+            array_keys($curBranchMap),
+            array_keys($lyBranchMap),
+            array_keys($llyBranchMap)
+        )));
+
+        $branchComparison = [];
+        foreach ($allBranchNamesList as $bName) {
+            $cSales = (float)($curBranchMap[$bName]['total_sales'] ?? 0);
+            $lSales = (float)($lyBranchMap[$bName]['total_sales'] ?? 0);
+            $llSales = (float)($llyBranchMap[$bName]['total_sales'] ?? 0);
+
+            $diff = $cSales - $lSales;
+            $growth = $lSales > 0 ? round(($diff / $lSales) * 100, 1) : ($cSales > 0 ? 100.0 : 0.0);
+
+            $branchComparison[] = [
+                'name'            => $bName,
+                'cur_sales'       => $cSales,
+                'formatted_cur'   => self::formatIndianCurrency($cSales),
+                'ly_sales'        => $lSales,
+                'formatted_ly'    => self::formatIndianCurrency($lSales),
+                'lly_sales'       => $llSales,
+                'formatted_lly'   => self::formatIndianCurrency($llSales),
+                'diff'            => $diff,
+                'growth_percent'  => $growth,
+                'is_growth'       => $diff >= 0,
+            ];
+        }
+
+        usort($branchComparison, fn($a, $b) => $b['cur_sales'] <=> $a['cur_sales']);
+
+        return [
+            'current' => [
+                'fy_label'        => 'FY 26-27 (Current)',
+                'badge'           => '🟢 Current FY',
+                'from_date'       => $curFrom,
+                'to_date'         => $curTo,
+                'display_period'  => \Carbon\Carbon::parse($curFrom)->format('d M Y') . ' → ' . \Carbon\Carbon::parse($curTo)->format('d M Y'),
+                'total_sales'     => $curSales,
+                'formatted_sales' => self::formatIndianCurrency($curSales),
+                'exact_sales'     => '₹ ' . number_format($curSales, 2),
+                'total_qty'       => (float)($curData->total_qty ?? 0),
+                'total_invoices'  => (int)($curData->total_invoices ?? 0),
+                'bar_percent'     => round(($curSales / $maxVal) * 100, 1),
+                'branches'        => $curBranches,
+            ],
+            'last_year' => [
+                'fy_label'        => 'FY 25-26 (Last Year)',
+                'badge'           => '📅 1 Year Ago (Same Period)',
+                'from_date'       => $lyFrom,
+                'to_date'         => $lyTo,
+                'display_period'  => \Carbon\Carbon::parse($lyFrom)->format('d M Y') . ' → ' . \Carbon\Carbon::parse($lyTo)->format('d M Y'),
+                'total_sales'     => $lySales,
+                'formatted_sales' => self::formatIndianCurrency($lySales),
+                'exact_sales'     => '₹ ' . number_format($lySales, 2),
+                'total_qty'       => (float)($lyData->total_qty ?? 0),
+                'total_invoices'  => (int)($lyData->total_invoices ?? 0),
+                'diff_sales'      => $lyDiff,
+                'growth_percent'  => $lyGrowthPct,
+                'is_growth'       => $lyDiff >= 0,
+                'formatted_diff'  => ($lyDiff >= 0 ? '+' : '') . self::formatIndianCurrency($lyDiff) . ' (' . ($lyGrowthPct >= 0 ? '+' : '') . $lyGrowthPct . '%)',
+                'bar_percent'     => round(($lySales / $maxVal) * 100, 1),
+                'branches'        => $lyBranches,
+            ],
+            'two_years_ago' => [
+                'fy_label'        => 'FY 24-25 (2 Years Ago)',
+                'badge'           => '📜 2 Years Ago (Same Period)',
+                'from_date'       => $llyFrom,
+                'to_date'         => $llyTo,
+                'display_period'  => \Carbon\Carbon::parse($llyFrom)->format('d M Y') . ' → ' . \Carbon\Carbon::parse($llyTo)->format('d M Y'),
+                'total_sales'     => $llySales,
+                'formatted_sales' => self::formatIndianCurrency($llySales),
+                'exact_sales'     => '₹ ' . number_format($llySales, 2),
+                'total_qty'       => (float)($llyData->total_qty ?? 0),
+                'total_invoices'  => (int)($llyData->total_invoices ?? 0),
+                'diff_sales'      => $llyDiff,
+                'growth_percent'  => $llyGrowthPct,
+                'is_growth'       => $llyDiff >= 0,
+                'formatted_diff'  => ($llyDiff >= 0 ? '+' : '') . self::formatIndianCurrency($llyDiff) . ' (' . ($llyGrowthPct >= 0 ? '+' : '') . $llyGrowthPct . '%)',
+                'bar_percent'     => round(($llySales / $maxVal) * 100, 1),
+                'branches'        => $llyBranches,
+            ],
+            'branch_comparison' => $branchComparison,
+        ];
+    }
+
+    /**
+     * Category styling metadata (emoji icon, human-readable label, CSS classes)
+     */
+    public static function categoryMeta(string $catName): array
     {
-        $branch = trim($request->get('branch', ''));
-        $series = trim($request->get('series', ''));
+        $upper = strtoupper(trim($catName));
+        return match($upper) {
+            'HERBICIDE' => [
+                'icon'         => '🌿',
+                'label'        => 'Herbicide',
+                'badge_class'  => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                'active_class' => 'bg-emerald-600 text-white shadow-emerald-600/30 border-emerald-600',
+                'color'        => 'emerald',
+            ],
+            'FUNGICIDE' => [
+                'icon'         => '🍄',
+                'label'        => 'Fungicide',
+                'badge_class'  => 'bg-teal-50 text-teal-700 border border-teal-200',
+                'active_class' => 'bg-teal-600 text-white shadow-teal-600/30 border-teal-600',
+                'color'        => 'teal',
+            ],
+            'INSECTICIDE' => [
+                'icon'         => '🐛',
+                'label'        => 'Insecticide',
+                'badge_class'  => 'bg-amber-50 text-amber-700 border border-amber-200',
+                'active_class' => 'bg-amber-600 text-white shadow-amber-600/30 border-amber-600',
+                'color'        => 'amber',
+            ],
+            'PLANT GROWTH REGULATOR', 'PGR' => [
+                'icon'         => '🌱',
+                'label'        => 'PGR / Growth Reg.',
+                'badge_class'  => 'bg-lime-50 text-lime-700 border border-lime-200',
+                'active_class' => 'bg-lime-600 text-white shadow-lime-600/30 border-lime-600',
+                'color'        => 'lime',
+            ],
+            'ORGANIC MANURE' => [
+                'icon'         => '🍂',
+                'label'        => 'Organic Manure',
+                'badge_class'  => 'bg-orange-50 text-orange-700 border border-orange-200',
+                'active_class' => 'bg-orange-600 text-white shadow-orange-600/30 border-orange-600',
+                'color'        => 'orange',
+            ],
+            'ANTIBIOTIC' => [
+                'icon'         => '💊',
+                'label'        => 'Antibiotic',
+                'badge_class'  => 'bg-sky-50 text-sky-700 border border-sky-200',
+                'active_class' => 'bg-sky-600 text-white shadow-sky-600/30 border-sky-600',
+                'color'        => 'sky',
+            ],
+            '100% SOLUBLE IN WATER', 'WATER SOLUBLE FERTILIZERS' => [
+                'icon'         => '💧',
+                'label'        => '100% Soluble',
+                'badge_class'  => 'bg-blue-50 text-blue-700 border border-blue-200',
+                'active_class' => 'bg-blue-600 text-white shadow-blue-600/30 border-blue-600',
+                'color'        => 'blue',
+            ],
+            default => [
+                'icon'         => '🧪',
+                'label'        => ucwords(strtolower($catName)),
+                'badge_class'  => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+                'active_class' => 'bg-indigo-600 text-white shadow-indigo-600/30 border-indigo-600',
+                'color'        => 'indigo',
+            ],
+        };
+    }
 
-        if (empty($branch)) {
-            return response()->json(['status' => 'error', 'message' => 'Branch is required'], 400);
-        }
-
-        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
-        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
-        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
-
-        if (!$tableName) {
-            return response()->json([
-                'status'                => 'success',
-                'level'                 => 'series',
-                'branch'                => $branch,
-                'series'                => $series,
-                'items'                 => [],
-                'total_sales'           => 0,
-                'formatted_total_sales' => '₹ 0.00',
-            ]);
-        }
-
-        // Branch Dictionary
-        $branchMap = [
+    /**
+     * Numeric branch code -> display name. The table stores whichever form the sync that
+     * wrote the row happened to use, so both are needed when filtering.
+     */
+    public static function branchCodeMap(): array
+    {
+        $map = [
             '2'  => 'FACTORY (HO)',
             '3'  => 'AKOLA',
             '6'  => 'PUNE',
@@ -1652,14 +2228,24 @@ class ReportController extends Controller
             '13' => 'GHAZIABAD',
             '14' => 'LUCKNOW',
         ];
+
         if (Schema::hasTable('branches')) {
-            foreach (\App\Models\Branch::all() as $br) {
-                if (!empty($br->code)) $branchMap[(string)$br->code] = strtoupper($br->name);
+            foreach (\App\Models\Branch::all() as $branch) {
+                if (!empty($branch->code)) {
+                    $map[(string)$branch->code] = strtoupper($branch->name);
+                }
             }
         }
 
-        // Series Friendly Names Dictionary (Exact ERP Descriptions)
-        $seriesNames = [
+        return $map;
+    }
+
+    /**
+     * Series code -> the description used in the ERP's own reports.
+     */
+    public static function seriesLabels(): array
+    {
+        return [
             'AMSR' => 'Akola Sales Return',
             'ISCR' => 'Akola Credit Note',
             'AKST' => 'Akola Stock Transfer',
@@ -1682,9 +2268,9 @@ class ReportController extends Controller
             'AKLF' => 'Akola Fertilizer Sale',
             'LKN'  => 'Lucknow Credit Sale',
             'LKR'  => 'Lucknow Sale Return',
-            // Additional variations / fallbacks
             'SPCN' => 'Pune Return Credit Note',
             'SPST' => 'Pune Stock Transfer',
+            'CNSW' => 'Ghaziabad Credit Note',
             'PNF'  => 'Pune Local / Factory',
             'LKS'  => 'Lucknow Credit Sale',
             'LKSL' => 'Lucknow Credit Sale',
@@ -1692,69 +2278,265 @@ class ReportController extends Controller
             'LKLF' => 'Lucknow Local Sales',
             'LKSR' => 'Lucknow Sale Return',
         ];
+    }
 
-        // Date Range logic
-        $datePreset = $request->get('date_range');
-        $fromDate = $request->get('from_date');
-        $toDate = $request->get('to_date');
+    /**
+     * Turn the date_range preset (or an explicit from/to) into [$fromDate, $toDate].
+     * Both can come back null, which means "all time".
+     */
+    public static function resolveDateWindow(Request $request): array
+    {
+        $preset = $request->get('date_range');
+        $from = $request->get('from_date');
+        $to = $request->get('to_date');
 
         $now = now();
-        $currentYear = $now->year;
-        $fyStartYear = $now->month >= 4 ? $currentYear : $currentYear - 1;
+        $fyStart = $now->month >= 4 ? $now->year : $now->year - 1;
 
-        if (empty($datePreset)) {
-            if (!empty($fromDate) || !empty($toDate)) {
-                $datePreset = 'custom';
-            } else {
-                $datePreset = 'this_fy';
+        if (empty($preset)) {
+            $preset = (!empty($from) || !empty($to)) ? 'custom' : 'this_fy';
+        }
+
+        return match ($preset) {
+            'today'      => [$now->toDateString(), $now->toDateString()],
+            'this_month' => [$now->copy()->startOfMonth()->toDateString(), $now->copy()->endOfMonth()->toDateString()],
+            'last_month' => [
+                $now->copy()->subMonth()->startOfMonth()->toDateString(),
+                $now->copy()->subMonth()->endOfMonth()->toDateString(),
+            ],
+            'this_fy'    => ["{$fyStart}-04-01", ($fyStart + 1) . '-03-31'],
+            'prev_fy'    => [($fyStart - 1) . '-04-01', "{$fyStart}-03-31"],
+            'fy_24_25'   => ['2024-04-01', '2025-03-31'],
+            'all_time'   => [null, null],
+            default      => [$from, $to],
+        };
+    }
+
+    /**
+     * The twelve 'YYYY-MM' keys of a financial year, April to March.
+     */
+    public static function financialYearMonths(?int $startYear = null): array
+    {
+        $now = now();
+        $startYear ??= $now->month >= 4 ? $now->year : $now->year - 1;
+
+        $cursor = \Carbon\Carbon::create($startYear, 4, 1);
+        $months = [];
+
+        for ($i = 0; $i < 12; $i++) {
+            $months[] = ['key' => $cursor->format('Y-m'), 'label' => $cursor->format('M y')];
+            $cursor->addMonth();
+        }
+
+        return $months;
+    }
+
+    /**
+     * Save a whole financial year of agent targets in one go.
+     *
+     * Payload: targets[<agent name>][<YYYY-MM>] = amount. A blank cell deletes that month's
+     * target rather than storing zero, so "no target set" and "target of zero" stay distinct.
+     */
+    public function salesAgentTargetsStore(Request $request)
+    {
+        $request->validate([
+            'targets' => 'required|array',
+        ]);
+
+        $saved = 0;
+        $cleared = 0;
+
+        foreach ($request->input('targets') as $agentName => $months) {
+            $agentName = trim((string)$agentName);
+
+            if ($agentName === '' || !is_array($months)) {
+                continue;
+            }
+
+            foreach ($months as $month => $amount) {
+                if (!preg_match('/^\d{4}-\d{2}$/', (string)$month)) {
+                    continue;
+                }
+
+                if ($amount === null || trim((string)$amount) === '') {
+                    $cleared += \App\Models\AgentSalesTarget::where('agent_name', $agentName)
+                        ->where('target_month', $month)
+                        ->delete();
+                    continue;
+                }
+
+                \App\Models\AgentSalesTarget::updateOrCreate(
+                    ['agent_name' => $agentName, 'target_month' => $month],
+                    ['target_amount' => (float)$amount]
+                );
+                $saved++;
             }
         }
 
-        if ($datePreset === 'today') {
-            $fromDate = $now->toDateString();
-            $toDate = $now->toDateString();
-        } elseif ($datePreset === 'this_month') {
-            $fromDate = $now->copy()->startOfMonth()->toDateString();
-            $toDate = $now->copy()->endOfMonth()->toDateString();
-        } elseif ($datePreset === 'last_month') {
-            $fromDate = $now->copy()->subMonth()->startOfMonth()->toDateString();
-            $toDate = $now->copy()->subMonth()->endOfMonth()->toDateString();
-        } elseif ($datePreset === 'this_fy') {
-            $fromDate = "{$fyStartYear}-04-01";
-            $toDate = ($fyStartYear + 1) . "-03-31";
-        } elseif ($datePreset === 'prev_fy') {
-            $fromDate = ($fyStartYear - 1) . "-04-01";
-            $toDate = "{$fyStartYear}-03-31";
-        } elseif ($datePreset === 'fy_24_25') {
-            $fromDate = "2024-04-01";
-            $toDate = "2025-03-31";
-        } elseif ($datePreset === 'all_time') {
-            $fromDate = null;
-            $toDate = null;
+        return redirect()->back()->with(
+            'success',
+            "Agent targets saved — {$saved} month value(s) updated" . ($cleared ? ", {$cleared} cleared." : '.')
+        );
+    }
+
+    /**
+     * Levels of the sales drill-down, in order.
+     *
+     * A branch card is the entry point; each level below drills one step further and carries
+     * every level above it as a filter. Reordering the chain or adding a level (godown, city,
+     * ...) is a change to this array only -- the query builder and both views are generic.
+     */
+    public const DRILL_LEVELS = [
+        ['key' => 'agent',    'label' => 'Agent',            'column' => 'agent_name',   'icon' => '👤'],
+        ['key' => 'category', 'label' => 'Product Category', 'column' => 'group_name',   'icon' => '🧪'],
+        ['key' => 'series',   'label' => 'Sale Type',        'column' => 'series',       'icon' => '🧾'],
+        ['key' => 'party',    'label' => 'Party',            'column' => 'act_name',     'icon' => '🏪'],
+        ['key' => 'bill',     'label' => 'Bill No',          'column' => 'vouch_num',    'icon' => '📄'],
+        ['key' => 'item',     'label' => 'Product',          'column' => 'item_hd_name', 'icon' => '📦'],
+    ];
+
+    /** URL value meaning "the rows where this level is blank". */
+    public const DRILL_BLANK = '__blank__';
+
+    /**
+     * The 'YYYY-MM' keys a date range covers, which is how agent_targets stores a month.
+     * A range that touches only part of a month still counts that month whole -- the UI
+     * shows the month count alongside the figure so the basis is never hidden.
+     */
+    public static function monthsInRange(?string $from, ?string $to): array
+    {
+        if (empty($from) || empty($to)) {
+            return [];
         }
 
-        $amtField = $useMssqlTable ? 'COALESCE(calc_net_amt_n, calc_net_amt, 0)' : 'COALESCE(amount, 0)';
-        $qtyField = $useMssqlTable ? 'COALESCE(tot_qty, 0)' : 'COALESCE(qty, 0)';
+        $cursor = \Carbon\Carbon::parse($from)->startOfMonth();
+        $last = \Carbon\Carbon::parse($to)->startOfMonth();
+        $months = [];
+
+        // Guard against a reversed range, and against an absurd span from a bad URL.
+        while ($cursor->lte($last) && count($months) < 120) {
+            $months[] = $cursor->format('Y-m');
+            $cursor->addMonth();
+        }
+
+        return $months;
+    }
+
+    /**
+     * Total agent target for a date range: ['AGENT NAME' => ['target' => float, 'months' => int]].
+     * Returns an empty array for an open-ended range (All Time), where no target applies.
+     */
+    public static function agentTargetsForPeriod(?string $from, ?string $to): array
+    {
+        $months = self::monthsInRange($from, $to);
+
+        if (empty($months) || !Schema::hasTable('agent_sales_targets')) {
+            return [];
+        }
+
+        $rows = \App\Models\AgentSalesTarget::whereIn('target_month', $months)
+            ->selectRaw('TRIM(agent_name) as agent_name')
+            ->selectRaw('SUM(target_amount) as total_target')
+            ->selectRaw('COUNT(DISTINCT target_month) as month_count')
+            ->groupBy(DB::raw('TRIM(agent_name)'))
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[strtoupper(trim($row->agent_name))] = [
+                'target' => (float)$row->total_target,
+                'months' => (int)$row->month_count,
+            ];
+        }
+
+        return $out;
+    }
+
+    /** Rows sent per level. Anything beyond is reported, never silently dropped. */
+    public const DRILL_PAGE_SIZE = 150;
+
+    /**
+     * The levels usable against a given table. A column the sync agent has not delivered yet
+     * (agent_name on a cloud DB that has not been bootstrapped) is dropped rather than
+     * producing an empty level.
+     */
+    public static function drillLevels(string $tableName): array
+    {
+        return array_values(array_filter(
+            self::DRILL_LEVELS,
+            fn ($level) => Schema::hasColumn($tableName, $level['column'])
+        ));
+    }
+
+    /**
+     * SQL for a level's grouping key: trimmed, with blanks collapsed to NULL so that '',
+     * '   ' and NULL all land in one bucket instead of three.
+     */
+    private static function drillKeyExpr(array $level): string
+    {
+        return "NULLIF(TRIM(COALESCE({$level['column']}, '')), '')";
+    }
+
+    /**
+     * AJAX/JSON API for the interactive sales drill-down.
+     *
+     * Branch is required; every level parameter present narrows the query one step further:
+     *   ?branch=AKOLA
+     *   ?branch=AKOLA&category=HERBICIDE
+     *   ?branch=AKOLA&category=HERBICIDE&series=AKSL
+     *   ?branch=AKOLA&category=HERBICIDE&series=AKSL&agent=TUSHAR+PISE ... and so on
+     *
+     * The response always names the level it just returned and the one below it, so the
+     * views can render the chain without knowing it.
+     */
+    public function salesDrilldown(Request $request)
+    {
+        if ($request->has('check_jobs')) {
+            $jobs = DB::table('query_jobs')->orderBy('id', 'desc')->limit(10)->get();
+            $output = [];
+            foreach ($jobs as $j) {
+                $output[] = "ID: {$j->id} | Status: {$j->status} | Rows: {$j->result_count} | Token: {$j->job_token} | Error: {$j->error_message} | Exec Time: {$j->execution_seconds}s | Created: {$j->created_at} | Updated: {$j->updated_at}";
+            }
+            return response(implode("\n", $output))->header('Content-Type', 'text/plain');
+        }
+
+        $branch = trim($request->get('branch', ''));
+
+        if ($branch === '') {
+            return response()->json(['status' => 'error', 'message' => 'Branch is required'], 400);
+        }
+
+        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
+        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
+        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
+
+        if (!$tableName) {
+            return response()->json([
+                'status'                => 'success',
+                'branch'                => $branch,
+                'levels'                => [],
+                'path'                  => [],
+                'level'                 => null,
+                'is_leaf'               => true,
+                'items'                 => [],
+                'total_sales'           => 0,
+                'formatted_total_sales' => '₹ 0.00',
+            ]);
+        }
+
+        $levels = self::drillLevels($tableName);
+        $branchMap = self::branchCodeMap();
+        $seriesNames = self::seriesLabels();
+
+        [$fromDate, $toDate] = self::resolveDateWindow($request);
+
+        $amtField   = $useMssqlTable ? 'COALESCE(calc_net_amt_n, calc_net_amt, 0)' : 'COALESCE(amount, 0)';
+        $qtyField   = $useMssqlTable ? 'COALESCE(tot_qty, 0)' : 'COALESCE(qty, 0)';
         $vouchField = $useMssqlTable ? 'COALESCE(vouch_num, id)' : 'id';
-        $branchCol = $useMssqlTable ? 'branch_name' : 'branch';
-        $hasSeries = Schema::hasColumn($tableName, 'series');
-        $hasGroup = Schema::hasColumn($tableName, 'group_name');
+        $branchCol  = $useMssqlTable ? 'branch_name' : 'branch';
 
-        $seriesField = $hasSeries ? "COALESCE(series, 'GENERAL')" : "'GENERAL'";
-        $groupField = $hasGroup ? "COALESCE(group_name, 'General Category')" : "'General Category'";
-        $itemField = $useMssqlTable ? "COALESCE(item_hd_name, user_code, 'Item')" : "COALESCE(item_name, 'Item')";
-
-        // Base Query filtered by Branch & Dates
-        $targetName = strtoupper(trim($branch));
-        $matchList = [$branch, $targetName];
-        foreach ($branchMap as $code => $name) {
-            if (strtoupper($name) === $targetName || strtoupper($code) === $targetName) {
-                $matchList[] = (string)$code;
-                $matchList[] = (string)$name;
-            }
-        }
-
-        $query = DB::table($tableName)->whereIn($branchCol, array_unique($matchList));
+        $query = DB::table($tableName)
+            ->whereIn($branchCol, self::branchMatchList([$branch], $branchMap));
 
         if (!empty($fromDate)) {
             $query->where('vouch_date', '>=', $fromDate);
@@ -1763,139 +2545,207 @@ class ReportController extends Controller
             $query->where('vouch_date', '<=', $toDate);
         }
 
-        // Exclude Stock Transfers (aligned with main salesReport filter)
-        if ($useMssqlTable && Schema::hasColumn('mssql_sales_records', 'series')) {
-            $query->where(function($q) {
-                $q->whereNull('series')
-                  ->orWhere(function($sq) {
-                      $sq->where('series', 'not like', '%ST%')
-                         ->where('series', 'not like', '%TR%')
-                         ->orWhereIn('series', ['AKST', 'MPST', 'UPST', 'SWPN']);
-                  });
-            });
-        }
+        self::applyTxnTypeFilter($query, self::resolveTxnTypes($request), $tableName);
 
-        // LEVEL 1: Series Breakdown for this Branch
-        if (empty($series)) {
-            $rawSeries = (clone $query)
-                ->select(
-                    DB::raw("{$seriesField} as series_code"),
-                    DB::raw("SUM({$amtField}) as total_sales"),
-                    DB::raw("SUM({$qtyField}) as total_qty"),
-                    DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices"),
-                    DB::raw("COUNT(*) as total_lines")
-                )
-                ->groupBy(DB::raw("{$seriesField}"))
-                ->orderByDesc('total_sales')
-                ->get();
+        // Walk down the chain for as long as the request supplies values. A gap stops the
+        // walk, so a stale link with a level missing degrades to the level above it instead
+        // of silently applying a filter from further down.
+        $path = [];
+        $depth = 0;
 
-            $totalBranchSales = (float)$rawSeries->sum('total_sales');
-            $totalBranchQty = (float)$rawSeries->sum('total_qty');
-            $totalBranchInvoices = (int)$rawSeries->sum('total_invoices');
+        foreach ($levels as $index => $level) {
+            $value = $request->get($level['key']);
 
-            $items = [];
-            foreach ($rawSeries as $s) {
-                $code = trim((string)$s->series_code);
-                $sales = (float)$s->total_sales;
-                $share = $totalBranchSales > 0 ? ($sales / $totalBranchSales) * 100 : 0;
-                $isReturn = (str_contains($code, 'SR') || str_contains($code, 'R') || $sales < 0);
-
-                $items[] = [
-                    'series_code'     => $code,
-                    'series_label'    => $seriesNames[$code] ?? "Series {$code}",
-                    'is_return'       => $isReturn,
-                    'total_sales'     => $sales,
-                    'formatted_sales' => self::formatIndianCurrency($sales),
-                    'total_qty'       => (float)$s->total_qty,
-                    'total_invoices'  => (int)$s->total_invoices,
-                    'total_lines'     => (int)$s->total_lines,
-                    'share_percent'   => round($share, 1),
-                ];
+            if ($value === null || $value === '') {
+                break;
             }
 
-            return response()->json([
-                'status'                => 'success',
-                'level'                 => 'series',
-                'branch'                => $branch,
-                'series'                => null,
-                'total_sales'           => $totalBranchSales,
-                'formatted_total_sales' => self::formatIndianCurrency($totalBranchSales),
-                'total_qty'             => $totalBranchQty,
-                'total_invoices'        => $totalBranchInvoices,
-                'items'                 => $items,
-            ]);
+            $expr = self::drillKeyExpr($level);
+
+            if ($value === self::DRILL_BLANK) {
+                $query->whereNull(DB::raw($expr));
+            } else {
+                $query->where(DB::raw($expr), trim((string)$value));
+            }
+
+            $path[] = [
+                'key'     => $level['key'],
+                'label'   => $level['label'],
+                'icon'    => $level['icon'],
+                'value'   => $value,
+                'display' => self::drillDisplayLabel($level['key'], $value, $seriesNames),
+            ];
+
+            $depth = $index + 1;
         }
 
-        // LEVEL 2: Product Categories / Groups Breakdown for that Series
-        if ($hasSeries) {
-            $query->where('series', $series);
-        }
-
-        $rawGroups = (clone $query)
+        // Totals for whatever the current filters describe -- the header of the panel.
+        $totals = (clone $query)
             ->select(
-                DB::raw("{$groupField} as category_name"),
                 DB::raw("SUM({$amtField}) as total_sales"),
                 DB::raw("SUM({$qtyField}) as total_qty"),
                 DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices"),
-                DB::raw("COUNT(DISTINCT {$itemField}) as distinct_products")
+                DB::raw("COUNT(*) as total_lines")
             )
-            ->groupBy(DB::raw("{$groupField}"))
+            ->first();
+
+        $totalSales = (float)($totals->total_sales ?? 0);
+
+        $response = [
+            'status'                => 'success',
+            'branch'                => $branch,
+            'levels'                => array_map(
+                fn ($l) => ['key' => $l['key'], 'label' => $l['label'], 'icon' => $l['icon']],
+                $levels
+            ),
+            'path'                  => $path,
+            'depth'                 => $depth,
+            'total_sales'           => $totalSales,
+            'formatted_total_sales' => self::formatIndianCurrency($totalSales),
+            'total_qty'             => (float)($totals->total_qty ?? 0),
+            'total_invoices'        => (int)($totals->total_invoices ?? 0),
+            'total_lines'           => (int)($totals->total_lines ?? 0),
+        ];
+
+        // Bottom of the chain: nothing left to group by.
+        if ($depth >= count($levels)) {
+            return response()->json($response + [
+                'level'      => null,
+                'next_level' => null,
+                'is_leaf'    => true,
+                'items'      => [],
+            ]);
+        }
+
+        $next = $levels[$depth];
+        $keyExpr = self::drillKeyExpr($next);
+
+        $select = [
+            DB::raw("{$keyExpr} as group_key"),
+            DB::raw("SUM({$amtField}) as total_sales"),
+            DB::raw("SUM({$qtyField}) as total_qty"),
+            DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices"),
+            DB::raw("COUNT(*) as total_lines"),
+        ];
+
+        // A bill is one document, so its date and customer are worth showing inline rather
+        // than making the user drill another step just to identify it.
+        $wantsBillMeta = $next['key'] === 'bill';
+        if ($wantsBillMeta) {
+            $select[] = DB::raw('MIN(vouch_date) as bill_date');
+            if (Schema::hasColumn($tableName, 'act_name')) {
+                $select[] = DB::raw('MIN(act_name) as bill_party');
+            }
+        }
+
+        // Monthly targets only make sense against agents, and only for a bounded period.
+        $agentTargets = $next['key'] === 'agent'
+            ? self::agentTargetsForPeriod($fromDate, $toDate)
+            : [];
+
+        // How many months the selected period spans. Compared against each agent's
+        // target_months this tells the UI when a target only covers part of the period --
+        // otherwise a year of sales against one month of target reads as 1400% achieved.
+        $periodMonths = $next['key'] === 'agent'
+            ? count(self::monthsInRange($fromDate, $toDate))
+            : 0;
+
+        // Group on the select alias rather than repeating the expression -- under
+        // ONLY_FULL_GROUP_BY, MariaDB does not treat two identical expressions as the same
+        // grouping key, but it does resolve an alias.
+        $rows = (clone $query)
+            ->select($select)
+            ->groupBy('group_key')
             ->orderByDesc('total_sales')
             ->get();
 
-        $totalSeriesSales = (float)$rawGroups->sum('total_sales');
-        $totalSeriesQty = (float)$rawGroups->sum('total_qty');
-        $totalSeriesInvoices = (int)$rawGroups->sum('total_invoices');
+        $distinctCount = $rows->count();
 
-        $categoryItems = [];
-        foreach ($rawGroups as $g) {
-            $catName = trim((string)$g->category_name);
-            $catSales = (float)$g->total_sales;
-            $share = $totalSeriesSales > 0 ? ($catSales / $totalSeriesSales) * 100 : 0;
+        $items = $rows->take(self::DRILL_PAGE_SIZE)
+            ->map(function ($row) use ($next, $seriesNames, $totalSales, $wantsBillMeta, $agentTargets) {
+                $raw = $row->group_key;
+                $sales = (float)$row->total_sales;
 
-            // Fetch top 5 products in this category
-            $topItems = (clone $query)
-                ->when($hasGroup, fn($q) => $q->where('group_name', $catName))
-                ->select(
-                    DB::raw("{$itemField} as item_name"),
-                    DB::raw("SUM({$amtField}) as item_sales"),
-                    DB::raw("SUM({$qtyField}) as item_qty")
-                )
-                ->groupBy(DB::raw("{$itemField}"))
-                ->orderByDesc('item_sales')
-                ->limit(5)
-                ->get()
-                ->map(fn($it) => [
-                    'item_name'       => $it->item_name,
-                    'sales'           => (float)$it->item_sales,
-                    'formatted_sales' => self::formatIndianCurrency($it->item_sales),
-                    'qty'             => (float)$it->item_qty,
-                ]);
+                $item = [
+                    'key'             => $raw === null ? self::DRILL_BLANK : (string)$raw,
+                    'label'           => self::drillDisplayLabel($next['key'], $raw, $seriesNames),
+                    'code'            => $next['key'] === 'series' ? trim((string)$raw) : null,
+                    'total_sales'     => $sales,
+                    'formatted_sales' => self::formatIndianCurrency($sales),
+                    'total_qty'       => (float)$row->total_qty,
+                    'total_invoices'  => (int)$row->total_invoices,
+                    'total_lines'     => (int)$row->total_lines,
+                    'share_percent'   => $totalSales != 0 ? round(($sales / $totalSales) * 100, 1) : 0,
+                    'is_return'       => $sales < 0,
+                ];
 
-            $categoryItems[] = [
-                'category_name'     => $catName,
-                'total_sales'       => $catSales,
-                'formatted_sales'   => self::formatIndianCurrency($catSales),
-                'total_qty'         => (float)$g->total_qty,
-                'total_invoices'    => (int)$g->total_invoices,
-                'distinct_products' => (int)$g->distinct_products,
-                'share_percent'     => round($share, 1),
-                'top_items'         => $topItems,
-            ];
+                if ($wantsBillMeta) {
+                    $item['bill_date'] = $row->bill_date
+                        ? \Carbon\Carbon::parse($row->bill_date)->format('d-m-Y')
+                        : null;
+                    $item['bill_party'] = $row->bill_party ?? null;
+                }
+
+                if ($next['key'] === 'agent') {
+                    $target = $agentTargets[strtoupper(trim((string)$raw))] ?? null;
+
+                    $item['target'] = $target['target'] ?? null;
+                    $item['target_months'] = $target['months'] ?? 0;
+                    $item['formatted_target'] = $target ? self::formatIndianCurrency($target['target']) : null;
+
+                    // Achievement is meaningless without a target, and returns can push an
+                    // agent negative -- both cases stay null rather than showing a fake 0%.
+                    $item['achievement_percent'] = ($target && $target['target'] > 0)
+                        ? round(($sales / $target['target']) * 100, 1)
+                        : null;
+
+                    $item['shortfall'] = ($target && $target['target'] > 0)
+                        ? round($target['target'] - $sales, 2)
+                        : null;
+                }
+
+                return $item;
+            })->values();
+
+        return response()->json($response + [
+            'level'         => ['key' => $next['key'], 'label' => $next['label'], 'icon' => $next['icon']],
+            'period_months' => $periodMonths,
+            'next_level' => $levels[$depth + 1]['label'] ?? null,
+            'is_leaf'    => !isset($levels[$depth + 1]),
+            'items'      => $items,
+            'shown'      => $items->count(),
+            'available'  => $distinctCount,
+            'truncated'  => $distinctCount > $items->count(),
+        ]);
+    }
+
+    /**
+     * Human label for a drill-down value. Series get their ERP description, and the ERP's
+     * placeholder agent (code 0, named "NIL") reads better as "No Agent".
+     */
+    private static function drillDisplayLabel(string $levelKey, $raw, array $seriesNames): string
+    {
+        $value = trim((string)($raw ?? ''));
+
+        if ($value === '' || $value === self::DRILL_BLANK) {
+            return match ($levelKey) {
+                'category' => '(No Category)',
+                'agent'    => '(No Agent)',
+                'party'    => '(Direct Customer)',
+                'item'     => '(Unknown Item)',
+                default    => '(Blank)',
+            };
         }
 
-        return response()->json([
-            'status'                => 'success',
-            'level'                 => 'categories',
-            'branch'                => $branch,
-            'series'                => $series,
-            'series_label'          => $seriesNames[$series] ?? "Series {$series}",
-            'total_sales'           => $totalSeriesSales,
-            'formatted_total_sales' => self::formatIndianCurrency($totalSeriesSales),
-            'total_qty'             => $totalSeriesQty,
-            'total_invoices'        => $totalSeriesInvoices,
-            'items'                 => $categoryItems,
-        ]);
+        if ($levelKey === 'series') {
+            return $seriesNames[$value] ?? "Series {$value}";
+        }
+
+        if ($levelKey === 'agent' && strcasecmp($value, 'NIL') === 0) {
+            return '(No Agent)';
+        }
+
+        return $value;
     }
 
     /**
@@ -1915,6 +2765,465 @@ class ReportController extends Controller
             return $sign . '₹ ' . number_format($abs / 1000, 1) . ' K';
         }
         return $sign . '₹ ' . number_format($abs, 2);
+    }
+
+    /**
+     * ------------------------------------------------------------------------------------
+     * 360-Degree Sales Explorer (mobile-only)
+     * ------------------------------------------------------------------------------------
+     * Unlike salesDrilldown()'s fixed agent -> category -> series -> party -> bill -> item
+     * chain (each level a strict prefix of the one before it), every dimension here --
+     * branch, category, agent, product -- is an independent, freely combinable AND filter
+     * over one query, so any combination can be applied at once. Built as a single engine
+     * (buildSales360Payload) shared by the page action and the AJAX action so they can never
+     * drift apart. Nothing here touches salesReport()/salesDrilldown()/DRILL_LEVELS.
+     */
+
+    /**
+     * Page entry point: permission guard + small preloaded filter-option lists (branches,
+     * categories, agents -- all bounded) + the initial breakdown payload for default filters,
+     * so the mobile view isn't blank-then-fetch on first paint. Products are deliberately NOT
+     * preloaded here -- see sales360Products().
+     */
+    public function sales360(Request $request): array
+    {
+        $user = Auth::user();
+        if ($user && $user->role !== 'admin') {
+            if (!$user->hasPermission('mobile_sales_360', 'view')) {
+                abort(403, 'Unauthorized access to 360 Sales Report.');
+            }
+        }
+
+        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
+        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
+        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
+
+        $branchMap = self::branchCodeMap();
+        $allBranchNames = [];
+        $allCategories = [];
+        $allAgents = [];
+
+        if ($tableName) {
+            $branchCol = $useMssqlTable ? 'branch_name' : 'branch';
+            $allBranchNames = DB::table($tableName)
+                ->whereNotNull($branchCol)
+                ->where($branchCol, '!=', '')
+                ->distinct()
+                ->pluck($branchCol)
+                ->map(fn ($b) => $branchMap[strtoupper(trim((string)$b))] ?? trim((string)$b))
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+
+            $categoryCol = Schema::hasColumn($tableName, 'group_name') ? 'group_name' : (Schema::hasColumn($tableName, 'category') ? 'category' : null);
+            if ($categoryCol) {
+                $allCategories = DB::table($tableName)
+                    ->whereNotNull($categoryCol)
+                    ->where($categoryCol, '!=', '')
+                    ->where($categoryCol, '!=', '(NIL)')
+                    ->distinct()
+                    ->orderBy($categoryCol)
+                    ->pluck($categoryCol)
+                    ->map(fn ($c) => trim((string)$c))
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+
+            if (Schema::hasColumn($tableName, 'agent_name')) {
+                $allAgents = DB::table($tableName)
+                    ->whereNotNull('agent_name')
+                    ->where('agent_name', '!=', '')
+                    ->distinct()
+                    ->orderBy('agent_name')
+                    ->pluck('agent_name')
+                    ->map(fn ($a) => trim((string)$a))
+                    ->filter(fn ($a) => $a !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+        }
+
+        return self::buildSales360Payload($request) + [
+            'filter_options' => [
+                'branches'   => $allBranchNames,
+                'categories' => $allCategories,
+                'agents'     => $allAgents,
+            ],
+            'txn_type_options' => self::TXN_TYPES,
+            'default_txn_types' => self::DEFAULT_TXN_TYPES,
+        ];
+    }
+
+    /**
+     * AJAX action: same filters as sales360(), returns just the breakdown payload. Called on
+     * every filter change from the mobile page.
+     */
+    public function sales360Data(Request $request)
+    {
+        $user = Auth::user();
+        if ($user && $user->role !== 'admin' && !$user->hasPermission('mobile_sales_360', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json(self::buildSales360Payload($request));
+    }
+
+    /**
+     * Product typeahead: products are far too numerous to preload like branches/categories/
+     * agents, so this is a debounced search-as-you-type sub-endpoint instead (capped at 20).
+     */
+    public function sales360Products(Request $request)
+    {
+        $user = Auth::user();
+        if ($user && $user->role !== 'admin' && !$user->hasPermission('mobile_sales_360', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $q = trim((string)$request->get('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['results' => []]);
+        }
+
+        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
+        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
+        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
+
+        $itemCol = $tableName
+            ? (Schema::hasColumn($tableName, 'item_hd_name') ? 'item_hd_name' : (Schema::hasColumn($tableName, 'item_name') ? 'item_name' : null))
+            : null;
+
+        if (!$itemCol) {
+            return response()->json(['results' => []]);
+        }
+
+        $results = DB::table($tableName)
+            ->whereNotNull($itemCol)
+            ->where($itemCol, 'like', '%' . $q . '%')
+            ->distinct()
+            ->orderBy($itemCol)
+            ->limit(20)
+            ->pluck($itemCol)
+            ->map(fn ($v) => trim((string)$v))
+            ->filter(fn ($v) => $v !== '')
+            ->unique()
+            ->values();
+
+        return response()->json(['results' => $results]);
+    }
+
+    /**
+     * Party (customer) typeahead: just as numerous as products, same debounced search pattern.
+     */
+    public function sales360Parties(Request $request)
+    {
+        $user = Auth::user();
+        if ($user && $user->role !== 'admin' && !$user->hasPermission('mobile_sales_360', 'view')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $q = trim((string)$request->get('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['results' => []]);
+        }
+
+        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
+        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
+        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
+
+        $actCol = $tableName && Schema::hasColumn($tableName, 'act_name') ? 'act_name' : null;
+
+        if (!$actCol) {
+            return response()->json(['results' => []]);
+        }
+
+        $results = DB::table($tableName)
+            ->whereNotNull($actCol)
+            ->where($actCol, 'like', '%' . $q . '%')
+            ->distinct()
+            ->orderBy($actCol)
+            ->limit(20)
+            ->pluck($actCol)
+            ->map(fn ($v) => trim((string)$v))
+            ->filter(fn ($v) => $v !== '')
+            ->unique()
+            ->values();
+
+        return response()->json(['results' => $results]);
+    }
+
+    /**
+     * The 360 engine: one filtered query (every dimension applied simultaneously, unlike the
+     * fixed-chain drilldown), grand totals, and five independent top-8+Others breakdowns
+     * (branch/category/agent/product/party) computed off clones of that same query.
+     */
+    private static function buildSales360Payload(Request $request): array
+    {
+        $emptyBreakdowns = [
+            'branch'   => ['available' => false, 'rows' => [], 'others' => null],
+            'category' => ['available' => false, 'rows' => [], 'others' => null],
+            'agent'    => ['available' => false, 'rows' => [], 'others' => null],
+            'product'  => ['available' => false, 'rows' => [], 'others' => null],
+            'party'    => ['available' => false, 'rows' => [], 'others' => null],
+        ];
+
+        $useMssqlTable = Schema::hasTable('mssql_sales_records') && DB::table('mssql_sales_records')->count() > 0;
+        $useSalesRegTable = Schema::hasTable('sales_registers') && DB::table('sales_registers')->count() > 0;
+        $tableName = $useMssqlTable ? 'mssql_sales_records' : ($useSalesRegTable ? 'sales_registers' : null);
+
+        if (!$tableName) {
+            return [
+                'totals' => [
+                    'total_sales' => 0, 'total_qty' => 0, 'total_qty_kg' => 0, 'qty_kg_available' => false,
+                    'total_invoices' => 0, 'avg_order_value' => 0,
+                    'formatted_sales' => self::formatIndianCurrency(0),
+                    'formatted_aov' => self::formatIndianCurrency(0),
+                ],
+                'filters_echo' => [],
+                'breakdowns' => $emptyBreakdowns,
+                'meta' => ['table_used' => null],
+            ];
+        }
+
+        [$fromDate, $toDate] = self::resolveDateWindow($request);
+        $branchMap = self::branchCodeMap();
+        $selectedTypes = self::resolveTxnTypes($request);
+
+        $trimFilter = fn ($key) => array_values(array_filter(
+            array_map('trim', (array)$request->get($key, [])),
+            fn ($v) => $v !== ''
+        ));
+
+        $selectedBranches   = $trimFilter('branches');
+        $selectedCategories = $trimFilter('categories');
+        $selectedAgents     = $trimFilter('agents');
+        $selectedProducts   = $trimFilter('products');
+        $selectedParties    = $trimFilter('parties');
+
+        $branchCol   = $useMssqlTable ? 'branch_name' : 'branch';
+        $categoryCol = Schema::hasColumn($tableName, 'group_name') ? 'group_name' : (Schema::hasColumn($tableName, 'category') ? 'category' : null);
+        $agentCol    = Schema::hasColumn($tableName, 'agent_name') ? 'agent_name' : null;
+        $itemCol     = Schema::hasColumn($tableName, 'item_hd_name') ? 'item_hd_name' : (Schema::hasColumn($tableName, 'item_name') ? 'item_name' : null);
+        $actCol      = Schema::hasColumn($tableName, 'act_name') ? 'act_name' : null;
+
+        $amtField   = $useMssqlTable ? 'COALESCE(calc_net_amt_n, calc_net_amt, 0)' : 'COALESCE(amount, 0)';
+        $qtyField   = $useMssqlTable ? 'COALESCE(tot_qty, 0)' : 'COALESCE(qty, 0)';
+        $vouchField = $useMssqlTable ? 'COALESCE(vouch_num, id)' : 'id';
+
+        // Busy's own Item Master already carries weight_per_unit normalized to KG/LTR per pack
+        // (e.g. a "500 ML" pack -> weight_per_unit 0.5, a "250 GM" pack -> 0.25) -- verified
+        // against live data on 2026-09-15. So SUM(tot_qty * weight_per_unit) is the sale
+        // quantity in KG/LTR directly, no separate product-master lookup/conversion needed.
+        $qtyKgAvailable = $useMssqlTable && Schema::hasColumn($tableName, 'weight_per_unit');
+        $qtyKgField = $qtyKgAvailable ? 'SUM(COALESCE(tot_qty, 0) * COALESCE(weight_per_unit, 0))' : null;
+
+        $query = DB::table($tableName);
+
+        if (!empty($fromDate)) {
+            $query->where('vouch_date', '>=', $fromDate);
+        }
+        if (!empty($toDate)) {
+            $query->where('vouch_date', '<=', $toDate);
+        }
+        if (!empty($selectedBranches)) {
+            $query->whereIn($branchCol, self::branchMatchList($selectedBranches, $branchMap));
+        }
+        if (!empty($selectedCategories) && $categoryCol) {
+            $query->whereIn($categoryCol, $selectedCategories);
+        }
+        if (!empty($selectedAgents) && $agentCol) {
+            $query->whereIn($agentCol, $selectedAgents);
+        }
+        if (!empty($selectedProducts) && $itemCol) {
+            $query->whereIn($itemCol, $selectedProducts);
+        }
+        if (!empty($selectedParties) && $actCol) {
+            $query->whereIn($actCol, $selectedParties);
+        }
+
+        self::applyTxnTypeFilter($query, $selectedTypes, $tableName);
+
+        // Grand totals -- the single source every breakdown's share_percent divides into.
+        // Never derive this by summing a breakdown's rows.
+        $totalsSelect = "SUM({$amtField}) as total_sales, SUM({$qtyField}) as total_qty, COUNT(DISTINCT {$vouchField}) as total_invoices";
+        if ($qtyKgField) {
+            $totalsSelect .= ", {$qtyKgField} as total_qty_kg";
+        }
+        $totalsRow = (clone $query)->selectRaw($totalsSelect)->first();
+
+        $grandSales = (float)($totalsRow->total_sales ?? 0);
+        $grandQty = (float)($totalsRow->total_qty ?? 0);
+        $grandQtyKg = $qtyKgField ? (float)($totalsRow->total_qty_kg ?? 0) : 0;
+        $grandInvoices = (int)($totalsRow->total_invoices ?? 0);
+        $aov = $grandInvoices > 0 ? $grandSales / $grandInvoices : 0;
+
+        $dimensions = [
+            'branch' => [
+                'col' => $branchCol,
+                'expr' => "COALESCE({$branchCol}, 'HEAD OFFICE')",
+                'available' => true,
+                // Numeric-code and name rows for the same branch must merge into one group,
+                // exactly like salesReport()'s branch summary does.
+                'resolve' => fn ($raw) => $branchMap[strtoupper(trim((string)$raw))] ?? trim((string)$raw),
+            ],
+            'category' => [
+                'col' => $categoryCol,
+                'expr' => $categoryCol ? "COALESCE({$categoryCol}, 'Uncategorized')" : null,
+                'available' => (bool)$categoryCol,
+                'resolve' => null,
+            ],
+            'agent' => [
+                'col' => $agentCol,
+                // The sync agent already NULLIFs blank/whitespace agent names at source (see
+                // docs/05-sales-sync-bridge.md), so a plain COALESCE is enough here -- keeping
+                // this a single simple function, like every other dimension's expr, avoids a
+                // MySQL ONLY_FULL_GROUP_BY mismatch some nested TRIM/NULLIF combinations trip.
+                'expr' => $agentCol ? "COALESCE({$agentCol}, 'Unassigned')" : null,
+                'available' => (bool)$agentCol,
+                'resolve' => null,
+            ],
+            'product' => [
+                'col' => $itemCol,
+                'expr' => $itemCol
+                    ? ($useMssqlTable ? "COALESCE({$itemCol}, user_code, 'Unknown Item')" : "COALESCE({$itemCol}, 'Unknown Item')")
+                    : null,
+                'available' => (bool)$itemCol,
+                'resolve' => null,
+            ],
+            'party' => [
+                'col' => $actCol,
+                'expr' => $actCol ? "COALESCE({$actCol}, 'Direct Customer')" : null,
+                'available' => (bool)$actCol,
+                'resolve' => null,
+            ],
+        ];
+
+        $breakdowns = [];
+
+        foreach ($dimensions as $key => $dim) {
+            if (!$dim['available']) {
+                $breakdowns[$key] = ['available' => false, 'rows' => [], 'others' => null];
+                continue;
+            }
+
+            $select = [
+                DB::raw("{$dim['expr']} as dim_value"),
+                DB::raw("SUM({$amtField}) as total_sales"),
+                DB::raw("SUM({$qtyField}) as total_qty"),
+                DB::raw("COUNT(DISTINCT {$vouchField}) as total_invoices"),
+            ];
+            if ($qtyKgField) {
+                $select[] = DB::raw("{$qtyKgField} as total_qty_kg");
+            }
+
+            $rawRows = (clone $query)
+                ->select($select)
+                ->groupBy(DB::raw($dim['expr']))
+                ->orderByDesc('total_sales')
+                ->get();
+
+            // Uniform group shape: [label, total_sales, total_qty, total_qty_kg, total_invoices,
+            // raw_values[]]. Branch merges multiple raw group values (code + name) into one
+            // label; every other dimension's SQL GROUP BY already produces one row per distinct
+            // label, so raw_values is a one-item list there -- kept the same shape either way so
+            // the "Others" exclusion below doesn't need to special-case branch.
+            if ($dim['resolve']) {
+                $groups = [];
+                foreach ($rawRows as $row) {
+                    $label = $dim['resolve']($row->dim_value);
+                    $groups[$label] ??= ['label' => $label, 'total_sales' => 0.0, 'total_qty' => 0.0, 'total_qty_kg' => 0.0, 'total_invoices' => 0, 'raw_values' => []];
+                    $groups[$label]['total_sales'] += (float)$row->total_sales;
+                    $groups[$label]['total_qty'] += (float)$row->total_qty;
+                    $groups[$label]['total_qty_kg'] += $qtyKgField ? (float)$row->total_qty_kg : 0.0;
+                    $groups[$label]['total_invoices'] += (int)$row->total_invoices;
+                    $groups[$label]['raw_values'][] = $row->dim_value;
+                }
+                $groups = collect($groups)->sortByDesc('total_sales')->values();
+            } else {
+                $groups = $rawRows->map(fn ($row) => [
+                    'label' => $row->dim_value,
+                    'total_sales' => (float)$row->total_sales,
+                    'total_qty' => (float)$row->total_qty,
+                    'total_qty_kg' => $qtyKgField ? (float)$row->total_qty_kg : 0.0,
+                    'total_invoices' => (int)$row->total_invoices,
+                    'raw_values' => [$row->dim_value],
+                ]);
+            }
+
+            $top = $groups->take(8)->values();
+            $remaining = $groups->slice(8)->values();
+
+            $rows = $top->map(function ($g, $idx) use ($grandSales) {
+                $sales = (float)$g['total_sales'];
+                return [
+                    'rank'            => $idx + 1,
+                    'label'           => $g['label'],
+                    'total_sales'     => $sales,
+                    'total_qty'       => (float)$g['total_qty'],
+                    'total_qty_kg'    => round((float)$g['total_qty_kg'], 2),
+                    'total_invoices'  => (int)$g['total_invoices'],
+                    'share_percent'   => $grandSales > 0 ? round(($sales / $grandSales) * 100, 1) : 0,
+                    'formatted_sales' => self::formatIndianCurrency($sales),
+                ];
+            })->values()->all();
+
+            $others = null;
+            if ($remaining->isNotEmpty()) {
+                $othersSales = (float)$remaining->sum('total_sales');
+                $othersQty = (float)$remaining->sum('total_qty');
+                $othersQtyKg = (float)$remaining->sum('total_qty_kg');
+
+                // Invoice counts are NOT additive/subtractive across a dimension's groups --
+                // one bill can span several products/categories -- so Others' invoice count
+                // needs its own distinct-count query, never derived from the rows above.
+                $topRawValues = $top->flatMap(fn ($g) => $g['raw_values'])->all();
+                $othersInvoices = (int)((clone $query)
+                    ->whereNotIn(DB::raw($dim['expr']), $topRawValues)
+                    ->selectRaw("COUNT(DISTINCT {$vouchField}) as c")
+                    ->value('c') ?? 0);
+
+                $others = [
+                    'label'           => 'Others',
+                    'total_sales'     => $othersSales,
+                    'total_qty'       => $othersQty,
+                    'total_qty_kg'    => round($othersQtyKg, 2),
+                    'total_invoices'  => $othersInvoices,
+                    'share_percent'   => $grandSales > 0 ? round(($othersSales / $grandSales) * 100, 1) : 0,
+                    'formatted_sales' => self::formatIndianCurrency($othersSales),
+                    'count'           => $remaining->count(),
+                ];
+            }
+
+            $breakdowns[$key] = ['available' => true, 'rows' => $rows, 'others' => $others];
+        }
+
+        return [
+            'totals' => [
+                'total_sales'      => $grandSales,
+                'total_qty'        => $grandQty,
+                'total_qty_kg'     => round($grandQtyKg, 2),
+                'qty_kg_available' => $qtyKgAvailable,
+                'total_invoices'   => $grandInvoices,
+                'avg_order_value'  => round($aov, 2),
+                'formatted_sales'  => self::formatIndianCurrency($grandSales),
+                'formatted_aov'    => self::formatIndianCurrency($aov),
+            ],
+            'filters_echo' => [
+                'date_range'  => $request->get('date_range'),
+                'from_date'   => $fromDate,
+                'to_date'     => $toDate,
+                'branches'    => $selectedBranches,
+                'categories'  => $selectedCategories,
+                'agents'      => $selectedAgents,
+                'products'    => $selectedProducts,
+                'parties'     => $selectedParties,
+                'txn_types'   => $selectedTypes,
+            ],
+            'breakdowns' => $breakdowns,
+            'meta' => ['table_used' => $tableName],
+        ];
     }
 
     public function executeSalesQuery(Request $request)

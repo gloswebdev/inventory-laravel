@@ -94,34 +94,12 @@ class CostingBomController extends Controller
         $finishedGoods = $fgQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id']);
         $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
         $types         = $typesQuery->get();
-        $bomPurities = \App\Models\CostingBomItem::whereNotNull('purity')
-            ->where('purity', '>', 0)
-            ->with('rawMaterial')
-            ->orderByDesc('id')
-            ->get()
-            ->filter(fn($item) => $item->rawMaterial !== null)
-            ->unique('rawMaterial.item_code')
-            ->pluck('purity', 'rawMaterial.item_code')
-            ->toArray();
+        $purities = \App\Models\ProductPrice::allPuritiesAsMap();
 
-        $pricePurities = \App\Models\ProductPrice::whereNotNull('purity')
-            ->where('purity', '>', 0)
-            ->pluck('purity', 'item_code')
-            ->toArray();
-
-        $prPurities = \App\Models\PurchaseRegister::whereNotNull('purity')
-            ->where('purity', '>', 0)
-            ->orderByDesc('vouch_date')
-            ->orderByDesc('id')
-            ->get()
-            ->unique('item_code')
-            ->pluck('purity', 'item_code')
-            ->toArray();
-
-        $purities = array_merge($bomPurities, $pricePurities, $prPurities);
-
-        $pricelists = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
-            ->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
+        $pricelists = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        })->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
 
         $pmRates = \App\Models\ProductPrice::allAsMap();
 
@@ -131,7 +109,36 @@ class CostingBomController extends Controller
             ->unique()
             ->values();
 
-        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists', 'pmRates', 'allBomProducts'));
+        // Build recipe packing map from Recipe Master (keyed by pricelist_id)
+        $recipePackingMap = [];
+        $allRecipes = \App\Models\Recipe::with(['items.rawMaterial.type', 'finishedProduct'])->has('items')->get();
+        $pricelistsByCode = $pricelists->keyBy('user_code');
+        foreach ($allRecipes as $r) {
+            $prod = $r->finishedProduct;
+            if (!$prod || !$prod->item_code) continue;
+            $pl = $pricelistsByCode->get($prod->item_code);
+            if (!$pl) continue;
+            
+            $pms = [];
+            foreach ($r->items as $item) {
+                $rm = $item->rawMaterial;
+                if (!$rm) continue;
+                $typeName = $rm->type->type_name ?? '';
+                if (str_contains(strtoupper($typeName), 'PACKING') || in_array(strtoupper($rm->rm_type ?? ''), ['DRUM', 'BAG', 'BOTTLE', 'CAP', 'CARTON', 'LABEL', 'TAPE', 'BOX'])) {
+                    $pms[] = [
+                        'pricelist_id'    => $pl->id,
+                        'raw_material_id' => $rm->id,
+                        'quantity'        => (float) $item->quantity,
+                        'is_container'    => in_array(strtoupper($rm->rm_type ?? ''), ['DRUM', 'BOTTLE', 'CAN', 'CONTAINER']),
+                    ];
+                }
+            }
+            if (!empty($pms)) {
+                $recipePackingMap[$pl->id] = $pms;
+            }
+        }
+
+        return view('costing.bom.index', compact('boms', 'finishedGoods', 'rawMaterials', 'types', 'purities', 'pricelists', 'pmRates', 'allBomProducts', 'recipePackingMap'));
     }
 
     public function store(Request $request)
@@ -254,6 +261,41 @@ class CostingBomController extends Controller
                                     'fetched_at'     => now(),
                                 ]
                             );
+                        }
+                    }
+                }
+
+                // Two-way sync: Update Recipe in Recipe Master for each configured Pricelist item
+                $pmsByPricelist = collect($validated['packing_materials'])->groupBy('pricelist_id');
+                foreach ($pmsByPricelist as $plId => $pms) {
+                    $pl = \App\Models\Pricelist::find($plId);
+                    if ($pl && $pl->user_code) {
+                        $prod = Product::where('item_code', $pl->user_code)->first();
+                        if ($prod) {
+                            $recipe = \App\Models\Recipe::firstOrCreate(
+                                ['finished_product_id' => $prod->id],
+                                ['yield_quantity' => 1, 'yield_uom' => $prod->uom ?: 'BOX']
+                            );
+                            $existingPackingIds = [];
+                            foreach ($recipe->items()->with('rawMaterial.type')->get() as $item) {
+                                $rm = $item->rawMaterial;
+                                if ($rm) {
+                                    $typeName = $rm->type->type_name ?? '';
+                                    if (str_contains(strtoupper($typeName), 'PACKING') || in_array(strtoupper($rm->rm_type ?? ''), ['DRUM', 'BAG', 'BOTTLE', 'CAP', 'CARTON', 'LABEL', 'TAPE', 'BOX'])) {
+                                        $existingPackingIds[] = $item->id;
+                                    }
+                                }
+                            }
+                            if (!empty($existingPackingIds)) {
+                                \App\Models\RecipeItem::whereIn('id', $existingPackingIds)->delete();
+                            }
+                            foreach ($pms as $pm) {
+                                \App\Models\RecipeItem::create([
+                                    'recipe_id'       => $recipe->id,
+                                    'raw_material_id' => $pm['raw_material_id'],
+                                    'quantity'        => $pm['quantity'],
+                                ]);
+                            }
                         }
                     }
                 }
@@ -390,6 +432,41 @@ class CostingBomController extends Controller
                                     'fetched_at'     => now(),
                                 ]
                             );
+                        }
+                    }
+                }
+
+                // Two-way sync: Update Recipe in Recipe Master for each configured Pricelist item
+                $pmsByPricelist = collect($validated['packing_materials'])->groupBy('pricelist_id');
+                foreach ($pmsByPricelist as $plId => $pms) {
+                    $pl = \App\Models\Pricelist::find($plId);
+                    if ($pl && $pl->user_code) {
+                        $prod = Product::where('item_code', $pl->user_code)->first();
+                        if ($prod) {
+                            $recipe = \App\Models\Recipe::firstOrCreate(
+                                ['finished_product_id' => $prod->id],
+                                ['yield_quantity' => 1, 'yield_uom' => $prod->uom ?: 'BOX']
+                            );
+                            $existingPackingIds = [];
+                            foreach ($recipe->items()->with('rawMaterial.type')->get() as $item) {
+                                $rm = $item->rawMaterial;
+                                if ($rm) {
+                                    $typeName = $rm->type->type_name ?? '';
+                                    if (str_contains(strtoupper($typeName), 'PACKING') || in_array(strtoupper($rm->rm_type ?? ''), ['DRUM', 'BAG', 'BOTTLE', 'CAP', 'CARTON', 'LABEL', 'TAPE', 'BOX'])) {
+                                        $existingPackingIds[] = $item->id;
+                                    }
+                                }
+                            }
+                            if (!empty($existingPackingIds)) {
+                                \App\Models\RecipeItem::whereIn('id', $existingPackingIds)->delete();
+                            }
+                            foreach ($pms as $pm) {
+                                \App\Models\RecipeItem::create([
+                                    'recipe_id'       => $recipe->id,
+                                    'raw_material_id' => $pm['raw_material_id'],
+                                    'quantity'        => $pm['quantity'],
+                                ]);
+                            }
                         }
                     }
                 }

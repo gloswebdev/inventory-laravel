@@ -122,5 +122,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $e, $request) {
+            $maxPost = ini_get('post_max_size');
+            $maxUpload = ini_get('upload_max_filesize');
+            return back()->with('system_error', "The uploaded file is too large for the server configuration. (Current PHP post_max_size: {$maxPost}, upload_max_filesize: {$maxUpload}). Please ensure the file is within these limits.");
+        });
     })->create();

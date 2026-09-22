@@ -708,7 +708,27 @@
                                 </select>
                             </div>
                             <div class="col-span-2">
-                                <button type="button" @click="if (bomModal.selectedManualPricelistId) { if (!bomModal.form.manual_pricelist_ids) { bomModal.form.manual_pricelist_ids = []; } if (!bomModal.form.manual_pricelist_ids.includes(parseInt(bomModal.selectedManualPricelistId))) { bomModal.form.manual_pricelist_ids.push(parseInt(bomModal.selectedManualPricelistId)); } bomModal.selectedManualPricelistId = ''; bomModal.manualSearchQuery = ''; }" 
+                                <button type="button" @click="if (bomModal.selectedManualPricelistId) { 
+                                            if (!bomModal.form.manual_pricelist_ids) { bomModal.form.manual_pricelist_ids = []; } 
+                                            const manualId = parseInt(bomModal.selectedManualPricelistId);
+                                            if (!bomModal.form.manual_pricelist_ids.includes(manualId)) { 
+                                                bomModal.form.manual_pricelist_ids.push(manualId); 
+                                                if (typeof __recipePackingMap !== 'undefined' && __recipePackingMap[manualId]) {
+                                                    __recipePackingMap[manualId].forEach(pm => {
+                                                        bomModal.form.packing_materials.push({
+                                                            pricelist_id: manualId,
+                                                            raw_material_id: pm.raw_material_id,
+                                                            quantity: pm.quantity,
+                                                            is_container: pm.is_container || false,
+                                                            rate: '',
+                                                            search: ''
+                                                        });
+                                                    });
+                                                }
+                                            } 
+                                            bomModal.selectedManualPricelistId = ''; 
+                                            bomModal.manualSearchQuery = ''; 
+                                        }" 
                                         class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] py-2 rounded-xl transition-all shadow-sm">
                                     Link
                                 </button>
@@ -944,6 +964,7 @@ const __purities      = @json($purities);
 const __types         = @json(\App\Models\ProductType::all());
 const __pricelists    = @json($pricelists ?? []);
 const __pmRates       = @json($pmRates ?? []);
+const __recipePackingMap = @json($recipePackingMap ?? []);
 
 function bomApp() {
     return {
@@ -1308,6 +1329,24 @@ function bomApp() {
                     search: ''
                 }))
             };
+
+            // Auto-fill from Recipe Master if not already present in Costing BOM
+            const linkedFGs = this.getLinkedPricelistItems(recipe.finished_product_id);
+            linkedFGs.forEach(fg => {
+                const hasExisting = this.bomModal.form.packing_materials.some(p => p.pricelist_id == fg.id);
+                if (!hasExisting && typeof __recipePackingMap !== 'undefined' && __recipePackingMap[fg.id]) {
+                    __recipePackingMap[fg.id].forEach(pm => {
+                        this.bomModal.form.packing_materials.push({
+                            pricelist_id: fg.id,
+                            raw_material_id: pm.raw_material_id,
+                            quantity: pm.quantity,
+                            is_container: pm.is_container || false,
+                            rate: '',
+                            search: ''
+                        });
+                    });
+                }
+            });
             this.bomModal.show = true;
         },
 
@@ -1361,6 +1400,24 @@ function bomApp() {
                     return;
                 }
                 
+                // Auto-fill any linked FG packing materials from Recipe Master if empty
+                const linkedFGs = this.getLinkedPricelistItems(this.bomModal.form.finished_product_id);
+                linkedFGs.forEach(fg => {
+                    const hasExisting = (this.bomModal.form.packing_materials || []).some(p => p.pricelist_id == fg.id);
+                    if (!hasExisting && typeof __recipePackingMap !== 'undefined' && __recipePackingMap[fg.id]) {
+                        __recipePackingMap[fg.id].forEach(pm => {
+                            this.bomModal.form.packing_materials.push({
+                                pricelist_id: fg.id,
+                                raw_material_id: pm.raw_material_id,
+                                quantity: pm.quantity,
+                                is_container: pm.is_container || false,
+                                rate: '',
+                                search: ''
+                            });
+                        });
+                    }
+                });
+
                 this.bomModal.step = 4;
             } else if (this.bomModal.step === 4) {
                 this.bomModal.step = 5;

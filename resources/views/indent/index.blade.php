@@ -75,10 +75,14 @@
                     </div>
                     <div>
                         <label class="block text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 ml-1">Item Type</label>
-                        <div class="w-full bg-emerald-50 border border-emerald-200 rounded-xl py-2.5 px-3 text-xs font-black text-emerald-700 shadow-sm flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                            Finished Good
-                        </div>
+                        <select id="item_type_filter" onchange="filterProducts()" class="w-full bg-emerald-50 border border-emerald-200 rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition text-xs font-black text-emerald-700 shadow-sm cursor-pointer">
+                            <option value="">All Types</option>
+                            @foreach($indentProductTypes ?? [] as $type)
+                            <option value="{{ $type->id }}" {{ $type->id == $defaultTypeId ? 'selected' : '' }}>
+                                {{ $type->type_name }}
+                            </option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
 
@@ -574,36 +578,29 @@
 
     function filterProducts() {
         try {
-            const query = document.getElementById('productSearchInput').value.toLowerCase().trim();
+            const query = (document.getElementById('productSearchInput')?.value || '').toLowerCase().trim();
+            const typeId = document.getElementById('item_type_filter')?.value || '';
             const rows = document.querySelectorAll('.product-row');
             
             rows.forEach(row => {
                 const name = (row.dataset.name || '').toLowerCase();
                 const code = (row.dataset.code || '').toLowerCase();
-                
-                if (name.includes(query) || code.includes(query)) {
+                const matchSearch = !query || name.includes(query) || code.includes(query);
+                const matchType = !typeId || row.dataset.typeId === typeId;
+
+                if (matchSearch && matchType) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';
                 }
             });
         } catch (e) {
-            alert('Search Error: ' + e.message);
+            console.error('Filter Error:', e);
         }
     }
 
     function filterProductsByType() {
-        const filterEl = document.getElementById('item_type_filter');
-        if (!filterEl) return;
-        const typeId = filterEl.value;
-        const rows = document.querySelectorAll('.product-row');
-        rows.forEach(row => {
-            if (!typeId || row.dataset.typeId === typeId) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+        filterProducts();
     }
 
     // Call once on load

@@ -22,6 +22,9 @@
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- html2canvas for card sharing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -259,12 +262,42 @@
         // PWA Service Worker Registration
         let deferredPrompt;
         
+        @php
+            // Stamp the registration URL with the worker file's own mtime. Every deploy that
+            // touches service-worker.js changes this, so no proxy or browser cache can pin
+            // users to an old worker.
+            $swBuild = @filemtime(public_path('service-worker.js')) ?: 0;
+        @endphp
+
         if ('serviceWorker' in navigator) {
+            // The new worker calls skipWaiting(), so it takes control as soon as it activates.
+            // Reload at that moment, otherwise the user keeps looking at the old page until
+            // they happen to close and reopen the app.
+            let pwaRefreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (pwaRefreshing) return;
+
+                // Don't yank the page out from under someone who is mid-entry -- the toast
+                // below still lets them refresh when they are ready.
+                const busy = document.querySelector('input:focus, textarea:focus, select:focus');
+                if (busy) return;
+
+                pwaRefreshing = true;
+                window.location.reload();
+            });
+
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register("{{ asset('service-worker.js') }}")
+                navigator.serviceWorker.register("{{ asset('service-worker.js') }}?v={{ $swBuild }}")
                     .then(reg => {
                         console.log('PWA: Service Worker registered!', reg);
-                        
+
+                        // A PWA can stay open for days. Without these checks it would never
+                        // notice a new build until it was fully closed and reopened.
+                        setInterval(() => reg.update().catch(() => {}), 15 * 60 * 1000);
+                        document.addEventListener('visibilitychange', () => {
+                            if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                        });
+
                         // Check for updates
                         reg.addEventListener('updatefound', () => {
                             const newWorker = reg.installing;
@@ -385,6 +418,7 @@
             }
         });
     </script>
+    @stack('scripts')
     </div>
 </body>
 </html>

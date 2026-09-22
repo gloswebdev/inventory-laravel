@@ -291,11 +291,6 @@ class ProductController extends Controller
                     continue;
                 }
 
-                // Resolve Type
-                $group5 = trim($item['Group5'] ?? '');
-                $typeName = $typeMap[$group5] ?? 'General';
-                $productType = ProductType::firstOrCreate(['type_name' => $typeName]);
-
                 // Resolve Category (Group1) as group
                 $categoryRaw = trim($item['Group1'] ?? '');
                 $groupId = null;
@@ -303,6 +298,11 @@ class ProductController extends Controller
                     $group = ProductGroup::firstOrCreate(['group_name' => $categoryRaw]);
                     $groupId = $group->id;
                 }
+
+                // Resolve Type
+                $group5 = trim($item['Group5'] ?? '');
+                $typeName = $typeMap[$group5] ?? ($categoryRaw === '100% SOLUBLE IN WATER' ? '100% SOLUBLE IN WATER' : 'General');
+                $productType = ProductType::firstOrCreate(['type_name' => $typeName]);
 
                 // Extract Size for weight_unit parsing
                 $size = trim($item['Size'] ?? '');

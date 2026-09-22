@@ -34,7 +34,7 @@ class QueryJob extends Model
     ];
 
     /**
-     * Get decoded rows as array
+     * Get decoded rows as array (Warning: Use getPreviewRows for large datasets to avoid memory limit)
      */
     public function getRowsAttribute(): array
     {
@@ -43,5 +43,69 @@ class QueryJob extends Model
         }
         $decoded = json_decode($this->result_rows, true);
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Safely extract first N preview rows without loading entire multi-megabyte JSON into memory
+     */
+    public function getPreviewRows(int $limit = 50): array
+    {
+        return self::extractPreviewRows($this->result_rows, $limit);
+    }
+
+    public static function extractPreviewRows(?string $rawJson, int $limit = 50): array
+    {
+        if (empty($rawJson)) return [];
+        
+        if (strlen($rawJson) < 200000) {
+            $decoded = json_decode($rawJson, true);
+            return is_array($decoded) ? array_slice($decoded, 0, $limit) : [];
+        }
+
+        $preview = [];
+        $raw = trim($rawJson);
+        if (str_starts_with($raw, '[')) {
+            $raw = substr($raw, 1);
+        }
+        
+        $depth = 0;
+        $inString = false;
+        $escape = false;
+        $start = -1;
+        $len = strlen($raw);
+        
+        for ($i = 0; $i < $len && count($preview) < $limit; $i++) {
+            $char = $raw[$i];
+            
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+            if ($char === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($char === '"') {
+                $inString = !$inString;
+                continue;
+            }
+            
+            if (!$inString) {
+                if ($char === '{') {
+                    if ($depth === 0) $start = $i;
+                    $depth++;
+                } elseif ($char === '}') {
+                    $depth--;
+                    if ($depth === 0 && $start !== -1) {
+                        $objStr = substr($raw, $start, $i - $start + 1);
+                        $obj = json_decode($objStr, true);
+                        if ($obj) $preview[] = $obj;
+                        $start = -1;
+                    }
+                }
+            }
+        }
+        
+        return $preview;
     }
 }

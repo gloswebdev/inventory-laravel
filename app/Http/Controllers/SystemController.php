@@ -199,14 +199,14 @@ class SystemController extends Controller
         $this->adminOnly();
 
         @set_time_limit(0);
-        @ini_set('memory_limit', '512M');
+        @ini_set('memory_limit', '1024M');
 
         $dbName   = config('database.connections.mysql.database', 'inventory_laravel_db');
         $filename = 'invoflow_backup_' . date('Ymd_His') . '.sql';
 
         return response()->streamDownload(function () use ($dbName) {
             @set_time_limit(0);
-            @ini_set('memory_limit', '512M');
+            @ini_set('memory_limit', '1024M');
 
             $out = fopen('php://output', 'w');
 
@@ -226,9 +226,18 @@ class SystemController extends Controller
             $tables = DB::select('SHOW TABLES');
             $tableKey = 'Tables_in_' . $dbName;
 
+            // Skip heavy tables that are synced locally and would cause hosting timeout
+            $skipTables = ['mssql_sales_records'];
+
             foreach ($tables as $tableObj) {
                 $table = $tableObj->$tableKey ?? array_values((array)$tableObj)[0];
                 if (empty($table)) continue;
+                if (in_array($table, $skipTables)) {
+                    fwrite($out, "-- SKIPPED: `{$table}` (large sync table, excluded from backup)\n\n");
+                    if (ob_get_level() > 0) @ob_flush();
+                    @flush();
+                    continue;
+                }
 
                 // CREATE TABLE Statement
                 try {
@@ -242,35 +251,20 @@ class SystemController extends Controller
                     continue;
                 }
 
-                // INSERT DATA streamed via PDO (Instant, no RAM buffer, no timeout)
+                // INSERT DATA streamed via unbuffered PDO statement (Zero RAM buffering)
                 try {
-                    $stmt = $pdo->query("SELECT * FROM `{$table}`");
-                    if ($stmt) {
-                        $stmt->setFetchMode(\PDO::FETCH_ASSOC);
-                        $batch = [];
+                    $stmt = $pdo->prepare("SELECT * FROM `{$table}`", [\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false]);
+                    $stmt->execute();
+                    $stmt->setFetchMode(\PDO::FETCH_ASSOC);
 
-                        while ($row = $stmt->fetch()) {
-                            $batch[] = $row;
-                            if (count($batch) >= 100) {
-                                $cols = array_keys($batch[0]);
-                                $colList = '`' . implode('`, `', $cols) . '`';
-                                $valuesList = [];
-                                foreach ($batch as $r) {
-                                    $vals = array_map(function ($v) {
-                                        if ($v === null) return 'NULL';
-                                        return "'" . addslashes((string)$v) . "'";
-                                    }, $r);
-                                    $valuesList[] = '(' . implode(', ', $vals) . ')';
-                                }
-                                fwrite($out, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
-                                $batch = [];
+                    $batch = [];
+                    $batchCount = 0;
 
-                                if (ob_get_level() > 0) @ob_flush();
-                                @flush();
-                            }
-                        }
+                    while ($row = $stmt->fetch()) {
+                        $batch[] = $row;
+                        $batchCount++;
 
-                        if (!empty($batch)) {
+                        if ($batchCount >= 500) {
                             $cols = array_keys($batch[0]);
                             $colList = '`' . implode('`, `', $cols) . '`';
                             $valuesList = [];
@@ -283,8 +277,29 @@ class SystemController extends Controller
                             }
                             fwrite($out, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
                             $batch = [];
+                            $batchCount = 0;
+
+                            if (ob_get_level() > 0) @ob_flush();
+                            @flush();
                         }
                     }
+
+                    if (!empty($batch)) {
+                        $cols = array_keys($batch[0]);
+                        $colList = '`' . implode('`, `', $cols) . '`';
+                        $valuesList = [];
+                        foreach ($batch as $r) {
+                            $vals = array_map(function ($v) {
+                                if ($v === null) return 'NULL';
+                                return "'" . addslashes((string)$v) . "'";
+                            }, $r);
+                            $valuesList[] = '(' . implode(', ', $vals) . ')';
+                        }
+                        fwrite($out, "INSERT INTO `{$table}` ({$colList}) VALUES\n" . implode(",\n", $valuesList) . ";\n\n");
+                        $batch = [];
+                    }
+
+                    $stmt->closeCursor();
                 } catch (\Throwable $de) {}
 
                 if (ob_get_level() > 0) @ob_flush();
@@ -310,75 +325,189 @@ class SystemController extends Controller
     {
         $this->adminOnly();
 
-        @set_time_limit(600);
-        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+        @ini_set('memory_limit', '1024M');
 
         $request->validate([
-            'sql_file' => 'required|file|max:102400', // 100MB max
+            'sql_file' => 'required|file|max:307200', // 300MB max
         ]);
 
         $file = $request->file('sql_file');
         $ext  = strtolower($file->getClientOriginalExtension());
-        $content = '';
+        $tempSqlPath = null;
 
         if ($ext === 'zip') {
             if (!class_exists('ZipArchive')) {
-                return back()->with('system_error', 'PHP Zip extension server par available nahi hai.');
+                return back()->with('system_error', 'PHP Zip extension is not installed on this server.');
             }
             $zip = new \ZipArchive();
             if ($zip->open($file->getRealPath()) === true) {
+                $foundSql = false;
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $stat = $zip->statIndex($i);
                     if (str_ends_with(strtolower($stat['name']), '.sql')) {
-                        $content = $zip->getFromIndex($i);
+                        $tempSqlPath = storage_path('app/temp_restore_' . time() . '.sql');
+                        file_put_contents($tempSqlPath, $zip->getFromIndex($i));
+                        $foundSql = true;
                         break;
                     }
                 }
                 $zip->close();
+
+                if (!$foundSql || !file_exists($tempSqlPath)) {
+                    return back()->with('system_error', 'Uploaded ZIP file does not contain any valid .sql file.');
+                }
             } else {
-                return back()->with('system_error', 'Uploaded ZIP file corrupt hai ya open nahi hui.');
+                return back()->with('system_error', 'Uploaded ZIP file is corrupt or could not be opened.');
             }
         } else {
-            $content = file_get_contents($file->getRealPath());
+            $tempSqlPath = $file->getRealPath();
         }
 
-        if (empty(trim($content))) {
-            return back()->with('system_error', 'SQL / ZIP file khali hai ya usme koi valid .sql file nahi mili!');
+        // Quick check on first 4KB to detect HTML error responses
+        $headerCheck = '';
+        $fCheck = @fopen($tempSqlPath, 'r');
+        if ($fCheck) {
+            $headerCheck = fread($fCheck, 4096);
+            fclose($fCheck);
         }
 
-        // Safety check
-        if (!str_contains($content, 'CREATE TABLE') && !str_contains($content, 'INSERT INTO')) {
-            return back()->with('system_error', 'Valid SQL backup file nahi lag rahi. InvoFlow backup file use karo.');
+        $trimmedHeader = ltrim($headerCheck);
+        if (str_starts_with($trimmedHeader, '<!') || str_starts_with($trimmedHeader, '<html') || str_starts_with($trimmedHeader, '<?xml')) {
+            if (isset($tempSqlPath) && str_contains($tempSqlPath, 'temp_restore_')) {
+                @unlink($tempSqlPath);
+            }
+            if (str_contains($headerCheck, 'FatalError') || str_contains($headerCheck, 'Internal Server Error') || str_contains($headerCheck, 'Allowed memory size')) {
+                return back()->with('system_error', '❌ The uploaded file is an HTML Error Page (500 Server Out of Memory / Fatal Error from the live server), NOT a valid SQL backup. Please generate a fresh database backup from the live server using mysqldump or the email backup feature.');
+            }
+            return back()->with('system_error', '❌ The uploaded file is an HTML webpage, not a valid SQL database backup.');
         }
 
+        if (empty(trim($headerCheck))) {
+            if (isset($tempSqlPath) && str_contains($tempSqlPath, 'temp_restore_')) {
+                @unlink($tempSqlPath);
+            }
+            return back()->with('system_error', 'The uploaded backup file is completely empty.');
+        }
+
+        $dbName = config('database.connections.mysql.database', 'inventory_laravel_db');
+
+        // 1. Drop all existing tables upfront with FOREIGN_KEY_CHECKS=0 to eliminate orphan FK constraints & conflicts
         try {
             DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            $existingTables = DB::select('SHOW TABLES');
+            $tableKey = 'Tables_in_' . $dbName;
+            foreach ($existingTables as $tObj) {
+                $t = $tObj->$tableKey ?? array_values((array)$tObj)[0] ?? null;
+                if (!empty($t)) {
+                    DB::statement("DROP TABLE IF EXISTS `{$t}`");
+                }
+            }
+        } catch (\Throwable $dropAllEx) {}
 
-            // Split into statements
-            $statements = array_filter(
-                array_map('trim', preg_split('/;\s*\n/', $content)),
-                fn($s) => !empty($s) && !str_starts_with($s, '--')
-            );
+        // 2. Try native MySQL CLI import first (Fastest: 1-2s, 0 RAM, 100% MariaDB compatible)
+        if ($this->runMysqlCliImport($tempSqlPath, $dbName)) {
+            if (isset($tempSqlPath) && str_contains($tempSqlPath, 'temp_restore_')) {
+                @unlink($tempSqlPath);
+            }
+            try {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            } catch (\Throwable $e) {}
 
+            return back()->with('system_success', "✅ Database restored successfully via native MySQL engine!");
+        }
+
+        // 3. Fallback: PHP Stream-based SQL line-by-line processor
+        try {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            DB::statement('SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO"');
+
+            $handle = fopen($tempSqlPath, 'r');
+            if (!$handle) {
+                throw new \Exception('Could not open SQL file for processing.');
+            }
+
+            $currentStmt = '';
             $executed = 0;
-            foreach ($statements as $stmt) {
-                if (empty(trim($stmt))) continue;
+            $inComment = false;
 
-                // Skip huge product_sync_logs insert statements to prevent max_allowed_packet crash
-                if (preg_match('/INSERT\s+INTO\s+`?product_sync_logs`?/i', $stmt)) {
-                    if (strlen($stmt) > 50000) { // > 50KB
-                        continue;
+            while (($line = fgets($handle)) !== false) {
+                $trimmed = trim($line);
+                if ($trimmed === '') continue;
+
+                // Handle multi-line block comments /* ... */
+                if ($inComment) {
+                    if (str_contains($trimmed, '*/')) {
+                        $inComment = false;
                     }
+                    continue;
+                }
+                if (str_starts_with($trimmed, '/*') && !str_starts_with($trimmed, '/*!')) {
+                    if (!str_contains($trimmed, '*/')) {
+                        $inComment = true;
+                    }
+                    continue;
                 }
 
-                DB::unprepared($stmt);
-                $executed++;
+                // Skip line comments
+                if (str_starts_with($trimmed, '--') || str_starts_with($trimmed, '#')) {
+                    continue;
+                }
+
+                $currentStmt .= $line;
+
+                if (str_ends_with($trimmed, ';')) {
+                    $stmtTrimmed = trim($currentStmt);
+                    if (empty($stmtTrimmed)) {
+                        $currentStmt = '';
+                        continue;
+                    }
+
+                    // Skip excessive product_sync_logs INSERT statements (> 100KB) to prevent packet errors
+                    if (preg_match('/INSERT\s+INTO\s+`?product_sync_logs`?/i', $stmtTrimmed) && strlen($stmtTrimmed) > 100000) {
+                        $currentStmt = '';
+                        continue;
+                    }
+
+                    try {
+                        DB::unprepared($currentStmt);
+                        $executed++;
+                    } catch (\Throwable $queryError) {
+                        $msg = $queryError->getMessage();
+                        // Ignore harmless DROP errors or non-breaking warnings
+                        if (
+                            !str_starts_with(strtoupper($stmtTrimmed), 'DROP TABLE') &&
+                            !str_contains($msg, 'already exists') &&
+                            !str_contains($msg, 'Duplicate column') &&
+                            !str_contains($msg, 'Duplicate key name') &&
+                            !str_contains($msg, 'Duplicate entry')
+                        ) {
+                            fclose($handle);
+                            if (str_contains($tempSqlPath, 'temp_restore_')) {
+                                @unlink($tempSqlPath);
+                            }
+                            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+                            return back()->with('system_error', 'Restore failed on statement: ' . $msg);
+                        }
+                    }
+
+                    $currentStmt = '';
+                }
+            }
+
+            fclose($handle);
+
+            if (str_contains($tempSqlPath, 'temp_restore_')) {
+                @unlink($tempSqlPath);
             }
 
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
-            return back()->with('system_success', "✅ Restore successful! $executed SQL statements executed.");
+            return back()->with('system_success', "✅ Database restored successfully! $executed SQL statements executed.");
         } catch (\Exception $e) {
+            if (isset($tempSqlPath) && str_contains($tempSqlPath, 'temp_restore_')) {
+                @unlink($tempSqlPath);
+            }
             DB::statement('SET FOREIGN_KEY_CHECKS=1');
             return back()->with('system_error', 'Restore failed: ' . $e->getMessage());
         }
@@ -391,8 +520,11 @@ class SystemController extends Controller
     {
         $this->adminOnly();
 
+        @set_time_limit(0);
+        @ini_set('memory_limit', '1024M');
+
         $request->validate([
-            'update_zip' => 'required|file|mimes:zip|max:102400', // 100MB
+            'update_zip' => 'required|file|mimes:zip|max:307200', // 300MB
         ]);
 
         if (!extension_loaded('zip')) {
@@ -519,5 +651,78 @@ class SystemController extends Controller
         );
         foreach ($it as $f) { $f->isDir() ? @rmdir($f) : @unlink($f); }
         @rmdir($dir);
+    }
+
+    /**
+     * Find mysql CLI binary path
+     */
+    private function findMysqlCli(): ?string
+    {
+        if (!function_exists('exec')) {
+            return null;
+        }
+
+        $binaries = [
+            'C:\\xampp\\mysql\\bin\\mysql.exe',
+            'mysql',
+            '/usr/bin/mysql',
+            '/usr/local/bin/mysql',
+            '/usr/local/mysql/bin/mysql',
+        ];
+
+        foreach ($binaries as $bin) {
+            $output = [];
+            $ret = 1;
+            @exec("{$bin} --version 2>&1", $output, $ret);
+            if ($ret === 0) {
+                return $bin;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Import SQL file directly via native MySQL CLI client
+     */
+    private function runMysqlCliImport(string $sqlFilePath, string $dbName): bool
+    {
+        $bin = $this->findMysqlCli();
+        if (!$bin) return false;
+
+        $host = config('database.connections.mysql.host', '127.0.0.1');
+        $port = config('database.connections.mysql.port', '3306');
+        $user = config('database.connections.mysql.username', 'root');
+        $pass = config('database.connections.mysql.password', '');
+
+        $cmd = [
+            $bin,
+            '--host=' . $host,
+            '--port=' . $port,
+            '--user=' . $user,
+            '--default-character-set=utf8mb4',
+            $dbName,
+        ];
+        if (!empty($pass)) {
+            $cmd[] = '--password=' . $pass;
+        }
+
+        $descriptorspec = [
+            0 => ['file', $sqlFilePath, 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = @proc_open($cmd, $descriptorspec, $pipes);
+        if (!is_resource($process)) {
+            return false;
+        }
+
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $returnCode = proc_close($process);
+        return $returnCode === 0;
     }
 }

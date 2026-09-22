@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Library\ErpStockPushService;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 
@@ -44,6 +45,8 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.stock'                  => 'mobile_stock',
                     'mobile.production'             => 'mobile_production',
                     'mobile.production.store'       => 'mobile_production',
+                    'mobile.production.retry-erp'   => 'mobile_production',
+                    'mobile.production.bulk-retry-erp' => 'mobile_production',
                     'mobile.planning'               => 'mobile_planning',
                     'mobile.planning.calculate'     => 'mobile_planning',
                     'mobile.planning.pdf'           => 'mobile_planning',
@@ -67,6 +70,9 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.recipes.destroy'        => 'mobile_recipes',
                     'mobile.adjustments'            => 'mobile_adjustments',
                     'mobile.adjustments.store'      => 'mobile_adjustments',
+                    'mobile.adjustments.bulk-retry-erp' => 'mobile_adjustments',
+                    'mobile.adjustments.retry-erp'      => 'mobile_adjustments',
+                    'mobile.adjustments.destroy'        => 'mobile_adjustments',
                     'mobile.ledger'                 => 'mobile_ledger',
                     'mobile.products'               => 'mobile_products',
                     'mobile.products.store'         => 'mobile_products',
@@ -101,6 +107,7 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.costing.pricelist-update.push' => 'mobile_costing_pricelist_update',
                     'mobile.costing.pricelist-update.history' => 'mobile_costing_pricelist_update',
                     'mobile.purchase-report'        => 'mobile_purchase_report',
+                    'mobile.sales-report'           => 'mobile_sales_report',
                     
                     // Collection Report & Targets
                     'mobile.collection-report'                => 'mobile_collection',
@@ -252,6 +259,20 @@ class MobileController extends Controller implements HasMiddleware
                 'route'      => 'mobile.purchase-report',
                 'color'      => 'bg-orange-500',
                 'permission' => 'mobile_purchase_report'
+            ],
+            [
+                'name'       => 'Sales Report',
+                'icon'       => 'fas fa-chart-line',
+                'route'      => 'mobile.sales-report',
+                'color'      => 'bg-blue-600',
+                'permission' => 'mobile_sales_report'
+            ],
+            [
+                'name'       => '360° Sales',
+                'icon'       => 'fas fa-circle-nodes',
+                'route'      => 'mobile.sales-360',
+                'color'      => 'bg-green-600',
+                'permission' => 'mobile_sales_360'
             ],
             [
                 'name'       => 'Collection Report',
@@ -663,10 +684,16 @@ class MobileController extends Controller implements HasMiddleware
         $permittedCodes = $user->getPermittedBranchCodes();
         $permittedTypeIds = $user->getPermittedProductTypeIds();
 
-        $productsQuery = Product::whereHas('recipes')->orderBy('name');
+        $productsQuery = Product::orderBy('name');
 
         if ($user->role !== 'admin') {
-            $productsQuery->whereIn('product_type_id', $permittedTypeIds);
+            $permittedRMTypes = $user->getPermittedRMTypes();
+            $productsQuery->whereIn('product_type_id', $permittedTypeIds)
+                ->where(function ($q) use ($permittedRMTypes) {
+                    $q->whereIn('rm_type', $permittedRMTypes)
+                        ->orWhereNull('rm_type')
+                        ->orWhere('rm_type', '');
+                });
         }
 
         $products = $productsQuery->get();
@@ -680,7 +707,14 @@ class MobileController extends Controller implements HasMiddleware
             ->limit(20)
             ->get();
 
-        return view('mobile.production', compact('products', 'branches', 'history', 'productTypes'));
+        $unpushedCount = \App\Models\Production::whereIn('branch_code', $permittedCodes)
+            ->where(function($q) {
+                $q->whereIn('erp_push_status', ['pending', 'failed', 'skipped'])
+                  ->orWhereNull('erp_push_status');
+            })
+            ->count();
+
+        return view('mobile.production', compact('products', 'branches', 'history', 'productTypes', 'unpushedCount'));
     }
 
     /**
@@ -695,7 +729,7 @@ class MobileController extends Controller implements HasMiddleware
         $permittedRMTypes = $user->getPermittedRMTypes();
         
         // Use Actual IDs for Finished Good (6) and Semi Finished Good (7)
-        $productsQuery = Product::whereHas('recipes')->whereIn('product_type_id', [6, 7])->orderBy('name');
+        $productsQuery = Product::whereIn('product_type_id', [6, 7])->orderBy('name');
         
         if ($user->role !== 'admin') {
             $productsQuery->whereIn('product_type_id', $permittedTypeIds)
@@ -1165,7 +1199,6 @@ class MobileController extends Controller implements HasMiddleware
     {
         $request->validate([
             'branch_code' => 'required',
-            'product_id' => 'required|exists:products,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
@@ -1175,14 +1208,18 @@ class MobileController extends Controller implements HasMiddleware
         ]);
 
         $branch = Branch::where('code', $request->branch_code)->first();
+        $includePackagingBatch = filter_var($request->input('include_packaging', true), FILTER_VALIDATE_BOOLEAN);
+        $includeFormulationBatch = filter_var($request->input('include_formulation', false), FILTER_VALIDATE_BOOLEAN);
+        $resolver = app(\App\Services\BomResolverService::class);
 
         try {
-            DB::transaction(function () use ($request, $branch) {
+            $production = DB::transaction(function () use ($request, $branch, $includePackagingBatch, $includeFormulationBatch, $resolver) {
                 $production = Production::create([
-                    'production_date' => $request->production_date,
-                    'branch_code' => $request->branch_code,
-                    'branch_name' => $branch ? $branch->name : $request->branch_code,
-                    'user_id' => auth()->id(),
+                    'production_date' => $request->production_date ?? now()->toDateString(),
+                    'branch_code'     => $request->branch_code,
+                    'branch_name'     => $branch ? $branch->name : $request->branch_code,
+                    'user_id'         => auth()->id(),
+                    'erp_push_status' => 'pending',
                 ]);
 
                 foreach ($request->items as $itemData) {
@@ -1194,108 +1231,82 @@ class MobileController extends Controller implements HasMiddleware
                         }
                     }
 
-                    $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
+                    $quantityBoxes = (float)$itemData['quantity'];
+                    $itemIncludePackaging = isset($itemData['include_packaging'])
+                        ? filter_var($itemData['include_packaging'], FILTER_VALIDATE_BOOLEAN)
+                        : $includePackagingBatch;
+                    $itemIncludeFormulation = isset($itemData['include_formulation']) 
+                        ? filter_var($itemData['include_formulation'], FILTER_VALIDATE_BOOLEAN)
+                        : $includeFormulationBatch;
 
                     $unitPerBox = (float)($product->unit_box ?: 1);
-                    $totalUnits = $itemData['quantity'] * $unitPerBox;
-                    $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+                    $totalUnits = $quantityBoxes * $unitPerBox;
 
                     ProductionItem::create([
                         'production_id' => $production->id,
-                        'product_id' => $product->id,
-                        'product_name' => $product->name,
-                        'pack_size' => $product->pack_name,
-                        'quantity_box' => $itemData['quantity'],
-                        'batch_number' => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
-                        'mfg_date' => $itemData['mfg_date'] ?? null,
-                        'exp_date' => $itemData['exp_date'] ?? null,
+                        'product_id'    => $product->id,
+                        'product_name'  => $product->name,
+                        'pack_size'     => $product->pack_name,
+                        'quantity_box'  => $quantityBoxes,
+                        'batch_number'  => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
+                        'mfg_date'      => $itemData['mfg_date'] ?? null,
+                        'exp_date'      => $itemData['exp_date'] ?? null,
                     ]);
 
                     $product->increment('current_stock', $totalUnits);
                     StockLedger::create([
-                        'product_id' => $product->id,
+                        'product_id'       => $product->id,
                         'transaction_type' => 'production_add',
-                        'transaction_id' => $production->id,
-                        'change_quantity' => $totalUnits,
-                        'new_stock' => $product->current_stock,
+                        'transaction_id'   => $production->id,
+                        'change_quantity'  => $totalUnits,
+                        'new_stock'        => $product->current_stock,
                     ]);
 
-                    if ($recipe) {
-                        foreach ($recipe->items as $recipeItem) {
-                            $deductQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
-                            $rawMaterial = Product::find($recipeItem->raw_material_id);
-                            $rawMaterial->decrement('current_stock', $deductQty);
+                    // Deduct BOM materials via BomResolverService (Packaging if toggled; Formulation if toggled)
+                    $bom = $resolver->resolve($product, $quantityBoxes, $itemIncludeFormulation, $itemIncludePackaging);
+                    foreach ($bom['all_materials'] as $mat) {
+                        if (!empty($mat['id'])) {
+                            $rawMaterial = Product::find($mat['id']);
+                            if ($rawMaterial) {
+                                $rawMaterial->decrement('current_stock', $mat['required_quantity']);
 
-                            StockLedger::create([
-                                'product_id' => $rawMaterial->id,
-                                'transaction_type' => 'production_deduct',
-                                'transaction_id' => $production->id,
-                                'change_quantity' => -$deductQty,
-                                'new_stock' => $rawMaterial->current_stock,
-                            ]);
-                        }
-                    }
-                }
-
-                // ── ERP PUSH (non-blocking) ────────────────────────────────────────
-                if (\App\Models\AppSetting::get('erp_push_enabled', '0') === '1') {
-                    $production->load('items.product');
-                    $issueItems   = [];
-                    $receiptItems = [];
-
-                    foreach ($production->items as $prodItem) {
-                        $product = $prodItem->product;
-                        if (!$product) continue;
-
-                        $unitPerBox  = (float) ($product->unit_box ?: 1);
-                        $totalUnits  = $prodItem->quantity_box * $unitPerBox;
-                        $receiptItems[] = [
-                            'item_code' => $product->item_code,
-                            'quantity'  => $totalUnits,
-                            'lot_no'    => $prodItem->batch_number,
-                            'mfg_date'  => $prodItem->mfg_date,
-                            'exp_date'  => $prodItem->exp_date,
-                            'rate'      => (float) ($product->price ?? 0),
-                        ];
-
-                        $recipe = Recipe::where('finished_product_id', $product->id)->with('items.rawMaterial')->first();
-                        if ($recipe) {
-                            $totalBase = $totalUnits * $product->weight_multiplier;
-                            foreach ($recipe->items as $recipeItem) {
-                                $rm  = $recipeItem->rawMaterial;
-                                if (!$rm || !$rm->item_code) continue;
-                                $qty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalBase;
-                                $issueItems[] = [
-                                    'item_code' => $rm->item_code,
-                                    'quantity'  => $qty,
-                                ];
+                                StockLedger::create([
+                                    'product_id'       => $rawMaterial->id,
+                                    'transaction_type' => 'production_deduct',
+                                    'transaction_id'   => $production->id,
+                                    'change_quantity'  => -$mat['required_quantity'],
+                                    'new_stock'        => $rawMaterial->current_stock,
+                                ]);
                             }
                         }
                     }
-
-                    $erp = new \App\Library\ErpStockPushService();
-                    $issueResult   = ['success' => true, 'response' => []];
-                    $receiptResult = ['success' => true, 'response' => []];
-
-                    if (!empty($issueItems)) {
-                        $issueResult = $erp->pushIssueStock($production, $issueItems);
-                    }
-                    if (!empty($receiptItems)) {
-                        $receiptResult = $erp->pushReceiptStock($production, $receiptItems);
-                    }
-
-                    $erpSuccess = $issueResult['success'] && $receiptResult['success'];
-                    $production->update([
-                        'erp_push_status'      => $erpSuccess ? 'success' : 'failed',
-                        'erp_issue_response'   => json_encode($issueResult['response'] ?? []),
-                        'erp_receipt_response' => json_encode($receiptResult['response'] ?? []),
-                    ]);
-                } else {
-                    $production->update(['erp_push_status' => 'skipped']);
                 }
+
+                return $production;
             });
 
-            return response()->json(['success' => true, 'message' => 'Production recorded successfully!']);
+            // ── ERP PUSH (non-blocking) ────────────────────────────────────────
+            if (\App\Models\AppSetting::get('erp_push_enabled', '0') === '1') {
+                $prodController = app(\App\Http\Controllers\ProductionController::class);
+                $result = $prodController->pushProductionToErp($production);
+
+                $erpMsg = $result['success']
+                    ? " ERP Synced ✓ [Receipt: {$result['receipt_doc']} | Issue: {$result['issue_doc']}]"
+                    : " ERP Push Failed (Can be retried from History)";
+
+                return response()->json([
+                    'success'    => true,
+                    'message'    => 'Production recorded successfully!' . $erpMsg,
+                    'erp_status' => $result['success'] ? 'success' : 'failed',
+                ]);
+            } else {
+                $production->update(['erp_push_status' => 'skipped']);
+                return response()->json([
+                    'success'    => true,
+                    'message'    => 'Production recorded successfully! (ERP sync skipped)',
+                    'erp_status' => 'skipped',
+                ]);
+            }
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
         }
@@ -1314,42 +1325,82 @@ class MobileController extends Controller implements HasMiddleware
             $production = Production::findOrFail($id);
 
             DB::transaction(function () use ($production) {
-                foreach ($production->items as $item) {
-                    $product = Product::find($item->product_id);
-                    if (!$product) continue;
-                    $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
+                // Revert previous deductions via StockLedger (exact record of what was deducted)
+                $deductLedgers = StockLedger::where('transaction_id', $production->id)
+                    ->where('transaction_type', 'production_deduct')
+                    ->get();
+                $addLedgers = StockLedger::where('transaction_id', $production->id)
+                    ->where('transaction_type', 'production_add')
+                    ->get();
 
-                    $unitPerBox = (float)($product->unit_box ?: 1);
-                    $totalUnits = $item->quantity_box * $unitPerBox;
-                    $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
+                if ($deductLedgers->isNotEmpty() || $addLedgers->isNotEmpty()) {
+                    foreach ($addLedgers as $ledger) {
+                        $p = Product::find($ledger->product_id);
+                        if ($p) {
+                            $p->decrement('current_stock', $ledger->change_quantity);
+                            StockLedger::create([
+                                'product_id'       => $p->id,
+                                'transaction_type' => 'production_delete_deduct',
+                                'transaction_id'   => $production->id,
+                                'change_quantity'  => -$ledger->change_quantity,
+                                'new_stock'        => $p->current_stock,
+                            ]);
+                        }
+                    }
 
-                    $product->decrement('current_stock', $totalUnits);
-                    StockLedger::create([
-                        'product_id' => $product->id,
-                        'transaction_type' => 'production_delete_deduct',
-                        'transaction_id' => $production->id,
-                        'change_quantity' => -$totalUnits,
-                        'new_stock' => $product->current_stock,
-                    ]);
+                    foreach ($deductLedgers as $ledger) {
+                        $rm = Product::find($ledger->product_id);
+                        if ($rm) {
+                            $revertQty = abs($ledger->change_quantity);
+                            $rm->increment('current_stock', $revertQty);
+                            StockLedger::create([
+                                'product_id'       => $rm->id,
+                                'transaction_type' => 'production_delete_add',
+                                'transaction_id'   => $production->id,
+                                'change_quantity'  => $revertQty,
+                                'new_stock'        => $rm->current_stock,
+                            ]);
+                        }
+                    }
+                } else {
+                    // Fallback if ledger was not present
+                    foreach ($production->items as $item) {
+                        $product = Product::find($item->product_id);
+                        if (!$product) continue;
+                        $recipe = Recipe::where('finished_product_id', $product->id)->with('items')->first();
 
-                    if ($recipe) {
-                        foreach ($recipe->items as $recipeItem) {
-                            $reverseQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
-                            $rawMaterial = Product::find($recipeItem->raw_material_id);
-                            if ($rawMaterial) {
-                                $rawMaterial->increment('current_stock', $reverseQty);
+                        $unitPerBox = (float)($product->unit_box ?: 1);
+                        $totalUnits = $item->quantity_box * $unitPerBox;
+                        $totalProducedInBaseUnit = $totalUnits * $product->weight_multiplier;
 
-                                StockLedger::create([
-                                    'product_id' => $rawMaterial->id,
-                                    'transaction_type' => 'production_delete_add',
-                                    'transaction_id' => $production->id,
-                                    'change_quantity' => $reverseQty,
-                                    'new_stock' => $rawMaterial->current_stock,
-                                ]);
+                        $product->decrement('current_stock', $totalUnits);
+                        StockLedger::create([
+                            'product_id'       => $product->id,
+                            'transaction_type' => 'production_delete_deduct',
+                            'transaction_id'   => $production->id,
+                            'change_quantity'  => -$totalUnits,
+                            'new_stock'        => $product->current_stock,
+                        ]);
+
+                        if ($recipe) {
+                            foreach ($recipe->items as $recipeItem) {
+                                $reverseQty = ($recipeItem->quantity / $recipe->yield_quantity) * $totalProducedInBaseUnit;
+                                $rawMaterial = Product::find($recipeItem->raw_material_id);
+                                if ($rawMaterial) {
+                                    $rawMaterial->increment('current_stock', $reverseQty);
+                                    StockLedger::create([
+                                        'product_id'       => $rawMaterial->id,
+                                        'transaction_type' => 'production_delete_add',
+                                        'transaction_id'   => $production->id,
+                                        'change_quantity'  => $reverseQty,
+                                        'new_stock'        => $rawMaterial->current_stock,
+                                    ]);
+                                }
                             }
                         }
                     }
                 }
+
                 $production->delete();
             });
 
@@ -1410,12 +1461,12 @@ class MobileController extends Controller implements HasMiddleware
     /**
      * Mobile Stock Adjustments
      */
-    public function adjustments()
+    public function adjustments(Request $request)
     {
         $user = Auth::user();
         if (!$user->hasFeature('mobile_adjustments', 'view')) abort(403);
 
-        $query = Adjustment::with('product')->orderByDesc('created_at');
+        $query = Adjustment::with(['product.type', 'user'])->orderByDesc('created_at');
 
         if ($user->role !== 'admin') {
             $permittedTypeIds = $user->getPermittedProductTypeIds();
@@ -1431,16 +1482,70 @@ class MobileController extends Controller implements HasMiddleware
             });
         }
 
-        $adjustments = $query->limit(50)->get();
+        // Filters
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'like', "%{$search}%")
+                  ->orWhere('reason', 'like', "%{$search}%")
+                  ->orWhere('branch_name', 'like', "%{$search}%")
+                  ->orWhereHas('product', function($pq) use ($search) {
+                      $pq->where('name', 'like', "%{$search}%")
+                         ->orWhere('item_code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->filled('type') && in_array($request->type, ['add', 'deduct'])) {
+            $query->where('adjustment_type', $request->type);
+        }
+
+        // Product Types & Branches
+        $productTypes = ProductType::orderBy('type_name')->get();
+
+        $isBranchLocked = ($user->role !== 'admin') && ($user->hasFeature('mobile_adjustments', 'branch_lock') || !$user->hasFeature('mobile_adjustments', 'branch_select'));
+        $userBranches = $user->branches;
+        $lockedBranch = $isBranchLocked ? $userBranches->first() : null;
+
+        if ($isBranchLocked && $lockedBranch) {
+            $branches = $userBranches->count() > 0 ? $userBranches : Branch::where('code', $lockedBranch->code)->get();
+            $query->where('branch_code', $lockedBranch->code);
+        } else {
+            $branches = Branch::orderBy('name')->get();
+        }
+
+        $adjustments = $query->limit(60)->get();
         
-        $productsQuery = Product::orderBy('name');
+        $productsQuery = Product::with('type')->orderBy('name');
         if ($user->role !== 'admin') {
             $permittedTypeIds = $user->getPermittedProductTypeIds();
-            $productsQuery->whereIn('product_type_id', $permittedTypeIds);
+            $permittedRMTypes = $user->getPermittedRMTypes();
+            $productsQuery->whereIn('product_type_id', $permittedTypeIds)
+                ->where(function($sq) use ($permittedRMTypes) {
+                    $sq->whereIn('rm_type', $permittedRMTypes)
+                      ->orWhereNull('rm_type')
+                      ->orWhere('rm_type', '');
+                });
         }
         $products = $productsQuery->get();
+
+        $totalAdjustments = Adjustment::count();
+        $totalReceipts = Adjustment::where('adjustment_type', 'add')->count();
+        $totalIssues = Adjustment::where('adjustment_type', 'deduct')->count();
+        $unsyncedCount = Adjustment::whereIn('erp_push_status', ['pending', 'failed'])->count();
         
-        return view('mobile.adjustments', compact('adjustments', 'products'));
+        return view('mobile.adjustments', compact(
+            'adjustments',
+            'products',
+            'productTypes',
+            'branches',
+            'isBranchLocked',
+            'lockedBranch',
+            'totalAdjustments',
+            'totalReceipts',
+            'totalIssues',
+            'unsyncedCount'
+        ));
     }
 
     /**
@@ -1449,26 +1554,57 @@ class MobileController extends Controller implements HasMiddleware
     public function storeAdjustment(Request $request)
     {
         $user = Auth::user();
-        if (!$user->hasFeature('mobile_adjustments', 'create')) {
-            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+
+        // Permissions check
+        if ($request->adjustment_type === 'add' && !$user->hasFeature('mobile_adjustments', 'create_receipt')) {
+            return response()->json(['success' => false, 'message' => 'You do not have permission to record Stock Receipts (+).'], 403);
+        }
+        if ($request->adjustment_type === 'deduct' && !$user->hasFeature('mobile_adjustments', 'create_issue')) {
+            return response()->json(['success' => false, 'message' => 'You do not have permission to record Stock Issues (-).'], 403);
         }
 
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id'      => 'required|exists:products,id',
             'adjustment_type' => 'required|in:add,deduct',
-            'quantity' => 'required|numeric|min:0.001',
-            'reason' => 'nullable|string|max:1000',
+            'quantity'        => 'required|numeric|min:0.0001',
+            'branch_code'     => 'nullable|string|max:50',
+            'reason'          => 'nullable|string|max:1000',
+            'sync_erp'        => 'nullable|boolean',
         ]);
 
+        $isBranchLocked = ($user->role !== 'admin') && ($user->hasFeature('mobile_adjustments', 'branch_lock') || !$user->hasFeature('mobile_adjustments', 'branch_select'));
+        $lockedBranch = $isBranchLocked ? $user->branches->first() : null;
+
+        if ($isBranchLocked && $lockedBranch) {
+            $validated['branch_code'] = $lockedBranch->code;
+            $branchName = $lockedBranch->name;
+        } else {
+            $branchName = null;
+            if (!empty($validated['branch_code'])) {
+                $branch = Branch::where('code', $validated['branch_code'])->first();
+                $branchName = $branch ? $branch->name : "Branch {$validated['branch_code']}";
+            }
+        }
+
         try {
-            DB::transaction(function () use ($validated) {
+            $adjustment = DB::transaction(function () use ($validated, $user, $branchName) {
                 $product = Product::lockForUpdate()->find($validated['product_id']);
 
                 if ($validated['adjustment_type'] === 'deduct' && $product->current_stock < $validated['quantity']) {
-                    throw new \Exception("Insufficient current stock. Available: {$product->current_stock}");
+                    throw new \Exception("Insufficient current stock. Available: {$product->current_stock}, Requested: {$validated['quantity']}");
                 }
 
-                $adjustment = Adjustment::create($validated);
+                $adj = Adjustment::create([
+                    'product_id'      => $product->id,
+                    'user_id'         => $user->id,
+                    'branch_code'     => $validated['branch_code'] ?? null,
+                    'branch_name'     => $branchName,
+                    'adjustment_type' => $validated['adjustment_type'],
+                    'quantity'        => $validated['quantity'],
+                    'reason'          => $validated['reason'] ?? null,
+                    'erp_push_status' => 'pending',
+                ]);
+
                 $changeQty = $validated['adjustment_type'] === 'add' ? $validated['quantity'] : -$validated['quantity'];
                 
                 if ($validated['adjustment_type'] === 'add') {
@@ -1478,15 +1614,190 @@ class MobileController extends Controller implements HasMiddleware
                 }
 
                 StockLedger::create([
-                    'product_id' => $product->id,
+                    'product_id'       => $product->id,
                     'transaction_type' => 'adjustment_' . $validated['adjustment_type'],
-                    'transaction_id' => $adjustment->id,
-                    'change_quantity' => $changeQty,
-                    'new_stock' => $product->current_stock,
+                    'transaction_id'   => $adj->id,
+                    'change_quantity'  => $changeQty,
+                    'new_stock'        => $product->current_stock,
                 ]);
+
+                return $adj;
             });
 
-            return response()->json(['success' => true, 'message' => 'Adjustment saved successfully!']);
+            // ERP Push
+            $shouldPushErp = $request->boolean('sync_erp', true) && $user->hasFeature('mobile_adjustments', 'erp_push');
+            if ($shouldPushErp) {
+                try {
+                    $erpService = new ErpStockPushService();
+                    $erpResult = $erpService->pushAdjustment($adjustment);
+
+                    if ($erpResult['success']) {
+                        $adjustment->update([
+                            'erp_push_status' => 'success',
+                            'erp_doc_no'      => $erpResult['LastSavedDoc'] ?? ($erpResult['response']['LastSavedDocNo'] ?? null),
+                            'erp_response'    => json_encode($erpResult['response'] ?? []),
+                        ]);
+                    } else {
+                        $adjustment->update([
+                            'erp_push_status' => 'failed',
+                            'erp_response'    => json_encode($erpResult['response'] ?? ['message' => $erpResult['message']]),
+                        ]);
+                    }
+                } catch (\Exception $erpEx) {
+                    $adjustment->update([
+                        'erp_push_status' => 'failed',
+                        'erp_response'    => json_encode(['error' => $erpEx->getMessage()]),
+                    ]);
+                }
+            } else {
+                $adjustment->update(['erp_push_status' => 'skipped']);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock adjustment saved successfully!',
+                'adjustment' => $adjustment->load('product'),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Retry Single ERP Push for Mobile Adjustment
+     */
+    public function retryAdjustmentErp(Adjustment $adjustment)
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_adjustments', 'erp_push')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        try {
+            $erpService = new ErpStockPushService();
+            $result = $erpService->pushAdjustment($adjustment);
+
+            if ($result['success']) {
+                $adjustment->update([
+                    'erp_push_status' => 'success',
+                    'erp_doc_no'      => $result['LastSavedDoc'] ?? ($result['response']['LastSavedDocNo'] ?? null),
+                    'erp_response'    => json_encode($result['response'] ?? []),
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'ERP sync succeeded!',
+                    'doc_no'  => $adjustment->erp_doc_no,
+                    'status'  => 'success',
+                ]);
+            } else {
+                $adjustment->update([
+                    'erp_push_status' => 'failed',
+                    'erp_response'    => json_encode($result['response'] ?? ['message' => $result['message']]),
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'ERP sync failed.',
+                    'status'  => 'failed',
+                ]);
+            }
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Bulk Retry ERP Push for Mobile Adjustments
+     */
+    public function bulkRetryAdjustmentErp()
+    {
+        $user = Auth::user();
+        if (!$user->hasFeature('mobile_adjustments', 'erp_bulk_retry')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        $unsynced = Adjustment::whereIn('erp_push_status', ['pending', 'failed'])
+            ->orderBy('created_at')
+            ->limit(30)
+            ->get();
+
+        if ($unsynced->isEmpty()) {
+            return response()->json(['success' => true, 'message' => 'No pending adjustments to sync.']);
+        }
+
+        $erpService = new ErpStockPushService();
+        $successCount = 0;
+        $failedCount = 0;
+
+        foreach ($unsynced as $adj) {
+            try {
+                $res = $erpService->pushAdjustment($adj);
+                if ($res['success']) {
+                    $adj->update([
+                        'erp_push_status' => 'success',
+                        'erp_doc_no'      => $res['LastSavedDoc'] ?? ($res['response']['LastSavedDocNo'] ?? null),
+                        'erp_response'    => json_encode($res['response'] ?? []),
+                    ]);
+                    $successCount++;
+                } else {
+                    $adj->update([
+                        'erp_push_status' => 'failed',
+                        'erp_response'    => json_encode($res['response'] ?? ['message' => $res['message']]),
+                    ]);
+                    $failedCount++;
+                }
+            } catch (\Exception $e) {
+                $adj->update([
+                    'erp_push_status' => 'failed',
+                    'erp_response'    => json_encode(['error' => $e->getMessage()]),
+                ]);
+                $failedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Bulk sync complete: {$successCount} succeeded, {$failedCount} failed.",
+            'success_count' => $successCount,
+            'failed_count'  => $failedCount,
+        ]);
+    }
+
+    /**
+     * Delete / Revert Mobile Adjustment
+     */
+    public function deleteAdjustment(Adjustment $adjustment)
+    {
+        $user = Auth::user();
+        if ($user->role !== 'admin' && !$user->hasFeature('mobile_adjustments', 'delete')) {
+            return response()->json(['success' => false, 'message' => 'Permission denied.'], 403);
+        }
+
+        try {
+            DB::transaction(function () use ($adjustment) {
+                $product = Product::lockForUpdate()->find($adjustment->product_id);
+
+                if ($product) {
+                    if ($adjustment->adjustment_type === 'add') {
+                        $product->decrement('current_stock', $adjustment->quantity);
+                        $changeQty = -$adjustment->quantity;
+                    } else {
+                        $product->increment('current_stock', $adjustment->quantity);
+                        $changeQty = $adjustment->quantity;
+                    }
+
+                    StockLedger::create([
+                        'product_id'       => $product->id,
+                        'transaction_type' => 'adjustment_revert',
+                        'transaction_id'   => $adjustment->id,
+                        'change_quantity'  => $changeQty,
+                        'new_stock'        => $product->current_stock,
+                    ]);
+                }
+
+                $adjustment->delete();
+            });
+
+            return response()->json(['success' => true, 'message' => 'Adjustment reverted successfully.']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
@@ -2092,12 +2403,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty = (float)$item->quantity;
 
                 if (strtoupper(trim($rm->rm_type ?? '')) === 'TECHNICAL') {
-                    $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
-                    if ($rmPurity <= 0 && $item->purity > 0) {
-                        $rmPurity = (float) $item->purity;
-                    }
-                    if ($rmPurity <= 0) $rmPurity = 100.0;
-
+                    $rmPurity = \App\Models\ProductPrice::resolvePurity($rm->item_code, $item->purity);
                     $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
                     $itemFormulation = ($item->quantity * $recipePurity) / $yieldQty;
                     $requiredQty = ($yieldQty * $itemFormulation) / $rmPurity;
@@ -2244,11 +2550,7 @@ class MobileController extends Controller implements HasMiddleware
             $rmPurity = 100.0;
             foreach ($recipe->items as $item) {
                 if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
-                    $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
-                    if ($rmPurity <= 0 && $item->purity > 0) {
-                        $rmPurity = (float) $item->purity;
-                    }
-                    if ($rmPurity <= 0) $rmPurity = 100.0;
+                    $rmPurity = \App\Models\ProductPrice::resolvePurity($item->rawMaterial->item_code, $item->purity);
                     break;
                 }
             }
@@ -2265,13 +2567,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $itemPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
-                    if ($itemPurity <= 0 && $item->purity > 0) {
-                        $itemPurity = (float) $item->purity;
-                    }
-                    if ($itemPurity <= 0) {
-                        $itemPurity = 100.0;
-                    }
+                    $itemPurity = \App\Models\ProductPrice::resolvePurity($rm->item_code, $item->purity);
                     $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
                     $itemFormulation = ($item->quantity * $recipePurity) / max($recipe->yield_quantity, 0.001);
                     $requiredQty = ($baseQty * $itemFormulation) / $itemPurity;
@@ -2353,11 +2649,7 @@ class MobileController extends Controller implements HasMiddleware
             $rmPurity = 100.0;
             foreach ($recipe->items as $item) {
                 if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
-                    $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
-                    if ($rmPurity <= 0 && $item->purity > 0) {
-                        $rmPurity = (float) $item->purity;
-                    }
-                    if ($rmPurity <= 0) $rmPurity = 100.0;
+                    $rmPurity = \App\Models\ProductPrice::resolvePurity($item->rawMaterial->item_code, $item->purity);
                     break;
                 }
             }
@@ -2372,13 +2664,7 @@ class MobileController extends Controller implements HasMiddleware
                 $requiredQty  = ($item->quantity / max($recipe->yield_quantity, 0.001)) * $baseQty;
                 
                 if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                    $itemPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
-                    if ($itemPurity <= 0 && $item->purity > 0) {
-                        $itemPurity = (float) $item->purity;
-                    }
-                    if ($itemPurity <= 0) {
-                        $itemPurity = 100.0;
-                    }
+                    $itemPurity = \App\Models\ProductPrice::resolvePurity($rm->item_code, $item->purity);
                     $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
                     $itemFormulation = ($item->quantity * $recipePurity) / max($recipe->yield_quantity, 0.001);
                     $requiredQty = ($baseQty * $itemFormulation) / $itemPurity;
@@ -2786,7 +3072,10 @@ class MobileController extends Controller implements HasMiddleware
      */
     public function costingPricelist(\Illuminate\Http\Request $request)
     {
-        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+        $query = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -2806,7 +3095,10 @@ class MobileController extends Controller implements HasMiddleware
         $query->orderBy('item_hd_name', $sortOrder);
 
         $pricelists = $query->paginate(20)->withQueryString();
-        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+        $group1List = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        })->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
 
         if ($request->ajax()) {
             return response()->json([
@@ -2859,7 +3151,10 @@ class MobileController extends Controller implements HasMiddleware
      */
     private function pricelistUpdateQuery(\Illuminate\Http\Request $request)
     {
-        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+        $query = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -2886,8 +3181,10 @@ class MobileController extends Controller implements HasMiddleware
     public function costingPricelistUpdate(\Illuminate\Http\Request $request)
     {
         $pricelists = $this->pricelistUpdateQuery($request)->paginate(20)->withQueryString();
-        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
-            ->whereNotNull('group1')->where('group1', '!=', '')
+        $group1List = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        })->whereNotNull('group1')->where('group1', '!=', '')
             ->distinct()->pluck('group1')->sort()->values();
 
         $priceLists = CostingController::PRICE_LIST_MAP;
@@ -3008,5 +3305,55 @@ class MobileController extends Controller implements HasMiddleware
     {
         $reportController = new ReportController();
         return $reportController->deleteTeam($team);
+    }
+
+    /**
+     * Mobile: Branch-Wise Consolidated Sales Report
+     */
+    public function salesReport(Request $request)
+    {
+        $reportController = new ReportController();
+        $response = $reportController->salesReport($request);
+        
+        if ($response instanceof \Illuminate\Http\RedirectResponse) {
+            return $response;
+        }
+
+        $data = $response->getData();
+        return view('mobile.sales_report', $data);
+    }
+
+    /**
+     * Mobile: Sales Drilldown API
+     */
+    public function salesDrilldown(Request $request)
+    {
+        $reportController = new ReportController();
+        return $reportController->salesDrilldown($request);
+    }
+
+    /**
+     * Mobile: 360-Degree Sales Explorer -- any-combination faceted filtering
+     * (branch/category/agent/product at once), distinct from the fixed-chain drilldown above.
+     */
+    public function sales360(Request $request)
+    {
+        $data = (new ReportController())->sales360($request);
+        return view('mobile.sales_360', $data);
+    }
+
+    public function sales360Data(Request $request)
+    {
+        return (new ReportController())->sales360Data($request);
+    }
+
+    public function sales360Products(Request $request)
+    {
+        return (new ReportController())->sales360Products($request);
+    }
+
+    public function sales360Parties(Request $request)
+    {
+        return (new ReportController())->sales360Parties($request);
     }
 }

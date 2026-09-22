@@ -51,10 +51,10 @@
     {{-- Tabs to Toggle between Teams Targets and Agents Targets --}}
     <div class="flex border-b border-gray-250 gap-4">
         <button onclick="switchTab('teamTab', 'agentTab', this)" class="tab-btn pb-3 px-4 font-black text-sm text-indigo-600 border-b-2 border-indigo-600 outline-none">
-            <i class="fas fa-people-group mr-1.5"></i> Team Targets
+            <i class="fas fa-people-group mr-1.5"></i> Team Targets <span class="text-[10px] font-bold opacity-60">(Collection)</span>
         </button>
         <button onclick="switchTab('agentTab', 'teamTab', this)" class="tab-btn pb-3 px-4 font-bold text-sm text-slate-400 hover:text-slate-700 outline-none">
-            <i class="fas fa-user-tie mr-1.5"></i> Agent Targets
+            <i class="fas fa-user-tie mr-1.5"></i> Agent Targets <span class="text-[10px] font-bold opacity-60">(Sales + Collection)</span>
         </button>
     </div>
 
@@ -68,6 +68,19 @@
                 </h3>
             </div>
 
+            <div class="mx-6 mt-5 mb-1 flex items-start gap-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+                <i class="fas fa-circle-info text-emerald-600 mt-0.5"></i>
+                <p class="text-xs font-bold text-emerald-900 leading-relaxed">
+                    Team ka apna goal <span class="underline">collection</span> ka hai. Members ke saamne
+                    <span class="text-emerald-700 font-black">Sales</span> aur
+                    <span class="text-slate-700 font-black">Collection</span> dono ke column hain — dono yahin bhar sakte ho.<br>
+                    <span class="font-medium text-emerald-800">Ye wahi values hain jo
+                    <button type="button" onclick="document.querySelectorAll('.tab-btn')[1].click()"
+                            class="font-black underline hover:text-emerald-700">Agent Targets</button>
+                    tab me dikhti hain — kahin bhi badlo, dono jagah wahi rahegi.</span>
+                </p>
+            </div>
+
             <form method="POST" action="{{ route('reports.team-targets.store') }}" class="p-6">
                 @csrf
                 <input type="hidden" name="month" value="{{ $targetMonth }}">
@@ -77,8 +90,10 @@
                     @php 
                         $tSlug = 'team_acc_' . $team->id; 
                         $teamAgentsTotal = 0;
+                        $teamSalesTotal = 0;
                         foreach($team->agents ?? [] as $member) {
                             $teamAgentsTotal += (float)($targets[$member] ?? 0);
+                            $teamSalesTotal += (float)($salesTargets[$member] ?? 0);
                         }
                     @endphp
                     <div class="border border-gray-150 rounded-2xl overflow-hidden shadow-sm">
@@ -94,7 +109,9 @@
                                     <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                         👉 Click to view & edit targets for {{ count($team->agents ?? []) }} Members
                                         <span id="desktop-total-agents-target-{{ $team->id }}">
-                                            • Total Agent Targets: ₹{{ fmod($teamAgentsTotal, 1) == 0 ? number_format($teamAgentsTotal, 0) : number_format($teamAgentsTotal, 2) }}
+                                            • Total Agent Targets: ₹{{ fmod($teamAgentsTotal, 1) == 0 ? number_format($teamAgentsTotal, 0) : number_format($teamAgentsTotal, 2) }}</span>
+                                        <span id="desktop-total-sales-target-{{ $team->id }}" class="text-emerald-600">
+                                            • Total Sales Targets: ₹{{ number_format($teamSalesTotal, 0) }}
                                         </span>
                                     </span>
                                 </div>
@@ -126,7 +143,8 @@
                                         <tr>
                                             <th class="py-2.5 px-4 text-center w-12">#</th>
                                             <th class="py-2.5 px-4">Member Name</th>
-                                            <th class="py-2.5 px-4 text-right w-64">Member Target (₹)</th>
+                                            <th class="py-2.5 px-4 text-right w-56">Sales Target (₹)</th>
+                                            <th class="py-2.5 px-4 text-right w-56">Collection Target (₹)</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-50">
@@ -138,6 +156,20 @@
                                             <td class="py-2.5 px-4 font-bold text-slate-700">{{ $member }}</td>
                                             <td class="py-2.5 px-4">
                                                 <div class="relative rounded-xl shadow-sm">
+                                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-emerald-500 font-bold text-xs">
+                                                        ₹
+                                                    </div>
+                                                    <input type="number"
+                                                           name="agent_sales_targets[{{ $member }}]"
+                                                           value="{{ $salesTargets[$member] ?? '' }}"
+                                                           step="0.01"
+                                                           placeholder="Set sales target..."
+                                                           oninput="updateDesktopTeamSalesTotal({{ $team->id }})"
+                                                           class="block w-full rounded-xl border border-emerald-200 py-1.5 pl-6 pr-3 text-xs font-semibold text-slate-800 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-150 outline-none transition bg-white desktop-agent-sales-input-{{ $team->id }}">
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-4">
+                                                <div class="relative rounded-xl shadow-sm">
                                                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 font-bold text-xs">
                                                         ₹
                                                     </div>
@@ -145,7 +177,7 @@
                                                            name="agent_targets[{{ $member }}]" 
                                                            value="{{ $targets[$member] ?? '' }}" 
                                                            step="0.01" 
-                                                           placeholder="Set member target..."
+                                                           placeholder="Set collection target..."
                                                            oninput="updateDesktopTeamAgentsTotal({{ $team->id }})"
                                                            class="block w-full rounded-xl border border-gray-200 py-1.5 pl-6 pr-3 text-xs font-semibold text-slate-800 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-150 outline-none transition bg-white desktop-agent-target-input-{{ $team->id }}">
                                                 </div>
@@ -200,7 +232,8 @@
                             <tr>
                                 <th class="py-3 px-6 text-center w-16">#</th>
                                 <th class="py-3 px-6">Salesman / Agent Name</th>
-                                <th class="py-3 px-6 text-right w-72">Collection Target (₹)</th>
+                                <th class="py-3 px-6 text-right w-64">Sales Target (₹)</th>
+                                <th class="py-3 px-6 text-right w-64">Collection Target (₹)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
@@ -217,6 +250,19 @@
                                 </td>
                                 <td class="py-3.5 px-6">
                                     <div class="relative rounded-2xl shadow-sm">
+                                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-emerald-500 font-bold text-xs">
+                                            ₹
+                                        </div>
+                                        <input type="number"
+                                               name="sales_targets[{{ $agent }}]"
+                                               value="{{ $salesTargets[$agent] ?? '' }}"
+                                               step="0.01"
+                                               placeholder="Sales goal..."
+                                               class="block w-full rounded-2xl border border-emerald-200 py-2.5 pl-8 pr-4 text-sm font-semibold text-slate-800 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 outline-none transition bg-white">
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-6">
+                                    <div class="relative rounded-2xl shadow-sm">
                                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 font-bold text-xs">
                                             ₹
                                         </div>
@@ -224,7 +270,7 @@
                                                name="targets[{{ $agent }}]" 
                                                value="{{ $targets[$agent] ?? '' }}" 
                                                step="0.01" 
-                                               placeholder="Enter goal limit..."
+                                               placeholder="Collection goal..."
                                                class="block w-full rounded-2xl border border-gray-200 py-2.5 pl-8 pr-4 text-sm font-semibold text-slate-800 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition bg-white">
                                     </div>
                                 </td>
@@ -234,10 +280,24 @@
                     </table>
                 </div>
 
-                <div class="mt-6 flex justify-end">
+                <div class="mt-6 flex flex-wrap items-center justify-between gap-4">
+                    {{-- Setting a year of targets one month at a time is twelve visits to this
+                         screen, so offer to repeat this month's figures across the rest of the FY. --}}
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input type="checkbox" name="apply_rest_of_fy" value="1"
+                               class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400">
+                        <span class="text-xs font-bold text-slate-600">
+                            Ye targets is FY ke <span class="text-emerald-700">baaki saare mahino</span> pe bhi lagu karo
+                            <span class="text-slate-400 font-medium">
+                                ({{ \Carbon\Carbon::parse($targetMonth.'-01')->format('M Y') }} se
+                                {{ \Carbon\Carbon::parse(end($fyMonths)['key'].'-01')->format('M Y') }} tak)
+                            </span>
+                        </span>
+                    </label>
+
                     <button type="submit"
                         class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-8 rounded-2xl shadow-lg hover:shadow-indigo-150 text-sm tracking-wide transition transform active:scale-98">
-                        <i class="fas fa-circle-check mr-2"></i> Save Agent Targets
+                        <i class="fas fa-circle-check mr-2"></i> Save Sales + Collection Targets
                     </button>
                 </div>
             </form>
@@ -270,6 +330,19 @@ function toggleAccordion(slug) {
     } else {
         el.classList.add('hidden');
         if (chev) chev.style.transform = '';
+    }
+}
+
+function updateDesktopTeamSalesTotal(teamId) {
+    const inputs = document.querySelectorAll(`.desktop-agent-sales-input-${teamId}`);
+    let total = 0;
+    inputs.forEach(input => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val)) total += val;
+    });
+    const badge = document.getElementById(`desktop-total-sales-target-${teamId}`);
+    if (badge) {
+        badge.innerHTML = ` • Total Sales Targets: ₹${total.toLocaleString('en-IN')}`;
     }
 }
 

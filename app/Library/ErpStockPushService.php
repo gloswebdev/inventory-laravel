@@ -15,9 +15,9 @@ class ErpStockPushService
 
     public function __construct()
     {
-        $this->baseUrl  = rtrim(AppSetting::get('erp_push_base_url', 'http://demo.logicerp.com/api'), '/');
-        $this->username = AppSetting::get('erp_push_username', '');
-        $this->password = AppSetting::get('erp_push_password', '');
+        $this->baseUrl  = rtrim(AppSetting::get('erp_push_base_url', 'http://logic.gloswebdev.in'), '/');
+        $this->username = AppSetting::get('erp_push_username', 'SALapi');
+        $this->password = AppSetting::get('erp_push_password', 'SAL@api@123');
     }
 
     /**
@@ -82,6 +82,76 @@ class ErpStockPushService
         ];
 
         return $this->callApi('SaveReceiptStock', $payload);
+    }
+
+    /**
+     * Push a stock adjustment to ERP (Receipt if 'add', Issue if 'deduct').
+     *
+     * @param  \App\Models\Adjustment  $adjustment
+     * @return array  ['success'=>bool, 'response'=>array, 'message'=>string]
+     */
+    public function pushAdjustment(\App\Models\Adjustment $adjustment): array
+    {
+        $adjustment->loadMissing('product');
+        $product = $adjustment->product;
+
+        if (!$product || empty($product->item_code)) {
+            return [
+                'success'  => false,
+                'response' => [],
+                'message'  => 'Product has no valid item code.',
+            ];
+        }
+
+        $branchCode = (int) ($adjustment->branch_code ?: AppSetting::get('product_master_branchcode', '2'));
+
+        if ($adjustment->adjustment_type === 'add') {
+            $payload = [
+                'Branch_Code'  => $branchCode,
+                'Doc_Prefix'   => AppSetting::get('erp_receipt_doc_prefix', 'REC'),
+                'IssueTo'      => AppSetting::get('erp_receipt_issue_to', ''),
+                'GodownName'   => AppSetting::get('erp_receipt_godown_name', 'MAIN'),
+                'ReceivedFrom' => '',
+                'Remarks'      => 'Stock Adjustment (Receipt) #' . $adjustment->id . ($adjustment->reason ? ' - ' . $adjustment->reason : ''),
+                'ListItems'    => [
+                    [
+                        'EANCode'              => '',
+                        'ItemCode'             => $product->item_code,
+                        'LotNo'                => null,
+                        'Quantity'             => round((float) $adjustment->quantity, 4),
+                        'Rate'                 => 0.0,
+                        'Mrp'                  => 0.0,
+                        'Manufacturing_Date'   => null,
+                        'Expiry_Date'          => null,
+                        'LotProductionUnit'    => '',
+                    ]
+                ],
+            ];
+            return $this->callApi('SaveReceiptStock', $payload);
+        } else {
+            $payload = [
+                'Branch_Code'  => $branchCode,
+                'Doc_Prefix'   => AppSetting::get('erp_issue_doc_prefix', 'IS'),
+                'IssueTo'      => AppSetting::get('erp_issue_issue_to', 'DAMAGE'),
+                'GodownName'   => AppSetting::get('erp_issue_godown_name', ''),
+                'ReceivedFrom' => '',
+                'Remarks'      => 'Stock Adjustment (Issue) #' . $adjustment->id . ($adjustment->reason ? ' - ' . $adjustment->reason : ''),
+                'ListItems'    => [
+                    [
+                        'EANCode'              => '',
+                        'ItemCode'             => $product->item_code,
+                        'LotNo'                => null,
+                        'Quantity'             => round((float) $adjustment->quantity, 4),
+                        'Rate'                 => 0.0,
+                        'Mrp'                  => 0.0,
+                        'Manufacturing_Date'   => null,
+                        'Expiry_Date'          => null,
+                        'LotProductionUnit'    => '',
+                    ]
+                ],
+            ];
+            return $this->callApi('SaveIssueStock', $payload);
+        }
     }
 
     /**

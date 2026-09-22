@@ -75,9 +75,10 @@ class DatabaseBackupService
                         continue;
                     }
 
-                    // INSERT DATA using raw PDO fetch (very fast, low memory)
+                    // INSERT DATA using unbuffered PDO fetch (Zero RAM buffering)
                     try {
-                        $stmt = $pdo->query("SELECT * FROM `{$table}`");
+                        $stmt = $pdo->prepare("SELECT * FROM `{$table}`", [\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false]);
+                        $stmt->execute();
                         if ($stmt) {
                             $stmt->setFetchMode(\PDO::FETCH_ASSOC);
                             $batch = [];
@@ -93,6 +94,7 @@ class DatabaseBackupService
                                 $this->writeInsertBatch($handle, $table, $batch);
                                 $batch = [];
                             }
+                            $stmt->closeCursor();
                         }
                     } catch (\Throwable $de) {
                         Log::warning("Could not dump rows for {$table}: " . $de->getMessage());

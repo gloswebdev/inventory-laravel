@@ -305,7 +305,7 @@
                          onclick="document.getElementById('sqlFile').click()">
                         <i class="fas fa-file-zipper text-2xl text-slate-300 mb-2 block"></i>
                         <div class="text-xs font-bold text-slate-500" id="sqlFileName">Click to select .zip or .sql file</div>
-                        <div class="text-[10px] text-slate-400 mt-1">Max: 100MB</div>
+                        <div class="text-[10px] text-slate-400 mt-1">Max: 250MB</div>
                     </div>
                     <input type="file" id="sqlFile" name="sql_file" accept=".zip,.sql,.txt" class="hidden"
                            onchange="document.getElementById('sqlFileName').textContent = this.files[0]?.name || 'No file selected'">
@@ -363,7 +363,7 @@
                          onclick="document.getElementById('zipFile').click()">
                         <i class="fas fa-file-zipper text-2xl text-slate-300 mb-2 block"></i>
                         <div class="text-xs font-bold text-slate-500" id="zipFileName">Click to select .zip file</div>
-                        <div class="text-[10px] text-slate-400 mt-1">Max: 100MB</div>
+                        <div class="text-[10px] text-slate-400 mt-1">Max: 250MB</div>
                     </div>
                     <input type="file" id="zipFile" name="update_zip" accept=".zip" class="hidden"
                            onchange="document.getElementById('zipFileName').textContent = this.files[0]?.name || 'No file selected'">

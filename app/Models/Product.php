@@ -48,6 +48,11 @@ class Product extends Model
         return $this->hasMany(Recipe::class, 'finished_product_id');
     }
 
+    public function recipe()
+    {
+        return $this->hasOne(Recipe::class, 'finished_product_id');
+    }
+
     public function costingBoms()
     {
         return $this->hasMany(CostingBom::class, 'finished_product_id');

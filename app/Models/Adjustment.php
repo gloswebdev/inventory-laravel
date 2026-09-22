@@ -12,14 +12,29 @@ class Adjustment extends Model
 
     protected $fillable = [
         'product_id',
+        'user_id',
+        'branch_code',
+        'branch_name',
         'adjustment_type',
         'quantity',
         'reason',
-        // 'date' is created_at
+        'erp_push_status',
+        'erp_doc_no',
+        'erp_response',
     ];
 
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'branch_code', 'code');
     }
 }

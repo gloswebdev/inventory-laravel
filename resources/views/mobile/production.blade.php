@@ -47,6 +47,51 @@
             </p>
         </div>
 
+        @if(Auth::user()->hasFeature('mobile_production', 'packaging_toggle') || Auth::user()->hasFeature('mobile_production', 'formulation_toggle'))
+        <!-- Material Issue Toggles: Packaging & Chemical -->
+        <div class="space-y-3">
+            @if(Auth::user()->hasFeature('mobile_production', 'packaging_toggle'))
+            <!-- Packaging Materials Toggle Card -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 p-5 rounded-[2.5rem] flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-colors"
+                         :class="includePackaging ? 'bg-blue-600 text-white shadow-md shadow-blue-200' : 'bg-slate-100 text-slate-400'">
+                        <i class="fas fa-box-open text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-black text-slate-800 uppercase tracking-tight">Packaging Materials</div>
+                        <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Issue boxes, bottles, caps (Default ON)</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" x-model="includePackaging" @change="recheckAllRequirements()" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+            @endif
+
+            @if(Auth::user()->hasFeature('mobile_production', 'formulation_toggle'))
+            <!-- Chemical Formulation Toggle Card -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/30 p-5 rounded-[2.5rem] flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-colors"
+                         :class="includeFormulation ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-100 text-slate-400'">
+                        <i class="fas fa-flask text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-black text-slate-800 uppercase tracking-tight">Chemical Formulation</div>
+                        <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Include chemical raw materials (Default OFF)</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" x-model="includeFormulation" @change="recheckAllRequirements()" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+            </div>
+            @endif
+        </div>
+        @endif
+
         <!-- Products List Section -->
         <div class="space-y-4">
             <div class="flex items-center justify-between px-3">
@@ -129,7 +174,13 @@
                                 <template x-for="req in item.requirements" :key="req.item_code">
                                     <div class="flex items-center justify-between text-[10px] py-1.5 border-b border-slate-100 last:border-0">
                                         <div class="min-w-0 flex-1 pr-2">
-                                            <div class="font-bold text-slate-700 truncate" x-text="req.name"></div>
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="font-bold text-slate-700 truncate" x-text="req.name"></span>
+                                                <span class="px-1.5 py-0.2 rounded text-[7px] font-black uppercase shrink-0"
+                                                      :class="req.type === 'formulation' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'"
+                                                      x-text="req.type === 'formulation' ? '🧪 Chem' : '📦 Pack'">
+                                                </span>
+                                            </div>
                                             <div class="text-[8px] font-black text-slate-400 uppercase tracking-wider" x-text="req.item_code"></div>
                                         </div>
                                         <div class="text-right flex gap-3">
@@ -162,7 +213,7 @@
         </div>
 
         <!-- Floating Submit Bar / Footer -->
-        <div class="fixed bottom-24 left-6 right-6 z-30 bg-white/80 backdrop-blur-md p-4 rounded-[2rem] border border-white/80 shadow-2xl flex items-center justify-between gap-4">
+        <div class="fixed bottom-[7.5rem] left-6 right-6 z-30 bg-white/85 backdrop-blur-md p-4 rounded-[2rem] border border-white/80 shadow-2xl flex items-center justify-between gap-4">
             <div class="pl-2">
                 <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Total Yield</span>
                 <span class="text-lg font-black text-indigo-600 tracking-tighter" x-text="totalQuantity.toFixed(2) + ' Boxes'"></span>
@@ -242,13 +293,30 @@
             </div>
 
             <!-- Notice card -->
-            <div class="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
-                <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                    <i class="fas fa-circle-exclamation text-xs"></i>
+            <div class="p-4 rounded-2xl border flex gap-3"
+                 :class="(!includePackaging && !includeFormulation) ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'">
+                <div class="w-8 h-8 rounded-lg text-white flex items-center justify-center shrink-0"
+                     :class="(!includePackaging && !includeFormulation) ? 'bg-emerald-600' : 'bg-amber-500'">
+                    <i :class="(!includePackaging && !includeFormulation) ? 'fas fa-boxes-packing text-xs' : 'fas fa-circle-exclamation text-xs'"></i>
                 </div>
                 <div>
-                    <h4 class="text-[10px] font-black text-amber-800 uppercase tracking-tight">Post Notice</h4>
-                    <p class="text-[9px] text-amber-600 leading-tight mt-0.5 font-bold">This yield entry will deduct recipe raw materials automatically from the live Factory Inventory.</p>
+                    <h4 class="text-[10px] font-black uppercase tracking-tight"
+                        :class="(!includePackaging && !includeFormulation) ? 'text-emerald-800' : 'text-amber-800'">
+                        <span x-show="includePackaging && includeFormulation">Stock & ERP Sync (Packaging + Chemical)</span>
+                        <span x-show="includePackaging && !includeFormulation">Stock & ERP Sync (Packaging Only)</span>
+                        <span x-show="!includePackaging && includeFormulation">Stock & ERP Sync (Chemical Only)</span>
+                        <span x-show="!includePackaging && !includeFormulation">Direct FG Receipt (No Materials Issued)</span>
+                    </h4>
+                    <p class="text-[9px] leading-tight mt-0.5 font-bold"
+                       :class="(!includePackaging && !includeFormulation) ? 'text-emerald-700' : 'text-amber-700'"
+                       x-text="(!includePackaging && !includeFormulation)
+                           ? 'Finished goods will be received into Factory (SaveReceiptStock). No packaging or raw materials will be issued or deducted (SaveIssueStock skipped).'
+                           : (includePackaging && includeFormulation
+                               ? 'Finished goods will be received into Factory (Branch 2), and both Packaging + Chemical Formulation raw materials will be issued (deducted) and synced with ERP.'
+                               : (includePackaging && !includeFormulation
+                                   ? 'Finished goods will be received into Factory (Branch 2), and only Packaging materials (pouches, cartons, labels) will be issued. Bulk chemicals will remain untouched.'
+                                   : 'Finished goods will be received into Factory (Branch 2), and only Chemical Formulation raw materials will be issued. Packaging materials will remain untouched.'))">
+                    </p>
                 </div>
             </div>
 
@@ -274,15 +342,23 @@
 
     @if(Auth::user()->hasFeature('mobile_production', 'history'))
     <!-- Production logs History List -->
-    <div x-show="step === 1" class="space-y-4">
+    <div x-show="step === 1" class="space-y-4 pb-36">
         <div class="flex items-center justify-between px-3">
-            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Yield History Log</h3>
-            <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest">Last 20 batches</span>
+            <div>
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Yield History Log</h3>
+                <span class="text-[8px] font-black text-slate-300 uppercase tracking-widest">Last 20 batches</span>
+            </div>
+            @if(Auth::user()->hasFeature('mobile_production', 'erp_bulk_retry'))
+            <button x-show="unpushedCount > 0" @click="bulkRetryErp()" :disabled="retryingBulk" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-50">
+                <i class="fas fa-arrows-rotate text-[8px]" :class="{ 'fa-spin': retryingBulk }"></i>
+                <span x-text="retryingBulk ? 'Syncing...' : 'Sync to ERP (' + unpushedCount + ')'"></span>
+            </button>
+            @endif
         </div>
 
         <div class="space-y-3">
             @forelse($history as $item)
-            <div @click="viewDetail({{ $item->id }})" class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/20 p-5 rounded-[2rem] hover:shadow-xl transition-all flex items-center justify-between active:scale-[0.99] cursor-pointer">
+            <div @if(Auth::user()->hasFeature('mobile_production', 'view_details')) @click="viewDetail({{ $item->id }})" @endif class="bg-white/70 backdrop-blur-xl border border-white/60 shadow-lg shadow-indigo-100/20 p-5 rounded-[2rem] hover:shadow-xl transition-all flex items-center justify-between active:scale-[0.99] {{ Auth::user()->hasFeature('mobile_production', 'view_details') ? 'cursor-pointer' : '' }}">
                 <div class="flex items-center gap-3.5">
                     <div class="w-10 h-10 bg-indigo-50 border border-indigo-100/50 rounded-2xl flex items-center justify-center text-indigo-500">
                         <i class="fas fa-boxes-stacked text-xs"></i>
@@ -299,17 +375,49 @@
                 <div class="text-right flex items-center gap-3">
                     <div class="pr-1">
                         <div class="text-xs font-black text-slate-800 tracking-tighter">{{ number_format($item->items->sum('quantity_box'), 1) }} Box</div>
-                        <div class="text-[7px] font-black text-slate-400 uppercase tracking-wider" x-text="'{{ $item->items->count() }} Products'"></div>
+                        <div class="text-[7px] font-black text-slate-400 uppercase tracking-wider">{{ $item->items->count() }} Products</div>
                     </div>
                     <div>
                         @if(($item->erp_push_status ?? 'pending') === 'success')
-                            <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[9px]"><i class="fas fa-check"></i></span>
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase flex items-center gap-1">
+                                <i class="fas fa-check text-[7px]"></i> Synced
+                            </span>
                         @elseif(($item->erp_push_status ?? 'pending') === 'failed')
-                            <span class="w-5 h-5 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-[9px]"><i class="fas fa-xmark"></i></span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[8px] font-black uppercase flex items-center gap-1">
+                                    <i class="fas fa-xmark text-[7px]"></i> Failed
+                                </span>
+                                @if(Auth::user()->hasFeature('mobile_production', 'erp_push'))
+                                <button @click.stop="retrySingleErp({{ $item->id }})" :disabled="retryingId === {{ $item->id }}" class="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[8px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 active:scale-95 transition-all">
+                                    <i class="fas fa-arrows-rotate text-[7px]" :class="{ 'fa-spin': retryingId === {{ $item->id }} }"></i>
+                                    <span>Retry</span>
+                                </button>
+                                @endif
+                            </div>
                         @elseif(($item->erp_push_status ?? 'pending') === 'skipped')
-                            <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-[9px]"><i class="fas fa-minus"></i></span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[8px] font-black uppercase flex items-center gap-1">
+                                    <i class="fas fa-minus text-[7px]"></i> Skipped
+                                </span>
+                                @if(Auth::user()->hasFeature('mobile_production', 'erp_push'))
+                                <button @click.stop="retrySingleErp({{ $item->id }})" :disabled="retryingId === {{ $item->id }}" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[8px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 active:scale-95 transition-all">
+                                    <i class="fas fa-paper-plane text-[7px]" :class="{ 'fa-spin': retryingId === {{ $item->id }} }"></i>
+                                    <span>Push</span>
+                                </button>
+                                @endif
+                            </div>
                         @else
-                            <span class="w-5 h-5 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center text-[9px]"><i class="fas fa-clock"></i></span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase flex items-center gap-1">
+                                    <i class="fas fa-clock text-[7px]"></i> Pending
+                                </span>
+                                @if(Auth::user()->hasFeature('mobile_production', 'erp_push'))
+                                <button @click.stop="retrySingleErp({{ $item->id }})" :disabled="retryingId === {{ $item->id }}" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[8px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 active:scale-95 transition-all">
+                                    <i class="fas fa-paper-plane text-[7px]" :class="{ 'fa-spin': retryingId === {{ $item->id }} }"></i>
+                                    <span>Push</span>
+                                </button>
+                                @endif
+                            </div>
                         @endif
                     </div>
                 </div>
@@ -359,6 +467,7 @@
                 </div>
 
                 <!-- Type Quick Filter pills (Horizontal Scroll) -->
+                @if(Auth::user()->hasFeature('mobile_production', 'type_filter'))
                 <div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
                     <button @click="typeFilter = ''" class="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 transition-all" :class="typeFilter === '' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'">
                         All Types
@@ -368,6 +477,7 @@
                         </button>
                     </template>
                 </div>
+                @endif
             </div>
 
             <!-- Drawer Products List -->
@@ -455,6 +565,13 @@
                         <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Recorded By</span>
                         <span class="text-xs font-black text-slate-700 uppercase" x-text="selectedProduction && selectedProduction.user ? selectedProduction.user.name : 'System'"></span>
                     </div>
+                    <div class="col-span-2 mt-1" x-show="selectedProductionReceiptDoc || selectedProductionIssueDoc">
+                        <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">ERP Document Numbers</span>
+                        <div class="flex items-center gap-2 mt-1 flex-wrap">
+                            <span x-show="selectedProductionReceiptDoc" class="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[8px] font-black uppercase" x-text="'Receipt: ' + selectedProductionReceiptDoc"></span>
+                            <span x-show="selectedProductionIssueDoc" class="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[8px] font-black uppercase" x-text="'Issue: ' + selectedProductionIssueDoc"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Products Yield List -->
@@ -478,17 +595,53 @@
                         </template>
                     </div>
                 </div>
+
+                <!-- Deducted Raw Materials List -->
+                <div class="space-y-3" x-show="selectedProductionIssueItems && selectedProductionIssueItems.length > 0">
+                    <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Deducted Raw Materials (BOM)</div>
+                    <div class="space-y-2">
+                        <template x-for="mat in selectedProductionIssueItems" :key="mat.id || mat.item_code">
+                            <div class="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center text-[10px]">
+                                <div class="min-w-0 pr-3">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-bold text-slate-800 truncate" x-text="mat.name"></span>
+                                        <span class="px-1.5 py-0.2 rounded text-[7px] font-black uppercase shrink-0"
+                                              :class="mat.type === 'formulation' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'"
+                                              x-text="mat.type === 'formulation' ? '🧪 Chem' : '📦 Pack'">
+                                        </span>
+                                    </div>
+                                    <div class="text-[8px] font-black text-slate-400 uppercase tracking-wider" x-text="mat.item_code"></div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <div class="font-black text-slate-900" x-text="parseFloat(mat.quantity).toFixed(2) + ' ' + (mat.uom || '')"></div>
+                                    <div class="text-[7px] text-slate-400 uppercase font-bold">Deducted</div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
             </div>
 
             <!-- Drawer Footer Actions -->
-            <div class="p-6 border-t bg-slate-50 flex gap-4 flex-shrink-0" x-show="selectedProduction">
-                <button @click="showDetailsDrawer = false" class="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-500 rounded-2xl font-black italic tracking-tighter uppercase text-xs active:scale-[0.97] transition-all">
-                    Close details
-                </button>
+            <div class="p-6 border-t bg-slate-50 flex flex-col gap-3 flex-shrink-0" x-show="selectedProduction">
+                <div class="flex gap-3">
+                    <button @click="showDetailsDrawer = false" class="flex-1 py-3.5 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-xs active:scale-[0.97] transition-all">
+                        Close
+                    </button>
+                    @if(Auth::user()->hasFeature('mobile_production', 'erp_push'))
+                    <button x-show="selectedProduction && ['pending', 'failed', 'skipped'].includes(selectedProduction.erp_push_status)"
+                            @click="retrySingleErp(selectedProduction.id)"
+                            :disabled="retryingId === selectedProduction.id"
+                            class="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase text-xs shadow-md shadow-indigo-200 active:scale-[0.97] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                        <i class="fas fa-arrows-rotate text-xs" :class="{ 'fa-spin': retryingId === selectedProduction.id }"></i>
+                        <span x-text="selectedProduction.erp_push_status === 'failed' ? 'Retry ERP Sync' : 'Push to ERP'"></span>
+                    </button>
+                    @endif
+                </div>
                 @if(Auth::user()->role === 'admin' || Auth::user()->hasPermission('mobile_production', 'delete'))
-                <button @click="deleteProductionEntry(selectedProduction.id)" class="flex-1 py-4 bg-rose-50 border-2 border-rose-100 text-rose-500 rounded-2xl font-black italic tracking-tighter uppercase text-xs hover:bg-rose-100 active:scale-[0.97] transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-trash-can"></i>
-                    <span>Revert Entry</span>
+                <button @click="deleteProductionEntry(selectedProduction.id)" class="w-full py-2.5 text-rose-500 hover:text-rose-600 font-bold uppercase text-[10px] tracking-wider transition-colors flex items-center justify-center gap-1.5">
+                    <i class="fas fa-trash-can text-[9px]"></i>
+                    <span>Revert / Delete Batch</span>
                 </button>
                 @endif
             </div>
@@ -503,7 +656,7 @@
          x-transition:leave="transition ease-in duration-200 transform"
          x-transition:leave-start="opacity-100 translate-y-0 scale-100"
          x-transition:leave-end="opacity-0 translate-y-10 scale-95"
-         class="fixed bottom-24 left-6 right-6 z-[200] p-1 rounded-[2rem] shadow-2xl"
+         class="fixed bottom-[7.5rem] left-6 right-6 z-[200] p-1 rounded-[2rem] shadow-2xl"
          :class="toast.success ? 'grad-emerald' : 'grad-rose'">
         <div class="bg-white/95 backdrop-blur-md rounded-[1.9rem] p-4 flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg" :class="toast.success ? 'grad-emerald' : 'grad-rose'">
@@ -537,9 +690,17 @@ function productionApp() {
         // Details drawer state
         showDetailsDrawer: false,
         selectedProduction: null,
+        selectedProductionIssueItems: [],
+        selectedProductionReceiptDoc: null,
+        selectedProductionIssueDoc: null,
 
         // Step/Wizard
         step: 1, 
+        includePackaging: true,
+        includeFormulation: false,
+        unpushedCount: {{ $unpushedCount ?? 0 }},
+        retryingBulk: false,
+        retryingId: null,
 
         // Toast feedback
         toast: {
@@ -557,6 +718,14 @@ function productionApp() {
             this.toast.success = success;
             this.toast.show = true;
             setTimeout(() => this.toast.show = false, 4000);
+        },
+
+        recheckAllRequirements() {
+            this.items.forEach((item, index) => {
+                if (item.product_id && item.quantity > 0) {
+                    this.fetchRequirements(index);
+                }
+            });
         },
 
         addItem() {
@@ -645,7 +814,9 @@ function productionApp() {
                 body: JSON.stringify({
                     product_id: item.product_id,
                     quantity: item.quantity,
-                    branch_code: this.branchCode
+                    branch_code: this.branchCode,
+                    include_packaging: this.includePackaging,
+                    include_formulation: this.includeFormulation
                 })
             })
             .then(res => res.json())
@@ -700,6 +871,8 @@ function productionApp() {
                     body: JSON.stringify({
                         production_date: this.productionDate,
                         branch_code: this.branchCode,
+                        include_packaging: this.includePackaging,
+                        include_formulation: this.includeFormulation,
                         items: this.items
                     })
                 });
@@ -709,7 +882,7 @@ function productionApp() {
                     this.showToast(data.message, true);
                     setTimeout(() => {
                         window.location.reload();
-                    }, 1000);
+                    }, 1200);
                 } else {
                     this.showToast(data.message, false);
                 }
@@ -722,23 +895,87 @@ function productionApp() {
 
         viewDetail(id) {
             this.loading = true;
-            fetch(`{{ url('mobile/production') }}/${id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        this.selectedProduction = data.production;
-                        this.showDetailsDrawer = true;
-                    } else {
-                        this.showToast('Failed to load batch details', false);
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
+            fetch(`{{ url('mobile/production') }}/${id}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    this.selectedProduction = data.production;
+                    this.selectedProductionIssueItems = data.issue_items || [];
+                    this.selectedProductionReceiptDoc = data.receipt_doc_no || null;
+                    this.selectedProductionIssueDoc = data.issue_doc_no || null;
+                    this.showDetailsDrawer = true;
+                } else {
                     this.showToast('Failed to load batch details', false);
-                })
-                .finally(() => {
-                    this.loading = false;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                this.showToast('Failed to load batch details', false);
+            })
+            .finally(() => {
+                this.loading = false;
+            });
+        },
+
+        async retrySingleErp(id) {
+            if (!id) return;
+            this.retryingId = id;
+            try {
+                const res = await fetch(`{{ url('mobile/production') }}/${id}/retry-erp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
                 });
+                const data = await res.json();
+                if (data.success) {
+                    this.showToast(data.message || 'ERP sync succeeded!', true);
+                    if (this.selectedProduction && this.selectedProduction.id == id) {
+                        this.selectedProduction.erp_push_status = data.status || 'success';
+                        if (data.receipt_doc) this.selectedProductionReceiptDoc = data.receipt_doc;
+                        if (data.issue_doc) this.selectedProductionIssueDoc = data.issue_doc;
+                    }
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    this.showToast(data.message || 'ERP sync failed.', false);
+                }
+            } catch (e) {
+                this.showToast('Network error while syncing to ERP.', false);
+            } finally {
+                this.retryingId = null;
+            }
+        },
+
+        async bulkRetryErp() {
+            this.retryingBulk = true;
+            try {
+                const res = await fetch("{{ route('mobile.production.bulk-retry-erp') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.showToast(data.message || 'Bulk sync complete!', true);
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    this.showToast(data.message || 'Bulk sync finished with errors.', false);
+                }
+            } catch (e) {
+                this.showToast('Network error during bulk sync.', false);
+            } finally {
+                this.retryingBulk = false;
+            }
         },
 
         async deleteProductionEntry(id) {

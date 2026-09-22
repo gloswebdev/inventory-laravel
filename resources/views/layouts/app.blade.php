@@ -10,6 +10,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     {{-- <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script> --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -414,9 +415,11 @@
                     <a href="{{ route('reports.live-stock') }}" class="sub-nav-link {{ request()->routeIs('reports.live-stock') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Live Stock
                     </a>
+                    @if(Auth::user()->hasPermission('sales_report', 'view') || Auth::user()->hasPermission('reports', 'view') || Auth::user()->role === 'admin')
                     <a href="{{ route('reports.sales-report') }}" class="sub-nav-link {{ request()->routeIs('reports.sales-report') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Sales Report
                     </a>
+                    @endif
                     @if(Auth::user()->hasPermission('purchase_report', 'view') || Auth::user()->role === 'admin')
                     <a href="{{ route('reports.purchase') }}" class="sub-nav-link {{ request()->routeIs('reports.purchase') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Purchase Report

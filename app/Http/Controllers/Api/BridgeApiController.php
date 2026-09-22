@@ -221,6 +221,9 @@ class BridgeApiController extends Controller
         $rows = $request->input('rows', []);
         $syncMode = $request->input('sync_mode', 'full');
         $truncateOld = $request->boolean('truncate_old', false);
+        $truncateAll = $request->boolean('truncate_all', false);
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
         $chunkIndex = (int)$request->input('chunk_index', 0);
 
         if (!\Illuminate\Support\Facades\Schema::hasTable($targetTable)) {
@@ -233,6 +236,26 @@ class BridgeApiController extends Controller
 
         try {
             \Illuminate\Support\Facades\DB::beginTransaction();
+
+            // Safe Deletion on Chunk 0 BEFORE inserting any batch
+            if ($chunkIndex === 0) {
+                if ($truncateAll) {
+                    \Illuminate\Support\Facades\DB::table($targetTable)->truncate();
+                } elseif ($truncateOld) {
+                    if (!empty($dateFrom) && !empty($dateTo)) {
+                        \Illuminate\Support\Facades\DB::table($targetTable)->whereBetween('vouch_date', [$dateFrom, $dateTo])->delete();
+                    } elseif ($targetTable === 'mssql_sales_records' && !empty($rows)) {
+                        $allChunkDates = array_values(array_filter(array_unique(array_column($rows, 'vouch_date'))));
+                        if (!empty($allChunkDates)) {
+                            $minDate = min($allChunkDates);
+                            $maxDate = max($allChunkDates);
+                            \Illuminate\Support\Facades\DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
+                        }
+                    } else {
+                        \Illuminate\Support\Facades\DB::table($targetTable)->delete();
+                    }
+                }
+            }
 
             foreach ($rows as $row) {
                 $record = [];
@@ -282,23 +305,6 @@ class BridgeApiController extends Controller
                 if (!empty($record)) $batch[] = $record;
 
                 if (count($batch) >= 500) {
-                    // Safe Scoped Deletion on Chunk 0 First Batch
-                    if ($chunkIndex === 0 && $insertedCount === 0) {
-                        if ($targetTable === 'mssql_sales_records') {
-                            $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
-                            if (!empty($batchDates)) {
-                                if ($truncateOld) {
-                                    $minDate = min($batchDates);
-                                    $maxDate = max($batchDates);
-                                    \Illuminate\Support\Facades\DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
-                                } else {
-                                    \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
-                                }
-                            }
-                        } elseif ($truncateOld) {
-                            \Illuminate\Support\Facades\DB::table($targetTable)->delete();
-                        }
-                    }
                     \Illuminate\Support\Facades\DB::table($targetTable)->insert($batch);
                     $insertedCount += count($batch);
                     $batch = [];
@@ -306,23 +312,6 @@ class BridgeApiController extends Controller
             }
 
             if (!empty($batch)) {
-                // Safe Scoped Deletion on Chunk 0 First Batch (if < 500 rows total)
-                if ($chunkIndex === 0 && $insertedCount === 0) {
-                    if ($targetTable === 'mssql_sales_records') {
-                        $batchDates = array_values(array_filter(array_unique(array_column($batch, 'vouch_date'))));
-                        if (!empty($batchDates)) {
-                            if ($truncateOld) {
-                                $minDate = min($batchDates);
-                                $maxDate = max($batchDates);
-                                \Illuminate\Support\Facades\DB::table($targetTable)->whereBetween('vouch_date', [$minDate, $maxDate])->delete();
-                            } else {
-                                \Illuminate\Support\Facades\DB::table($targetTable)->whereIn('vouch_date', $batchDates)->delete();
-                            }
-                        }
-                    } elseif ($truncateOld) {
-                        \Illuminate\Support\Facades\DB::table($targetTable)->delete();
-                    }
-                }
                 \Illuminate\Support\Facades\DB::table($targetTable)->insert($batch);
                 $insertedCount += count($batch);
             }

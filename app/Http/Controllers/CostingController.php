@@ -91,11 +91,7 @@ class CostingController extends Controller
             if ($recipe) {
                 foreach ($recipe->items as $item) {
                     if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
-                        $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
-                        if ($rmPurity <= 0 && $item->purity > 0) {
-                            $rmPurity = (float) $item->purity;
-                        }
-                        if ($rmPurity <= 0) $rmPurity = 100.0;
+                        $rmPurity = \App\Models\ProductPrice::resolvePurity($item->rawMaterial->item_code, $item->purity);
                         break;
                     }
                 }
@@ -297,11 +293,7 @@ class CostingController extends Controller
             if ($recipe) {
                 foreach ($recipe->items as $item) {
                     if ($item->rawMaterial && strtoupper(trim($item->rawMaterial->rm_type)) === 'TECHNICAL') {
-                        $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $item->rawMaterial->item_code)->value('purity');
-                        if ($rmPurity <= 0 && $item->purity > 0) {
-                            $rmPurity = (float) $item->purity;
-                        }
-                        if ($rmPurity <= 0) $rmPurity = 100.0;
+                        $rmPurity = \App\Models\ProductPrice::resolvePurity($item->rawMaterial->item_code, $item->purity);
                         break;
                     }
                 }
@@ -445,11 +437,7 @@ class CostingController extends Controller
                 $requiredQty = (float)$item->quantity;
 
                 if (strtoupper(trim($rm->rm_type ?? '')) === 'TECHNICAL') {
-                    $rmPurity = (float) ProductPrice::where('item_code', $rm->item_code)->value('purity');
-                    if ($rmPurity <= 0 && $item->purity > 0) {
-                        $rmPurity = (float) $item->purity;
-                    }
-                    if ($rmPurity <= 0) $rmPurity = 100.0;
+                    $rmPurity = \App\Models\ProductPrice::resolvePurity($rm->item_code, $item->purity);
 
                     $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
                     $itemFormulation = ($item->quantity * $recipePurity) / $yieldQty;
@@ -574,8 +562,10 @@ class CostingController extends Controller
         $rawMaterials  = $rmQuery->get(['id', 'name', 'pack_name', 'uom', 'item_code', 'product_type_id', 'rm_type']);
         $types         = $typesQuery->get();
 
-        $pricelists = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')
-            ->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
+        $pricelists = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        })->get(['id', 'item_hd_name', 'user_code', 'size', 'cf_1', 'group3']);
 
         $pmRates = \App\Models\ProductPrice::allAsMap();
         $purities = $localPurities;
@@ -839,7 +829,10 @@ class CostingController extends Controller
             abort(403, 'Access denied to Pricelist module.');
         }
 
-        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+        $query = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -859,7 +852,10 @@ class CostingController extends Controller
 
         $pricelists = $query->paginate(30)->withQueryString();
 
-        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+        $group1List = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        })->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
 
         $settings = [
             'pricelist_sync_auto'      => AppSetting::get('pricelist_sync_auto', 'disabled'),
@@ -1029,7 +1025,10 @@ class CostingController extends Controller
             abort(403, 'Access denied to Pricelist Update module.');
         }
 
-        $query = \App\Models\Pricelist::where('group5', 'FINISHED GOODS');
+        $query = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -1049,7 +1048,10 @@ class CostingController extends Controller
 
         $pricelists = $query->paginate(30)->withQueryString();
 
-        $group1List = \App\Models\Pricelist::where('group5', 'FINISHED GOODS')->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
+        $group1List = \App\Models\Pricelist::where(function($q) {
+            $q->whereIn('group5', ['FINISHED GOODS', 'FERTILIZER GOODS'])
+              ->orWhere('group1', '100% SOLUBLE IN WATER');
+        })->whereNotNull('group1')->where('group1', '!=', '')->distinct()->pluck('group1')->sort()->values();
 
         $priceLists = self::PRICE_LIST_MAP;
         $recentPushes = \App\Models\PricelistPushLog::latest()->limit(10)->get();
@@ -1307,13 +1309,7 @@ class CostingController extends Controller
             
             // Adjust required technical raw material quantity by formulation and purity percentage
             if (strtoupper(trim($rm->rm_type)) === 'TECHNICAL') {
-                $rmPurity = (float) \App\Models\ProductPrice::where('item_code', $rm->item_code)->value('purity');
-                if ($rmPurity <= 0 && $item->purity > 0) {
-                    $rmPurity = (float) $item->purity;
-                }
-                if ($rmPurity <= 0) {
-                    $rmPurity = 100.0;
-                }
+                $rmPurity = \App\Models\ProductPrice::resolvePurity($rm->item_code, $item->purity);
                 $recipePurity = (float)($item->purity > 0 ? $item->purity : 100.0);
                 $itemFormulation = ($item->quantity * $recipePurity) / max($recipe->yield_quantity, 0.001);
                 $requiredQty = ($baseQty * $itemFormulation) / $rmPurity;

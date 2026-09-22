@@ -494,21 +494,96 @@
 
                 <hr class="border-slate-100">
 
-                {{-- ---- SECTION 6: ERP Production Push ---- --}}
+                {{-- ---- SECTION 6: LOGIC ERP Stock Push (SaveIssueStock & SaveReceiptStock) ---- --}}
                 <div>
                     <div class="flex items-center gap-2 mb-1">
                         <span class="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-black">6</span>
-                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">ERP Stock Push &mdash; Production Module</h4>
-                        <span class="px-1.5 py-0.5 bg-green-100 text-green-700 text-[8px] font-bold rounded">PRODUCTION PUSH</span>
+                        <h4 class="text-xs font-black text-slate-600 uppercase tracking-widest">Logic ERP Stock Push (SaveIssueStock &amp; SaveReceiptStock)</h4>
+                        <span class="px-1.5 py-0.5 bg-green-100 text-green-700 text-[8px] font-bold rounded">STOCK REGISTERS</span>
+                        <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-bold rounded">PRODUCTION CONFIGURED</span>
                     </div>
                     <p class="text-[11px] text-slate-400 mb-4 ml-8">
-                        When enabled, every new production entry automatically pushes to Logic ERP:
-                        &nbsp;<code class="bg-slate-100 px-1.5 py-0.5 rounded text-green-700 text-[10px]">POST /SaveIssueStock</code> (RM consumed)
-                        &nbsp;&amp;&nbsp;
-                        <code class="bg-slate-100 px-1.5 py-0.5 rounded text-green-700 text-[10px]">POST /SaveReceiptStock</code> (FG produced)
+                        Logic ERP me stock issue aur receipt update karne ke liye do APIs hain: RM Consumption / Stock Out ke liye
+                        <code class="bg-slate-100 px-1.5 py-0.5 rounded text-orange-700 text-[10px]">POST /SaveIssueStock</code>
+                        aur Finished Goods / Stock In ke liye
+                        <code class="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 text-[10px]">POST /SaveReceiptStock</code>.
                     </p>
 
                     <div class="bg-green-50/50 border border-green-100 rounded-xl p-4 space-y-5">
+
+                        {{-- API Overview Cards --}}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {{-- SaveIssueStock Card --}}
+                            <div class="bg-white border border-orange-200 rounded-xl p-4 shadow-xs">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-black rounded flex items-center gap-1.5">
+                                        <i class="fas fa-arrow-up-from-bracket"></i> SaveIssueStock
+                                    </span>
+                                    <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">POST</span>
+                                </div>
+                                <h5 class="text-xs font-bold text-slate-800">Issue Register (Stock Out / RM Consumption)</h5>
+                                <p class="text-[11px] text-slate-500 mt-1 mb-2">Used to deduct / issue stock (e.g. Damage, Department transfer, Raw material consumption).</p>
+                                <div class="bg-slate-50 rounded-lg p-2 font-mono text-[10px] text-slate-700 break-all border border-slate-200">
+                                    <span class="text-slate-400 select-none">URL: </span><span id="preview_issue_url">{{ ($settings['erp_push_base_url']->value ?? 'http://logic.gloswebdev.in') }}/SaveIssueStock</span>
+                                </div>
+                                <div class="mt-2.5 flex items-center justify-between text-[10px]">
+                                    <span class="text-slate-500"><strong class="text-slate-700">Auth:</strong> Basic Auth</span>
+                                    <a href="https://www.logicerp.com/LogicAPIHelp/api/saveissuestock.html" target="_blank" class="text-orange-600 hover:text-orange-800 font-bold flex items-center gap-1">
+                                        <i class="fas fa-external-link-alt text-[9px]"></i> View Official Doc
+                                    </a>
+                                </div>
+                            </div>
+
+                            {{-- SaveReceiptStock Card --}}
+                            <div class="bg-white border border-blue-200 rounded-xl p-4 shadow-xs">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-black rounded flex items-center gap-1.5">
+                                        <i class="fas fa-arrow-down-to-bracket"></i> SaveReceiptStock
+                                    </span>
+                                    <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">POST</span>
+                                </div>
+                                <h5 class="text-xs font-bold text-slate-800">Receipt Register (Stock In / FG Production)</h5>
+                                <p class="text-[11px] text-slate-500 mt-1 mb-2">Used to receive / add stock into warehouse (e.g. Finished goods production, inward receipt).</p>
+                                <div class="bg-slate-50 rounded-lg p-2 font-mono text-[10px] text-slate-700 break-all border border-slate-200">
+                                    <span class="text-slate-400 select-none">URL: </span><span id="preview_receipt_url">{{ ($settings['erp_push_base_url']->value ?? 'http://logic.gloswebdev.in') }}/SaveReceiptStock</span>
+                                </div>
+                                <div class="mt-2.5 flex items-center justify-between text-[10px]">
+                                    <span class="text-slate-500"><strong class="text-slate-700">Auth:</strong> Basic Auth</span>
+                                    <a href="https://www.logicerp.com/LogicAPIHelp/api/savereceiptstock.html" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
+                                        <i class="fas fa-external-link-alt text-[9px]"></i> View Official Doc
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Production Credentials Banner --}}
+                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                    <i class="fas fa-shield-check text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h5 class="text-xs font-black text-emerald-900 uppercase tracking-wider">Production Logic ERP Credentials Configured</h5>
+                                        <span class="px-2 py-0.2 bg-emerald-200 text-emerald-900 text-[9px] font-bold rounded-full">Live Active</span>
+                                    </div>
+                                    <p class="text-[11px] text-emerald-800 leading-relaxed">
+                                        Production Logic ERP server ke active credentials configure kiye gaye hain. Production entry save hone par receipt aur issue registers live ERP me sync honge.
+                                    </p>
+                                    <div class="mt-3 flex flex-wrap gap-3 font-mono text-[11px]">
+                                        <span class="bg-white/80 border border-emerald-200 px-2.5 py-1 rounded-lg text-slate-700">
+                                            <strong>Base URL:</strong> <span class="text-blue-700 font-bold">http://logic.gloswebdev.in</span>
+                                        </span>
+                                        <span class="bg-white/80 border border-emerald-200 px-2.5 py-1 rounded-lg text-slate-700">
+                                            <strong>Username:</strong> <span class="text-emerald-700 font-bold">SALapi</span>
+                                        </span>
+                                        <span class="bg-white/80 border border-emerald-200 px-2.5 py-1 rounded-lg text-slate-700">
+                                            <strong>Password:</strong> <span class="text-emerald-700 font-bold">••••••••</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         {{-- Master Toggle --}}
                         <div class="flex items-center justify-between bg-white border border-green-200 rounded-xl px-5 py-4">
@@ -518,7 +593,7 @@
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer select-none">
                                 <input type="checkbox" name="erp_push_enabled" id="erp_push_enabled" value="1"
-                                    {{ ($settings['erp_push_enabled']->value ?? '0') === '1' ? 'checked' : '' }}
+                                    {{ ($settings['erp_push_enabled']->value ?? '1') === '1' ? 'checked' : '' }}
                                     class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-400 rounded-full peer
                                             peer-checked:after:translate-x-full peer-checked:after:border-white
@@ -528,33 +603,43 @@
                             </label>
                         </div>
 
-                        {{-- Credentials --}}
+                        {{-- Credentials & Connection Test --}}
                         <div>
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Basic Auth Credentials &amp; Endpoint</p>
+                            <div class="flex justify-between items-center mb-3">
+                                <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Basic Auth Credentials &amp; Endpoint</p>
+                                <button type="button" onclick="testErpConnection()" id="btn_test_erp"
+                                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm active:scale-95">
+                                    <i class="fas fa-satellite-dish"></i> Test Connection
+                                </button>
+                            </div>
+
+                            <div id="erp_test_result" class="hidden mb-4 p-3 rounded-xl text-xs font-medium border"></div>
+
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div class="md:col-span-3">
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
-                                        Push Base URL <span class="font-normal text-gray-400 normal-case">(e.g. http://demo.logicerp.com/api)</span>
+                                        Push Base URL <span class="font-normal text-gray-400 normal-case">(e.g. http://logic.gloswebdev.in or your live server URL)</span>
                                     </label>
-                                    <input type="text" name="erp_push_base_url"
-                                        value="{{ $settings['erp_push_base_url']->value ?? 'http://demo.logicerp.com/api' }}"
+                                    <input type="text" id="erp_push_base_url" name="erp_push_base_url"
+                                        value="{{ $settings['erp_push_base_url']->value ?? 'http://logic.gloswebdev.in' }}"
+                                        oninput="updatePreviewUrls(this.value)"
                                         class="w-full border border-gray-200 rounded-xl py-2.5 px-4 font-mono text-sm text-green-700 focus:ring-2 focus:ring-green-500 outline-none transition bg-white"
-                                        placeholder="http://demo.logicerp.com/api">
+                                        placeholder="http://logic.gloswebdev.in">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Username</label>
-                                    <input type="text" name="erp_push_username"
-                                        value="{{ $settings['erp_push_username']->value ?? '' }}"
+                                    <input type="text" id="erp_push_username" name="erp_push_username"
+                                        value="{{ $settings['erp_push_username']->value ?? 'SALapi' }}"
                                         class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-green-500 outline-none transition bg-white"
-                                        placeholder="Demo">
+                                        placeholder="SALapi">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Password</label>
                                     <div class="relative">
                                         <input type="password" id="erp_push_password_input" name="erp_push_password"
-                                            value="{{ $settings['erp_push_password']->value ?? '' }}"
+                                            value="{{ $settings['erp_push_password']->value ?? 'SAL@api@123' }}"
                                             class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-green-500 outline-none transition pr-10 bg-white"
-                                            placeholder="••••••">
+                                            placeholder="SAL@api@123">
                                         <button type="button" onclick="toggleErpPwd()"
                                             class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-green-600 transition">
                                             <i id="erp_pwd_eye" class="fas fa-eye text-xs"></i>
@@ -567,8 +652,8 @@
                         {{-- Receipt Stock Config --}}
                         <div class="border-t border-green-100 pt-4">
                             <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px]">SaveReceiptStock</span>
-                                Finished Good Production Settings
+                                <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[9px] font-bold">SaveReceiptStock</span>
+                                Finished Good Production Settings (Stock In)
                             </p>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div>
@@ -588,9 +673,9 @@
                                 <div>
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">ReceivedFrom</label>
                                     <input type="text" name="erp_receipt_received_from"
-                                        value="{{ $settings['erp_receipt_received_from']->value ?? '' }}"
+                                        value="{{ $settings['erp_receipt_received_from']->value ?? 'PRODUCTION' }}"
                                         class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
-                                        placeholder="RKSS">
+                                        placeholder="PRODUCTION">
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">IssueTo</label>
@@ -605,8 +690,8 @@
                         {{-- Issue Stock Config --}}
                         <div class="border-t border-green-100 pt-4">
                             <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px]">SaveIssueStock</span>
-                                Raw Material Consumption Settings
+                                <span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px] font-bold">SaveIssueStock</span>
+                                Raw Material Consumption Settings (Stock Out)
                             </p>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div>
@@ -619,9 +704,9 @@
                                 <div>
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Godown Name</label>
                                     <input type="text" name="erp_issue_godown_name"
-                                        value="{{ $settings['erp_issue_godown_name']->value ?? '' }}"
+                                        value="{{ $settings['erp_issue_godown_name']->value ?? 'MAIN' }}"
                                         class="w-full border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-orange-500 outline-none transition bg-white"
-                                        placeholder="(blank ok)">
+                                        placeholder="MAIN">
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 ml-1">
@@ -640,8 +725,7 @@
                             <i class="fas fa-circle-info text-green-500 text-sm mt-0.5"></i>
                             <div class="text-[11px] text-slate-500 leading-relaxed">
                                 <strong class="text-slate-700">Non-blocking push:</strong>
-                                If ERP API fails, production is still saved locally. Check <code class="bg-slate-100 px-1 rounded text-slate-600">storage/logs/laravel.log</code>
-                                for errors. ERP push status is shown in the Production history table as <span class="font-bold text-green-600">✓ success</span>,
+                                Production entry will save locally even if ERP server is unreachable. ERP push status is logged and shown in the Production history table as <span class="font-bold text-green-600">✓ success</span>,
                                 <span class="font-bold text-red-500">✗ failed</span>, or <span class="font-bold text-slate-400">— skipped</span>.
                             </div>
                         </div>
@@ -764,6 +848,60 @@ function toggleErpPwd() {
         input.type = 'password';
         icon.classList.replace('fa-eye-slash', 'fa-eye');
     }
+}
+
+function updatePreviewUrls(baseUrl) {
+    baseUrl = (baseUrl || 'http://logic.gloswebdev.in').replace(/\/+$/, '');
+    const issueEl = document.getElementById('preview_issue_url');
+    const receiptEl = document.getElementById('preview_receipt_url');
+    if (issueEl) issueEl.innerText = baseUrl + '/SaveIssueStock';
+    if (receiptEl) receiptEl.innerText = baseUrl + '/SaveReceiptStock';
+}
+
+function testErpConnection() {
+    const btn = document.getElementById('btn_test_erp');
+    const resultBox = document.getElementById('erp_test_result');
+    const baseUrl = document.getElementById('erp_push_base_url').value;
+    const username = document.getElementById('erp_push_username').value;
+    const password = document.getElementById('erp_push_password_input').value;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    resultBox.className = 'hidden';
+
+    fetch("{{ route('settings.api.test-erp-push') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            erp_push_base_url: baseUrl,
+            erp_push_username: username,
+            erp_push_password: password
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        resultBox.classList.remove('hidden');
+        if (data.success) {
+            resultBox.className = 'mb-4 p-3.5 rounded-xl text-xs font-medium border bg-emerald-50 border-emerald-200 text-emerald-800 flex items-start gap-2.5';
+            resultBox.innerHTML = '<i class="fas fa-check-circle text-emerald-600 text-base mt-0.5 shrink-0"></i> <div><strong class="font-bold">Connection Successful!</strong><div class="mt-0.5 text-emerald-700">' + data.message + '</div></div>';
+        } else {
+            resultBox.className = 'mb-4 p-3.5 rounded-xl text-xs font-medium border bg-red-50 border-red-200 text-red-800 flex items-start gap-2.5';
+            resultBox.innerHTML = '<i class="fas fa-exclamation-circle text-red-600 text-base mt-0.5 shrink-0"></i> <div><strong class="font-bold">Connection Failed:</strong><div class="mt-0.5 text-red-700">' + data.message + '</div></div>';
+        }
+    })
+    .catch(err => {
+        resultBox.classList.remove('hidden');
+        resultBox.className = 'mb-4 p-3.5 rounded-xl text-xs font-medium border bg-red-50 border-red-200 text-red-800 flex items-start gap-2.5';
+        resultBox.innerHTML = '<i class="fas fa-exclamation-circle text-red-600 text-base mt-0.5 shrink-0"></i> <div><strong class="font-bold">Network Error:</strong><div class="mt-0.5 text-red-700">' + err.message + '</div></div>';
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Test Connection';
+    });
 }
 </script>
 @endsection

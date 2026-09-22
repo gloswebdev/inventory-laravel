@@ -24,19 +24,16 @@
                 </button>
                 @endif
                 
-                @if(Auth::user()->hasFeature('indent', 'type_filter'))
-                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
-                    <i class="fas fa-filter text-slate-400 text-[10px]"></i>
-                    <select id="global_type_filter" onchange="applyGlobalTypeFilter()" class="bg-transparent border-none text-xs font-bold text-indigo-600 focus:ring-0 outline-none pr-6 py-0.5">
+                <div class="flex items-center gap-2 bg-indigo-50/70 border border-indigo-200/80 rounded-xl px-3 py-1.5 shadow-xs">
+                    <i class="fas fa-filter text-indigo-500 text-xs"></i>
+                    <label for="global_type_filter" class="text-[10px] font-black text-indigo-900 uppercase tracking-wider">Product Type:</label>
+                    <select id="global_type_filter" onchange="applyGlobalTypeFilter()" class="bg-transparent border-none text-xs font-black text-indigo-700 focus:ring-0 outline-none pr-6 py-0.5 cursor-pointer uppercase">
                         <option value="">All Types</option>
                         @foreach($productTypes as $type)
                             <option value="{{ $type->id }}">{{ $type->type_name }}</option>
                         @endforeach
                     </select>
                 </div>
-                @else
-                <select id="global_type_filter" style="display: none;"><option value=""></option></select>
-                @endif
 
                 @if(Auth::user()->hasFeature('indent', 'bulk_add'))
                 <button type="button" onclick="toggleBulkModal()" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-bold py-2 px-3 rounded-xl text-xs transition duration-200 flex items-center gap-2 shadow-sm">
@@ -86,6 +83,22 @@
                         <i class="fas fa-plus"></i> Add Item
                     </button>
                 </div>
+            </div>
+            {{-- Chemical Formulation Toggle --}}
+            <div class="mt-4 flex items-center justify-between bg-white p-3.5 rounded-2xl border border-indigo-100 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-xs">
+                        <i class="fas fa-flask text-xs"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-black text-slate-800 block">Include Chemical Formulation (Raw Materials)</span>
+                        <span class="text-[10px] font-bold text-slate-400 block -mt-0.5">Default OFF: Only Packaging Materials are planned</span>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="include_formulation_toggle" class="sr-only peer" onchange="if(document.getElementById('resultSection').style.display !== 'none') { calculateIndent(); }">
+                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
             </div>
         </div>
 
@@ -276,7 +289,8 @@
                 <label class="flex items-center px-6 py-3 hover:bg-indigo-50 border-b border-gray-100 cursor-pointer product-list-item transition duration-150" 
                        data-name="{{ strtolower($product->name) }}" 
                        data-code="{{ strtolower($product->item_code) }}"
-                       data-type-id="{{ $product->product_type_id }}">
+                       data-type-id="{{ $product->product_type_id }}"
+                       data-category="{{ strtolower($product->category ?? '') }}">
                     <input type="checkbox" value="{{ $product->id }}" class="product-checkbox w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
                     <div class="ml-4 flex-grow">
                         <div class="font-bold text-gray-800">{{ $product->name }}</div>
@@ -419,27 +433,41 @@
         }
     }
 
-    function applyGlobalTypeFilter() {
-        const typeId = document.getElementById('global_type_filter').value;
-        const rows = document.querySelectorAll('.product-row');
+    const allFinishedGoods = @json($finishedGoods);
+
+    function populateProductSelect(selectElement, selectedValue = '') {
+        const typeFilterEl = document.getElementById('global_type_filter');
+        const typeId = typeFilterEl ? typeFilterEl.value : '';
+        const selectedOpt = typeFilterEl && typeFilterEl.selectedIndex >= 0 ? typeFilterEl.options[typeFilterEl.selectedIndex] : null;
+        const typeName = selectedOpt ? selectedOpt.text.toLowerCase().trim() : '';
+        const currentVal = selectedValue !== '' ? selectedValue : selectElement.value;
         
-        // Filter options in all selection dropdowns
-        document.querySelectorAll('.product-select').forEach(select => {
-            const options = select.querySelectorAll('option');
-            options.forEach(option => {
-                const optionTypeId = option.getAttribute('data-type-id');
-                if (!typeId || !optionTypeId || optionTypeId === typeId) {
-                    option.style.display = 'block';
-                } else {
-                    option.style.display = 'none';
+        selectElement.innerHTML = '<option value="" data-type-id="">Select Product</option>';
+        
+        allFinishedGoods.forEach(product => {
+            const prodCategory = (product.category || '').toLowerCase().trim();
+            const matchesType = !typeId || String(product.product_type_id) === String(typeId) || (typeName && typeName !== 'all types' && prodCategory === typeName);
+
+            if (matchesType) {
+                const opt = document.createElement('option');
+                opt.value = product.id;
+                opt.setAttribute('data-type-id', product.product_type_id || '');
+                opt.textContent = product.name + (product.pack_name ? ' (' + product.pack_name + ')' : '');
+                if (String(product.id) === String(currentVal)) {
+                    opt.selected = true;
                 }
-            });
-            
-            // If the currently selected option is now hidden, reset the select
-            const selectedOption = select.options[select.selectedIndex];
-            if (selectedOption && selectedOption.style.display === 'none') {
-                select.value = '';
+                selectElement.appendChild(opt);
             }
+        });
+
+        if (currentVal) {
+            selectElement.value = currentVal;
+        }
+    }
+
+    function applyGlobalTypeFilter() {
+        document.querySelectorAll('.product-select').forEach(select => {
+            populateProductSelect(select);
         });
 
         // Also filter the bulk modal if it's open or about to be
@@ -447,17 +475,22 @@
     }
 
     function filterProducts() {
-        const query = document.getElementById('productSearch').value.toLowerCase();
-        const typeId = document.getElementById('global_type_filter').value;
+        const searchInput = document.getElementById('productSearch');
+        const query = searchInput ? searchInput.value.toLowerCase() : '';
+        const typeFilterEl = document.getElementById('global_type_filter');
+        const typeId = typeFilterEl ? typeFilterEl.value : '';
+        const selectedOpt = typeFilterEl && typeFilterEl.selectedIndex >= 0 ? typeFilterEl.options[typeFilterEl.selectedIndex] : null;
+        const typeName = selectedOpt ? selectedOpt.text.toLowerCase().trim() : '';
         const items = document.querySelectorAll('.product-list-item');
         
         items.forEach(item => {
-            const name = item.getAttribute('data-name');
-            const code = item.getAttribute('data-code');
-            const itemTypeId = item.getAttribute('data-type-id');
+            const name = item.getAttribute('data-name') || '';
+            const code = item.getAttribute('data-code') || '';
+            const itemTypeId = item.getAttribute('data-type-id') || '';
+            const itemCategory = (item.getAttribute('data-category') || '').toLowerCase().trim();
             
             const matchesSearch = name.includes(query) || code.includes(query);
-            const matchesType = !typeId || itemTypeId === typeId;
+            const matchesType = !typeId || itemTypeId === typeId || (typeName && typeName !== 'all types' && itemCategory === typeName);
 
             if (matchesSearch && matchesType) {
                 item.style.display = 'flex';
@@ -524,24 +557,18 @@
             container.appendChild(row);
         }
         
-        if (productId) row.querySelector('.product-select').value = productId;
-        if (qty) row.querySelector('.demand-qty').value = qty;
-        
-        // Apply current filter to the new row
-        const typeId = document.getElementById('global_type_filter').value;
-        if (typeId) {
-            row.querySelectorAll('.product-select option').forEach(option => {
-                const optionTypeId = option.getAttribute('data-type-id');
-                if (!typeId || !optionTypeId || optionTypeId === typeId) {
-                    option.style.display = 'block';
-                } else {
-                    option.style.display = 'none';
-                }
-            });
-        }
+        const select = row.querySelector('.product-select');
+        populateProductSelect(select, productId);
+        row.querySelector('.demand-qty').value = qty || '';
 
         return row;
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.product-select').forEach(select => {
+            populateProductSelect(select, select.value);
+        });
+    });
 
     async function calculateIndent() {
         const rows = document.querySelectorAll('.product-row');
@@ -569,7 +596,8 @@
                 },
                 body: JSON.stringify({ 
                     products: products,
-                    branch_code: document.getElementById('branch_code').value
+                    branch_code: document.getElementById('branch_code').value,
+                    include_formulation: document.getElementById('include_formulation_toggle') ? document.getElementById('include_formulation_toggle').checked : false
                 })
             });
 
@@ -598,12 +626,20 @@
                 
                 result.data.forEach(item => {
                     const row = document.createElement('tr');
-                     row.className = "hover:bg-slate-50/70 transition-colors group";
+                    row.className = "hover:bg-slate-50/70 transition-colors group";
+                    const isPacking = item.type === 'packing';
+                    const typeBadge = isPacking 
+                        ? `<span class="font-black text-[9px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md uppercase tracking-wider"><i class="fas fa-box text-[8px] mr-1"></i>Packing</span>`
+                        : `<span class="font-black text-[9px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md uppercase tracking-wider"><i class="fas fa-flask text-[8px] mr-1"></i>Chemical</span>`;
+
                     row.innerHTML = `
                         <td class="py-3 px-6 text-left">
-                            <div class="font-bold text-slate-800 text-sm">${item.name}</div>
+                            <div class="flex items-center gap-2">
+                                <div class="font-bold text-slate-800 text-sm">${item.name}</div>
+                                ${typeBadge}
+                            </div>
                             <div class="flex items-center gap-2 mt-1">
-                                ${item.item_code ? `<span class="font-mono text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">${item.item_code}</span>` : ''}
+                                ${item.item_code ? `<span class="font-mono text-[9px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">${item.item_code}</span>` : ''}
                                 <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">${item.pack_name || ''}</span>
                             </div>
                         </td>
@@ -669,6 +705,12 @@
         branchInput.name = 'branch_code';
         branchInput.value = document.getElementById('branch_code').value;
         form.appendChild(branchInput);
+
+        const formulationInput = document.createElement('input');
+        formulationInput.type = 'hidden';
+        formulationInput.name = 'include_formulation';
+        formulationInput.value = document.getElementById('include_formulation_toggle') && document.getElementById('include_formulation_toggle').checked ? '1' : '0';
+        form.appendChild(formulationInput);
 
         document.body.appendChild(form);
         form.submit();

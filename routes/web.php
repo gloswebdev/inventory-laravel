@@ -56,9 +56,15 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::get('recipes/import-template', [RecipeController::class, 'importTemplate'])->name('recipes.import-template');
     Route::post('recipes/import', [RecipeController::class, 'import'])->name('recipes.import');
     Route::post('recipes/bulk-delete', [RecipeController::class, 'bulkDelete'])->name('recipes.bulk-delete');
+    Route::get('recipes/{recipe}/packing', [RecipeController::class, 'getPackingConfig'])->name('recipes.packing.get');
+    Route::post('recipes/{recipe}/packing', [RecipeController::class, 'savePackingConfig'])->name('recipes.packing.save');
     Route::resource('recipes', RecipeController::class);
     Route::resource('production', ProductionController::class);
     Route::post('production/check-stock', [ProductionController::class, 'checkStock'])->name('production.check-stock');
+    Route::post('production/bulk-retry-erp', [ProductionController::class, 'bulkRetryErpPush'])->name('production.bulk-retry-erp');
+    Route::post('production/{production}/retry-erp', [ProductionController::class, 'retryErpPush'])->name('production.retry-erp');
+    Route::post('adjustments/bulk-retry-erp', [AdjustmentController::class, 'bulkRetryErp'])->name('adjustments.bulk-retry-erp');
+    Route::post('adjustments/{adjustment}/retry-erp', [AdjustmentController::class, 'retryErp'])->name('adjustments.retry-erp');
     Route::resource('adjustments', AdjustmentController::class);
 
     // User Management
@@ -134,9 +140,12 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::post('reports/teams/setup/save', [ReportController::class, 'saveTeamsSetup'])->name('reports.teams.setup.save');
     Route::get('reports/party-master', [ReportController::class, 'partyMasterReport'])->name('reports.party-master');
     Route::get('reports/sales-report', [ReportController::class, 'salesReport'])->name('reports.sales-report');
+    Route::get('reports/sales-report/drilldown', [ReportController::class, 'salesDrilldown'])->name('reports.sales-report.drilldown');
+    Route::post('reports/sales-report/clean-data', [ReportController::class, 'cleanSalesData'])->name('reports.sales-report.clean-data');
     Route::post('reports/sales-report/execute', [ReportController::class, 'executeSalesQuery'])->name('reports.sales-report.execute');
     Route::post('reports/sales-report/export', [ReportController::class, 'exportSalesQuery'])->name('reports.sales-report.export');
     Route::post('reports/sales-report/sync', [ReportController::class, 'syncSalesReport'])->name('reports.sales-report.sync');
+    Route::post('reports/sales-report/agent-targets', [ReportController::class, 'salesAgentTargetsStore'])->name('reports.sales-report.agent-targets');
     Route::post('reports/collection/teams', [ReportController::class, 'storeTeam'])->name('reports.collection.teams.store');
     Route::put('reports/collection/teams/{team}', [ReportController::class, 'updateTeam'])->name('reports.collection.teams.update');
     Route::delete('reports/collection/teams/{team}', [ReportController::class, 'deleteTeam'])->name('reports.collection.teams.destroy');
@@ -161,6 +170,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     // Settings
     Route::get('settings/branches', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.branches.index');
     Route::post('settings/api', [App\Http\Controllers\SettingController::class, 'updateApiSettings'])->name('settings.api.update');
+    Route::post('settings/api/test-erp-push', [App\Http\Controllers\SettingController::class, 'testErpPushConnection'])->name('settings.api.test-erp-push');
     Route::post('settings/branches/store', [App\Http\Controllers\SettingController::class, 'storeBranch'])->name('settings.branches.store');
     Route::post('settings/branches/update', [App\Http\Controllers\SettingController::class, 'updateBranches'])->name('settings.branches.update');
     Route::delete('settings/branches/{branch}', [App\Http\Controllers\SettingController::class, 'deleteBranch'])->name('settings.branches.destroy');
@@ -188,6 +198,8 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     Route::delete('/production/{id}', [App\Http\Controllers\MobileController::class, 'destroyProduction'])->name('mobile.production.destroy');
     Route::post('/production/check-stock', [ProductionController::class, 'checkStock'])->name('mobile.production.check-stock');
     Route::get('/production/{production}', [ProductionController::class, 'show'])->name('mobile.production.show');
+    Route::post('/production/bulk-retry-erp', [ProductionController::class, 'bulkRetryErpPush'])->name('mobile.production.bulk-retry-erp');
+    Route::post('/production/{production}/retry-erp', [ProductionController::class, 'retryErpPush'])->name('mobile.production.retry-erp');
     Route::get('/planning', [App\Http\Controllers\MobileController::class, 'planning'])->name('mobile.planning');
     Route::post('/planning/calculate', [App\Http\Controllers\MobileController::class, 'calculateMRP'])->name('mobile.planning.calculate');
     Route::get('/indents', [App\Http\Controllers\MobileController::class, 'indents'])->name('mobile.indents');
@@ -231,6 +243,15 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     // Purchase Report
     Route::get('/purchase-report', [App\Http\Controllers\MobileController::class, 'purchaseReport'])->name('mobile.purchase-report');
 
+    // Sales Report
+    Route::get('/sales-report', [App\Http\Controllers\MobileController::class, 'salesReport'])->name('mobile.sales-report');
+    Route::get('/sales-report/drilldown', [App\Http\Controllers\MobileController::class, 'salesDrilldown'])->name('mobile.sales-report.drilldown');
+    // 360-Degree Sales Explorer (any-combination faceted filtering, distinct from the drilldown above)
+    Route::get('/sales-360', [App\Http\Controllers\MobileController::class, 'sales360'])->name('mobile.sales-360');
+    Route::get('/sales-360/data', [App\Http\Controllers\MobileController::class, 'sales360Data'])->name('mobile.sales-360.data');
+    Route::get('/sales-360/products', [App\Http\Controllers\MobileController::class, 'sales360Products'])->name('mobile.sales-360.products');
+    Route::get('/sales-360/parties', [App\Http\Controllers\MobileController::class, 'sales360Parties'])->name('mobile.sales-360.parties');
+
     // Recipes
     Route::get('/recipes', [App\Http\Controllers\MobileController::class, 'recipes'])->name('mobile.recipes');
     Route::get('/recipes/{recipe}', [App\Http\Controllers\MobileController::class, 'showRecipe'])->name('mobile.recipes.show');
@@ -240,6 +261,9 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
     // Adjustments
     Route::get('/adjustments', [App\Http\Controllers\MobileController::class, 'adjustments'])->name('mobile.adjustments');
     Route::post('/adjustments', [App\Http\Controllers\MobileController::class, 'storeAdjustment'])->name('mobile.adjustments.store');
+    Route::post('/adjustments/bulk-retry-erp', [App\Http\Controllers\MobileController::class, 'bulkRetryAdjustmentErp'])->name('mobile.adjustments.bulk-retry-erp');
+    Route::post('/adjustments/{adjustment}/retry-erp', [App\Http\Controllers\MobileController::class, 'retryAdjustmentErp'])->name('mobile.adjustments.retry-erp');
+    Route::delete('/adjustments/{adjustment}', [App\Http\Controllers\MobileController::class, 'deleteAdjustment'])->name('mobile.adjustments.destroy');
     // Ledger
     Route::get('/ledger', [App\Http\Controllers\MobileController::class, 'ledger'])->name('mobile.ledger');
     // Product Master
@@ -291,6 +315,9 @@ Route::get('/cron/database-backup', [SystemController::class, 'cronBackup'])->na
 use App\Http\Controllers\Api\MssqlSyncController;
 Route::post('/api/sync/mssql-sales', [MssqlSyncController::class, 'ingestSales'])->name('api.sync.mssql-sales');
 Route::get('/api/sync/mssql-sales/status', [MssqlSyncController::class, 'getSyncStatus'])->name('api.sync.mssql-sales.status');
+Route::post('/api/sync/mssql-sales/checksum', [MssqlSyncController::class, 'checksum'])->name('api.sync.mssql-sales.checksum');
+Route::post('/api/sync/mssql-sales/prune', [MssqlSyncController::class, 'prune'])->name('api.sync.mssql-sales.prune');
+Route::match(['get', 'post'], '/api/sync/mssql-sales/agent-health', [MssqlSyncController::class, 'agentHealth'])->name('api.sync.mssql-sales.agent-health');
 
 // Python Local MSSQL Bridge Agent API (Zero-XAMPP Bridge)
 use App\Http\Controllers\Api\BridgeApiController;

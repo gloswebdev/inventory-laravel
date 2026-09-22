@@ -1,8 +1,8 @@
 {
     "mssql": {
-        "server": "localhost",
+        "server": "100.108.74.58",
         "database": "LOGICDBSY",
-        "use_windows_auth": true,
+        "use_windows_auth": false,
         "username": "sa",
         "password": "Logic@1234",
         "driver": "{ODBC Driver 17 for SQL Server}"
@@ -13,10 +13,10 @@
         "poll_interval_seconds": 2
     },
     "auto_sync": {
-        "enabled": true,
+        "enabled": false,
         "sync_mode": "incremental",
-        "incremental_days": 7,
+        "incremental_days": 5,
         "sync_interval_hours": 1,
-        "sync_on_startup": true
+        "sync_on_startup": false
     }
 }

@@ -19,11 +19,17 @@ class IndentController extends Controller
      */
     public function index(Request $request)
     {
-        // Load only Finished Good products for the indent entry list
+        // Load Finished Good and 100% SOLUBLE IN WATER products for the indent entry list
         $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
         $defaultTypeId = $defaultType ? $defaultType->id : 6;
 
-        $productsQuery = Product::orderBy('name')->where('product_type_id', $defaultTypeId);
+        $allowedTypeNames = ['Finished Good', '100% SOLUBLE IN WATER'];
+        $allowedTypeIds = \App\Models\ProductType::whereIn('type_name', $allowedTypeNames)->pluck('id')->toArray();
+        if (empty($allowedTypeIds)) {
+            $allowedTypeIds = [$defaultTypeId];
+        }
+
+        $productsQuery = Product::orderBy('name')->whereIn('product_type_id', $allowedTypeIds);
         $this->applyTypeFilters($productsQuery);
         $finishedGoods = $productsQuery->get();
         
@@ -51,7 +57,15 @@ class IndentController extends Controller
         $users = \App\Models\User::orderBy('name')->get();
         $productTypes = \App\Models\ProductType::orderBy('type_name')->get();
 
-        return view('indent.index', compact('finishedGoods', 'branches', 'history', 'users', 'productTypes', 'defaultTypeId'));
+        $user = Auth::user();
+        $indentProductTypesQuery = \App\Models\ProductType::whereIn('type_name', $allowedTypeNames)->orderBy('type_name');
+        if ($user && $user->role !== 'admin') {
+            $permittedTypeIds = $user->getPermittedProductTypeIds();
+            $indentProductTypesQuery->whereIn('id', $permittedTypeIds);
+        }
+        $indentProductTypes = $indentProductTypesQuery->get();
+
+        return view('indent.index', compact('finishedGoods', 'branches', 'history', 'users', 'productTypes', 'defaultTypeId', 'indentProductTypes'));
     }
 
     /**
@@ -148,11 +162,17 @@ class IndentController extends Controller
     {
         $branchCode = $request->get('branch_code');
         
-        // Only fetch stock for Finished Good products
+        // Fetch stock for Finished Good and 100% SOLUBLE IN WATER products
         $defaultType = \App\Models\ProductType::where('type_name', 'Finished Good')->first();
         $defaultTypeId = $defaultType ? $defaultType->id : 6;
 
-        $productsQuery = Product::orderBy('name')->where('product_type_id', $defaultTypeId);
+        $allowedTypeNames = ['Finished Good', '100% SOLUBLE IN WATER'];
+        $allowedTypeIds = \App\Models\ProductType::whereIn('type_name', $allowedTypeNames)->pluck('id')->toArray();
+        if (empty($allowedTypeIds)) {
+            $allowedTypeIds = [$defaultTypeId];
+        }
+
+        $productsQuery = Product::orderBy('name')->whereIn('product_type_id', $allowedTypeIds);
         $this->applyTypeFilters($productsQuery);
         $products = $productsQuery->get();
         $externalStock = $this->getExternalStock();

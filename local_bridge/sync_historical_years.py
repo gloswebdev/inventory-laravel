@@ -37,8 +37,8 @@ SELECT
     BS.series,
     ACT.act_name,
     TXN.item_det_code,
-    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,
-    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,
+    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,
+    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,
     TXN.Free_Qty,
     TXN.rate,
     TXN.Calc_Tax_1,
@@ -55,11 +55,10 @@ LEFT JOIN It_Mst_Hd AS IMH ON IMD.Item_Hd_Code = IMH.Item_Hd_Code
 LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code
 LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code
 LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code
-WHERE BS.Stock_Trans = 0
-  AND BS.type IN ('SL', 'SR')
-  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')
+WHERE BS.series IN ('AMSR', 'ISCR', 'AKST', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'SPCN', 'SWPN', 'MPSL', 'MPCS', 'MPST', 'MSR', 'MDS', 'UPSL', 'UPCS', 'UPST', 'SWSR', 'MHSL', 'MHST', 'LKN', 'LKR')
 ORDER BY HD.vouch_date DESC;
 """
+
 
 def json_serializer(obj):
     if isinstance(obj, (datetime.datetime, datetime.date)):
@@ -78,8 +77,14 @@ def sync_year(year_code: str, year_label: str):
         "Content-Type": "application/json"
     }
 
+    start_yr = year_code[:4]
+    end_yr = year_code[4:]
+    date_from = f"{start_yr}-04-01"
+    date_to = f"{end_yr}-03-31"
+
     print(f"\n=======================================================")
     print(f"[*] Starting Direct Sync for: {year_label} (Sl_Txn{year_code})")
+    print(f"    Date Range: {date_from} to {date_to}")
     print(f"=======================================================")
 
     t0 = time.time()
@@ -112,6 +117,8 @@ def sync_year(year_code: str, year_label: str):
             "rows": chunk,
             "sync_mode": "full",
             "truncate_old": (i == 0),
+            "date_from": date_from,
+            "date_to": date_to,
             "chunk_index": i,
             "total_chunks": total_chunks
         }

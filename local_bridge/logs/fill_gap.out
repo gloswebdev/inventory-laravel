@@ -1,0 +1,13 @@
+[2026-08-22 21:49:54] [INFO] [cloud] FY 2026-2027 -- fetching (entries since 2026-08-22 16:19)
+[2026-08-22 21:49:54] [INFO] [cloud] FY 2026-2027 -- 71 rows from ERP
+[2026-08-22 21:49:55] [INFO] [cloud] FY 2026-2027 -- 71 rows written
+[2026-08-22 21:49:55] [INFO] [cloud] FY 2025-2026 -- fetching (entries since 2025-04-01 00:00)
+[2026-08-22 21:50:04] [INFO] [cloud] FY 2025-2026 -- 42477 rows from ERP
+[2026-08-22 21:51:07] [INFO] [cloud] FY 2025-2026 -- 42477 rows written
+[2026-08-22 21:51:07] [INFO] [cloud] FY 2024-2025 -- fetching (entries since 2024-04-01 00:00)
+[2026-08-22 21:51:16] [INFO] [cloud] FY 2024-2025 -- 35221 rows from ERP
+[2026-08-22 21:52:05] [INFO] [cloud] FY 2024-2025 -- 35221 rows written
+[2026-08-22 21:52:06] [INFO] [cloud] FY 2026-2027 reconcile clean (2026-07-08 .. 2026-08-22)
+[2026-08-22 21:52:07] [INFO] [cloud] FY 2025-2026 reconcile clean (2026-02-14 .. 2026-03-31)
+[2026-08-22 21:52:08] [INFO] [cloud] FY 2024-2025 reconcile clean (2025-02-14 .. 2025-03-31)
+[2026-08-22 21:52:08] [INFO] Done -- 77769 rows written. OK

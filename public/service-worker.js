@@ -1,4 +1,13 @@
-const CACHE_NAME = 'invoflow-v10';
+/*
+ * IMPORTANT: bump CACHE_VERSION on every release that changes the mobile UI.
+ *
+ * That is the kill switch for stale installs. When these bytes change, the browser sees a
+ * different service worker, installs it, and the activate handler below deletes every cache
+ * whose name is not the current one -- so every user's old cache is wiped on their next visit.
+ * Leaving it unchanged means users keep whatever they cached, however old.
+ */
+const CACHE_VERSION = 11;
+const CACHE_NAME = `invoflow-v${CACHE_VERSION}`;
 const OFFLINE_PAGE = '/offline.html';
 
 const ASSETS_TO_CACHE = [
@@ -37,6 +46,16 @@ self.addEventListener('activate', (event) => {
             );
         }).then(() => self.clients.claim())
     );
+});
+
+// ── Message: let the page ask this worker to take over immediately ──────────
+self.addEventListener('message', (event) => {
+    if (event.data === 'SKIP_WAITING' || event.data?.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+    if (event.data?.type === 'GET_VERSION') {
+        event.source?.postMessage({ type: 'VERSION', version: CACHE_NAME });
+    }
 });
 
 // ── Fetch: Smart strategy with offline fallback ─────────────────────────────

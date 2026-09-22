@@ -1,0 +1,60 @@
+{
+    "source": {
+        "server": "100.108.74.58",
+        "database": "LOGICDBSY",
+        "username": "sa",
+        "password": "Logic@1234",
+        "driver": "{ODBC Driver 17 for SQL Server}",
+        "use_windows_auth": false,
+        "login_timeout_seconds": 20,
+        "query_timeout_seconds": 600
+    },
+
+    "schedule": {
+        "mode": "daily",
+        "daily_at": "02:00",
+        "interval_minutes": 1440,
+        "run_on_startup": false,
+        "catch_up_if_missed": true,
+        "retry_after_minutes": 30,
+        "max_retries_per_window": 4
+    },
+
+    "sync": {
+        "years": ["auto"],
+        "previous_years": 2,
+        "series": [],
+        "safety_overlap_minutes": 180,
+        "batch_size": 1000,
+        "reconcile": {
+            "enabled": true,
+            "days": 45,
+            "tolerance": 0.01
+        }
+    },
+
+    "targets": {
+        "local": {
+            "enabled": true,
+            "type": "mysql",
+            "host": "127.0.0.1",
+            "port": 3306,
+            "database": "inventory_laravel_db",
+            "username": "root",
+            "password": ""
+        },
+        "cloud": {
+            "enabled": true,
+            "type": "http",
+            "base_url": "https://invoflow.gloswebdev.in",
+            "token": "invoflow_mssql_sync_secret_2026",
+            "timeout_seconds": 120,
+            "verify_ssl": true,
+            "report_health": true
+        }
+    },
+
+    "logging": {
+        "keep_days": 30
+    }
+}

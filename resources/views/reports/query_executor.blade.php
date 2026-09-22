@@ -644,7 +644,8 @@ function renderResults(data) {
     currentResultColumns = data.columns || (currentResultRows.length > 0 ? Object.keys(currentResultRows[0]) : []);
     currentJobToken = data.job_token;
 
-    document.getElementById('resRowCount').textContent = currentResultRows.length.toLocaleString();
+    const totalCount = data.row_count || currentResultRows.length;
+    document.getElementById('resRowCount').textContent = totalCount.toLocaleString();
     document.getElementById('resTime').textContent = (data.execution_seconds || 0) + 's';
     document.getElementById('csvExportBtn').href = `${EXPORT_BASE_URL}/${currentJobToken}`;
 
@@ -777,7 +778,10 @@ function toggleSingleRow(idx, checked) {
 }
 
 function updateSelectedCount() {
-    document.getElementById('selectedCountBadge').textContent = selectedRowIndexes.size.toLocaleString();
+    const badge = document.getElementById('selectedCountBadge');
+    if (badge) {
+        badge.textContent = selectedRowIndexes.size.toLocaleString();
+    }
 }
 
 function filterResultGrid() {
@@ -793,7 +797,7 @@ function filterResultGrid() {
     renderCurrentPage();
 }
 
-// Database Import Execution (Chunked for Large Datasets)
+// Database Import Execution (Direct Server-Side for Job, or Chunked for Custom Selections)
 async function executeDatabaseImport() {
     if (selectedRowIndexes.size === 0) {
         alert('Please select at least 1 row to import into database.');
@@ -802,28 +806,59 @@ async function executeDatabaseImport() {
 
     const targetTable = document.getElementById('importTargetTable').value;
     const truncateOld = document.getElementById('truncateOldCheck').checked;
+    const totalCountText = document.getElementById('resRowCount').textContent || '';
+    const totalCount = parseInt(totalCountText.replace(/,/g, ''), 10) || selectedRowIndexes.size;
 
-    if (!confirm(`Are you sure you want to insert ${selectedRowIndexes.size.toLocaleString()} rows into '${targetTable}'?`)) {
+    if (!confirm(`Are you sure you want to insert all ${totalCount.toLocaleString()} records into '${targetTable}'?`)) {
         return;
     }
 
     const btn = document.getElementById('importBtn');
     btn.disabled = true;
-
-    // Extract selected rows
-    const selectedRows = [];
-    selectedRowIndexes.forEach(idx => {
-        if (currentResultRows[idx]) {
-            selectedRows.push(currentResultRows[idx]);
-        }
-    });
-
-    const totalSelected = selectedRows.length;
-    const chunkSize = 1500;
-    const totalChunks = Math.ceil(totalSelected / chunkSize);
-    let totalImported = 0;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing to Database...';
 
     try {
+        // Fast direct server-side import using job_token if available
+        if (currentJobToken) {
+            const res = await fetch(IMPORT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    target_table: targetTable,
+                    job_token: currentJobToken,
+                    truncate_old: truncateOld ? 1 : 0
+                })
+            });
+
+            const data = await res.json();
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-cloud-arrow-down"></i> Insert Selected to Database';
+
+            if (!data.success) {
+                alert('Import failed: ' + data.message);
+                return;
+            }
+
+            alert(`🎉 Successfully imported ${(data.count || totalCount).toLocaleString()} rows into '${targetTable}'!`);
+            return;
+        }
+
+        // Extract selected rows for custom fallback
+        const selectedRows = [];
+        selectedRowIndexes.forEach(idx => {
+            if (currentResultRows[idx]) {
+                selectedRows.push(currentResultRows[idx]);
+            }
+        });
+
+        const totalSelected = selectedRows.length;
+        const chunkSize = 1500;
+        const totalChunks = Math.ceil(totalSelected / chunkSize);
+        let totalImported = 0;
+
         for (let i = 0; i < totalChunks; i++) {
             const chunkRows = selectedRows.slice(i * chunkSize, (i + 1) * chunkSize);
             const isFirstChunk = (i === 0);

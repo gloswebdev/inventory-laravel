@@ -50,8 +50,8 @@ class QueryExecutorController extends Controller
                     "    BS.series,\n" .
                     "    ACT.act_name,\n" .
                     "    TXN.item_det_code,\n" .
-                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
-                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
                     "    TXN.Free_Qty,\n" .
                     "    TXN.rate,\n" .
                     "    TXN.Calc_Tax_1,\n" .
@@ -68,9 +68,7 @@ class QueryExecutorController extends Controller
                     "LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code\n" .
                     "LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code\n" .
                     "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code\n" .
-                    "WHERE BS.Stock_Trans = 0\n" .
-                    "  AND BS.type IN ('SL', 'SR')\n" .
-                    "  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')\n" .
+                    "WHERE BS.series IN ('AMSR', 'ISCR', 'AKST', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'SPCN', 'SWPN', 'MPSL', 'MPCS', 'MPST', 'MSR', 'MDS', 'UPSL', 'UPCS', 'UPST', 'SWSR', 'MHSL', 'LKN', 'LKR')\n" .
                     "ORDER BY HD.vouch_date DESC;"
             ],
             [
@@ -86,8 +84,8 @@ class QueryExecutorController extends Controller
                     "    BS.series,\n" .
                     "    ACT.act_name,\n" .
                     "    TXN.item_det_code,\n" .
-                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
-                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
                     "    TXN.Free_Qty,\n" .
                     "    TXN.rate,\n" .
                     "    TXN.Calc_Tax_1,\n" .
@@ -104,9 +102,7 @@ class QueryExecutorController extends Controller
                     "LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code\n" .
                     "LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code\n" .
                     "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code\n" .
-                    "WHERE BS.Stock_Trans = 0\n" .
-                    "  AND BS.type IN ('SL', 'SR')\n" .
-                    "  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')\n" .
+                    "WHERE BS.series IN ('AMSR', 'ISCR', 'AKST', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'SPCN', 'SWPN', 'MPSL', 'MPCS', 'MPST', 'MSR', 'MDS', 'UPSL', 'UPCS', 'UPST', 'SWSR', 'MHSL', 'LKN', 'LKR')\n" .
                     "ORDER BY HD.vouch_date DESC;"
             ],
             [
@@ -122,8 +118,8 @@ class QueryExecutorController extends Controller
                     "    BS.series,\n" .
                     "    ACT.act_name,\n" .
                     "    TXN.item_det_code,\n" .
-                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
-                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Tot_Qty * -1 ELSE TXN.Tot_Qty END AS tot_qty,\n" .
+                    "    CASE WHEN TXN.sale_or_sr = 'SR' OR BS.type = 'SR' OR BS.series IN ('AMSR', 'ISCR', 'SPSR', 'SPCN', 'MSR', 'MDS', 'SWSR', 'LKR') THEN TXN.Calc_Net_Amt * -1 ELSE TXN.Calc_Net_Amt END AS calc_net_amt_n,\n" .
                     "    TXN.Free_Qty,\n" .
                     "    TXN.rate,\n" .
                     "    TXN.Calc_Tax_1,\n" .
@@ -140,15 +136,13 @@ class QueryExecutorController extends Controller
                     "LEFT JOIN Group_Mst AS GM1 ON IMH.Group_Code = GM1.Group_Code\n" .
                     "LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code\n" .
                     "LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code\n" .
-                    "WHERE BS.Stock_Trans = 0\n" .
-                    "  AND BS.type IN ('SL', 'SR')\n" .
-                    "  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')\n" .
+                    "WHERE BS.series IN ('AMSR', 'ISCR', 'AKST', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'SPCN', 'SWPN', 'MPSL', 'MPCS', 'MPST', 'MSR', 'MDS', 'UPSL', 'UPCS', 'UPST', 'SWSR', 'MHSL', 'LKN', 'LKR')\n" .
                     "ORDER BY HD.vouch_date DESC;"
             ],
         ];
 
         foreach ($standardPresets as $preset) {
-            SavedQuery::firstOrCreate(['title' => $preset['title']], $preset);
+            SavedQuery::updateOrCreate(['title' => $preset['title']], $preset);
         }
 
         $savedQueries = SavedQuery::orderByDesc('is_favorite')
@@ -277,14 +271,18 @@ class QueryExecutorController extends Controller
         }
 
         if ($job->status === 'completed') {
+            $totalCount = $job->row_count ?: 0;
+            $previewRows = $job->getPreviewRows(100);
+
             return response()->json([
                 'success'           => true,
                 'status'            => 'completed',
                 'job_id'            => $job->id,
                 'job_token'         => $job->job_token,
-                'columns'           => $job->result_columns ?: [],
-                'rows'              => $job->rows,
-                'row_count'         => $job->row_count,
+                'columns'           => $job->result_columns ?: (count($previewRows) > 0 ? array_keys($previewRows[0]) : []),
+                'rows'              => $previewRows,
+                'row_count'         => $totalCount ?: count($previewRows),
+                'is_preview'        => $totalCount > 100,
                 'execution_seconds' => $job->execution_seconds,
                 'completed_at'      => $job->completed_at ? $job->completed_at->format('d M Y, h:i:s A') : '',
             ]);
@@ -315,17 +313,24 @@ class QueryExecutorController extends Controller
 
         $request->validate([
             'target_table' => 'required|string',
-            'rows'         => 'required|array|min:1',
+            'rows'         => 'nullable|array',
+            'job_token'    => 'nullable|string',
             'mapping'      => 'nullable|array',
             'truncate_old' => 'nullable|boolean',
         ]);
 
         $targetTable = $request->target_table;
-        $rows = $request->rows;
         $mapping = $request->mapping ?: [];
         $truncateOld = (bool)$request->truncate_old;
         $chunkIndex = (int)$request->input('chunk_index', 0);
         $totalChunks = (int)$request->input('total_chunks', 1);
+
+        if ($request->filled('job_token')) {
+            $job = QueryJob::where('job_token', $request->job_token)->first();
+            $rows = $job ? $job->rows : [];
+        } else {
+            $rows = $request->input('rows', []);
+        }
 
         if (!Schema::hasTable($targetTable)) {
             return response()->json([

@@ -17,7 +17,7 @@ class PlanningController extends Controller
      */
     public function index(Request $request)
     {
-        $productsQuery = Product::whereHas('recipes')->whereIn('product_type_id', [6, 7])->orderBy('name');
+        $productsQuery = Product::orderBy('name');
         $this->applyTypeFilters($productsQuery);
         $finishedGoods = $productsQuery->get();
         
@@ -43,12 +43,13 @@ class PlanningController extends Controller
     {
         $productsInput = $request->input('products', []);
         $branchCode = $request->input('branch_code');
+        $includeFormulation = filter_var($request->input('include_formulation', false), FILTER_VALIDATE_BOOLEAN);
         
         if (empty($productsInput)) {
             return response()->json(['success' => false, 'message' => 'No products provided']);
         }
 
-        $results = $this->getConsolidatedRequirements($productsInput, $branchCode);
+        $results = $this->getConsolidatedRequirements($productsInput, $branchCode, $includeFormulation);
 
         if (is_string($results)) {
             return response()->json(['success' => false, 'message' => $results]);
@@ -59,7 +60,8 @@ class PlanningController extends Controller
         return response()->json([
             'success' => true, 
             'data' => $results,
-            'summary' => $summary
+            'summary' => $summary,
+            'include_formulation' => $includeFormulation,
         ]);
     }
 
@@ -70,8 +72,9 @@ class PlanningController extends Controller
     {
         $productsInput = json_decode($request->input('products_json', '[]'), true);
         $branchCode = $request->input('branch_code');
+        $includeFormulation = filter_var($request->input('include_formulation', false), FILTER_VALIDATE_BOOLEAN);
         
-        $results = $this->getConsolidatedRequirements($productsInput, $branchCode);
+        $results = $this->getConsolidatedRequirements($productsInput, $branchCode, $includeFormulation);
 
         if (is_string($results)) {
             return redirect()->back()->with('error', $results);
@@ -82,47 +85,46 @@ class PlanningController extends Controller
         return (new \App\Exports\MRPExport($results, $summary, $branchCode))->download('mrp_planning_report.xlsx');
     }
 
-    private function getConsolidatedRequirements($productsInput, $branchCode = null)
+    private function getConsolidatedRequirements($productsInput, $branchCode = null, $includeFormulation = false)
     {
         $totalRequirements = [];
         $externalStock = $this->getExternalStock();
+        $resolver = new \App\Services\BomResolverService();
 
         foreach ($productsInput as $input) {
             $productId = $input['id'];
             $demandQty = (float)$input['demand_qty'];
 
             $product = Product::find($productId);
-            $recipe = Recipe::where('finished_product_id', $productId)->with('items.rawMaterial')->first();
-            if (!$product || !$recipe) continue;
+            if (!$product) continue;
 
-            foreach ($recipe->items as $item) {
-                $rm = $item->rawMaterial;
-                if (!$rm) continue;
+            $bom = $resolver->resolve($product, $demandQty, $includeFormulation);
 
-                $requiredForThisPerYield = ($item->quantity / $recipe->yield_quantity);
-                // Convert demand items to KG/LTR to match recipe yield unit
-                $demandInBaseUnit = $demandQty * $product->weight_multiplier;
-                $requiredForThis = $requiredForThisPerYield * $demandInBaseUnit;
+            foreach ($bom['all_materials'] as $item) {
+                $rmId = $item['raw_material_id'];
+                $requiredForThis = $item['required_qty'];
+                $type = $item['type']; // 'packing' or 'formulation'
 
-                if (isset($totalRequirements[$rm->id])) {
-                    $totalRequirements[$rm->id]['required_qty'] += $requiredForThis;
+                if (isset($totalRequirements[$rmId])) {
+                    $totalRequirements[$rmId]['required_qty'] += $requiredForThis;
                 } else {
                     $currentStock = 0;
-                    if ($branchCode && isset($externalStock[$branchCode][$rm->item_code])) {
-                        $currentStock = $externalStock[$branchCode][$rm->item_code];
+                    if ($branchCode && isset($externalStock[$branchCode][$item['item_code']])) {
+                        $currentStock = $externalStock[$branchCode][$item['item_code']];
                     } else {
                         foreach ($externalStock as $bCode => $items) {
-                            $currentStock += ($items[$rm->item_code] ?? 0);
+                            $currentStock += ($items[$item['item_code']] ?? 0);
                         }
                     }
 
-                    $totalRequirements[$rm->id] = [
-                        'id' => $rm->id,
-                        'name' => $rm->name,
-                        'item_code' => $rm->item_code,
-                        'uom' => $rm->uom,
-                        'pack_name' => $rm->pack_name,
-                        'required_qty' => $requiredForThis,
+                    $totalRequirements[$rmId] = [
+                        'id'            => $rmId,
+                        'name'          => $item['name'],
+                        'item_code'     => $item['item_code'],
+                        'uom'           => $item['uom'],
+                        'pack_name'     => $item['pack_name'],
+                        'type'          => $type,
+                        'required_qty'  => $requiredForThis,
                         'current_stock' => $currentStock,
                     ];
                 }

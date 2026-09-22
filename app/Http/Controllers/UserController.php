@@ -22,6 +22,7 @@ class UserController extends Controller
         'planning_process' => 'Indent: Process List',
         'production' => 'Production Manager',
         'reports' => 'Reports Viewer',
+        'sales_report' => 'Branch-Wise Sales Report',
         'purchase_report' => 'Purchase Report',
         'collection_report' => 'Collection Report & Analyzer',
         'teams_setup' => 'Teams Hierarchy & Setup',
@@ -39,6 +40,8 @@ class UserController extends Controller
         'mobile_products' => 'Mobile: Product Master',
         'mobile_users'  => 'Mobile: User Manager',
         'mobile_settings' => 'Mobile: System Settings',
+        'mobile_sales_report' => 'Mobile: Sales Report',
+        'mobile_sales_360' => 'Mobile: 360° Sales Report',
         'mobile_purchase_report' => 'Mobile: Purchase Report',
         'mobile_collection' => 'Mobile: Collection Report',
         'mobile_teams_setup' => 'Mobile: Teams Setup',
@@ -76,9 +79,14 @@ class UserController extends Controller
             'search' => 'Search Bar'
         ],
         'mobile_production' => [
-            'history' => 'Production History',
-            'management' => 'Record New Production',
-            'type_filter' => 'Type Filter'
+            'management'         => 'Record New Production Entry',
+            'history'            => 'View Production History Cards',
+            'type_filter'        => 'Product Type Filter',
+            'packaging_toggle'   => 'Packaging Material Issue Toggle (ON/OFF)',
+            'formulation_toggle' => 'Chemical Formulation Issue Toggle (ON/OFF)',
+            'erp_push'           => 'ERP Push / Retry Single Batch',
+            'erp_bulk_retry'     => 'ERP Bulk Retry All Failed',
+            'view_details'       => 'View Batch Details Modal',
         ],
         'indent' => [
             'bulk_add' => 'Bulk Add Modal',
@@ -88,9 +96,27 @@ class UserController extends Controller
             'branch_reorder' => 'Reorder Branch Columns'
         ],
         'production' => [
-            'history' => 'View Production History',
-            'management' => 'Record New Production',
-            'type_filter' => 'Type Filter'
+            'management'         => 'Record New Production Entry',
+            'history'            => 'View Production History Table',
+            'type_filter'        => 'Product Type Filter',
+            'packaging_toggle'   => 'Packaging Material Issue Toggle (ON/OFF)',
+            'formulation_toggle' => 'Chemical Formulation Issue Toggle (ON/OFF)',
+            'erp_push'           => 'ERP Push / Sync Single Batch',
+            'erp_bulk_retry'     => 'ERP Bulk Retry Failed Batches',
+            'view_details'       => 'View Batch Details Drawer',
+        ],
+        'adjustments' => [
+            'management'         => 'Record New Stock Adjustment Form & Slip',
+            'create_receipt'     => 'Allow Stock Receipt (+ Inward / Add Stock)',
+            'create_issue'       => 'Allow Stock Issue (- Outward / Deduct Stock)',
+            'history'            => 'View Stock Adjustment History Table',
+            'type_filter'        => 'Product Type Filter (FG / RM / PM)',
+            'branch_select'      => 'Branch Selection (Switch Branch)',
+            'branch_lock'        => 'Branch Lock (Restrict to Assigned Branch)',
+            'reason_select'      => 'Reason & Remarks Field',
+            'erp_push'           => 'ERP Push / Retry Single Adjustment',
+            'erp_bulk_retry'     => 'ERP Bulk Retry Failed Adjustments',
+            'delete'             => 'Revert / Delete Adjustment',
         ],
         'mobile_planning' => [
             'type_filter' => 'Product Type Filter',
@@ -107,15 +133,31 @@ class UserController extends Controller
             'edit' => 'Edit Indent',
             'branch_reorder' => 'Reorder Branch Columns'
         ],
+        'recipes' => [
+            'packing_config' => 'Step 4: Packaging Configuration (BOM)',
+            'define_bom'     => 'Formulation / BOM (Raw Materials & Yield)',
+            'price_edit'     => 'Edit Packing Material Rates',
+        ],
         'mobile_recipes' => [
-            'view' => 'View Recipes',
-            'search' => 'Search Recipes',
-            'edit' => 'Edit Recipes',
-            'delete' => 'Delete Recipes'
+            'view'           => 'View Recipes',
+            'search'         => 'Search Recipes',
+            'edit'           => 'Edit Recipes',
+            'delete'         => 'Delete Recipes',
+            'packing_config' => 'Step 4: Packaging Configuration (BOM)',
         ],
         'mobile_adjustments' => [
-            'view' => 'View Adjustments',
-            'create' => 'Record Adjustment'
+            'view'               => 'View Adjustments Screen',
+            'management'         => 'Record New Stock Adjustment Form',
+            'create_receipt'     => 'Allow Stock Receipt (+ Inward / Add Stock)',
+            'create_issue'       => 'Allow Stock Issue (- Outward / Deduct Stock)',
+            'history'            => 'View Stock Adjustment History Cards',
+            'type_filter'        => 'Product Type Filter (FG / RM / PM)',
+            'branch_select'      => 'Branch Selection (Switch Branch)',
+            'branch_lock'        => 'Branch Lock (Restrict to Assigned Branch)',
+            'reason_select'      => 'Reason & Remarks Field',
+            'erp_push'           => 'ERP Push / Retry Single Adjustment',
+            'erp_bulk_retry'     => 'ERP Bulk Retry Failed Adjustments',
+            'delete'             => 'Revert / Delete Adjustment',
         ],
         'mobile_ledger' => [
             'view' => 'View Ledger',
@@ -226,6 +268,22 @@ class UserController extends Controller
             'view'         => 'View Agent Targets',
             'month_filter' => 'Target Month Selector',
             'set_target'   => 'Configure & Save Targets',
+        ],
+        'sales_report' => [
+            'sync_mssql'    => 'Sync from MSSQL Button',
+            'branch_filter' => 'Branch Filter',
+            'search'        => 'Search Keyword',
+        ],
+        'mobile_sales_report' => [
+            'period_filter' => 'Period Quick Presets',
+            'branch_filter' => 'Branch Filter',
+            'search'        => 'Search Bar',
+        ],
+        'mobile_sales_360' => [
+            'branch_filter'   => 'Branch Filter',
+            'category_filter' => 'Category Filter',
+            'agent_filter'    => 'Agent Filter',
+            'product_filter'  => 'Product Filter',
         ],
     ];
 

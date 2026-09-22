@@ -82,7 +82,7 @@ LEFT JOIN Accounts AS ACT ON HD.cust_code = ACT.act_code
 LEFT JOIN Branch_Mst AS BM ON HD.Branch_Code = BM.Branch_Code
 WHERE BS.Stock_Trans = 0
   AND BS.type IN ('SL', 'SR')
-  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'SWAK', 'SWPN', 'SWMP', 'SWUP')
+  AND BS.series IN ('AMSR', 'AKSL', 'AKCS', 'AKLF', 'PNSL', 'PNCS', 'PNF', 'SPSR', 'MPSL', 'MPCS', 'SMSR', 'UPSL', 'UPCS', 'SWSR', 'MHSL', 'LKS', 'LKR', 'LKN', 'SWAK', 'SWPN', 'SWMP', 'SWUP', 'ISCR', 'MDS', 'SPCN')
 {date_filter}ORDER BY HD.vouch_date DESC;
 """
 
@@ -375,6 +375,11 @@ class InvoFlowBridge:
             print(f"[{now_str}] [AUTO-SYNC] No new/modified records in this window. Sync complete.", flush=True)
             return True
 
+        # Extract min and max dates for clean chunk deletion
+        all_dates = [r.get("vouch_date") for r in rows if r.get("vouch_date")]
+        date_from = min(all_dates) if all_dates else None
+        date_to = max(all_dates) if all_dates else None
+
         url = f"{self.base_url}/push-sync"
         chunk_size = 2500
         total_chunks = (len(rows) + chunk_size - 1) // chunk_size
@@ -385,7 +390,9 @@ class InvoFlowBridge:
                 "target_table": "mssql_sales_records",
                 "rows": chunk_rows,
                 "sync_mode": self.sync_mode,
-                "truncate_old": (self.sync_mode == "full" and i == 0),
+                "truncate_old": (i == 0),
+                "date_from": date_from if i == 0 else None,
+                "date_to": date_to if i == 0 else None,
                 "chunk_index": i,
                 "total_chunks": total_chunks
             }

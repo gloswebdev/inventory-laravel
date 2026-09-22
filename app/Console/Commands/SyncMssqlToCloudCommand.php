@@ -20,6 +20,8 @@ class SyncMssqlToCloudCommand extends Command
                             {--url= : Cloud App URL (default: https://invoflow.gloswebdev.in)} 
                             {--token= : Sync Token (default from settings)} 
                             {--truncate : Truncate and perform fresh sync}
+                            {--all : Force a full year sync (ignores latest sync status)}
+                            {--days= : Sync only last N days}
                             {--batch=1000 : Number of rows per HTTP request}';
 
     /**
@@ -40,7 +42,49 @@ class SyncMssqlToCloudCommand extends Command
         $cloudUrl = rtrim($this->option('url') ?: AppSetting::get('cloud_app_url', env('CLOUD_APP_URL', 'https://invoflow.gloswebdev.in')), '/');
         $token = $this->option('token') ?: AppSetting::get('mssql_sync_token', 'invoflow_mssql_sync_secret_2026');
         $batchSize = (int)$this->option('batch') ?: 1000;
-        $shouldTruncate = $this->option('truncate') || true; // fresh sync
+        
+        $shouldTruncate = $this->option('truncate');
+        $allParam = $this->option('all');
+        $daysParam = $this->option('days');
+        
+        $startDate = null;
+        $endDate = date('Y-m-d');
+        
+        if ($shouldTruncate || $allParam) {
+            $shouldTruncate = true;
+            $this->info("Performing FULL sync (records will be truncated on target).");
+        } else {
+            // Incremental sync
+            if ($daysParam !== null) {
+                $days = (int)$daysParam;
+                $startDate = date('Y-m-d', strtotime("-{$days} days"));
+                $this->info("Performing incremental sync for the last {$days} days (from {$startDate} to {$endDate}).");
+            } else {
+                // Fetch from cloud API
+                $this->comment("Fetching latest sync status from cloud website...");
+                try {
+                    $response = Http::withoutVerifying()
+                        ->timeout(15)
+                        ->get("{$cloudUrl}/api/sync/mssql-sales/status", [
+                            'token' => $token
+                        ]);
+                    if ($response->successful() && isset($response['latest_date']) && !empty($response['latest_date'])) {
+                        $latestDate = $response['latest_date'];
+                        // 2-day buffer to capture recent changes
+                        $startDate = date('Y-m-d', strtotime($latestDate . ' - 2 days'));
+                        $this->info("Live database latest record date: {$latestDate}");
+                        $this->info("Performing incremental sync with 2-day safety buffer (from {$startDate} to {$endDate}).");
+                    } else {
+                        $this->warn("Could not retrieve latest sync status from cloud. Defaulting to full sync.");
+                        $shouldTruncate = true;
+                    }
+                } catch (\Exception $e) {
+                    $this->warn("Error querying cloud status: " . $e->getMessage() . ". Defaulting to full sync.");
+                    $shouldTruncate = true;
+                }
+            }
+        }
+        
         $yearParam = $this->option('year') ?: 'all';
 
         $yearsToSync = [];
@@ -56,6 +100,11 @@ class SyncMssqlToCloudCommand extends Command
         $this->info("• Target Cloud: {$cloudUrl}");
         $this->info("• Financial Years: " . implode(', ', $yearsToSync));
         $this->info("• Batch Size: {$batchSize}");
+        if ($startDate) {
+            $this->info("• Sync Date Range: {$startDate} to {$endDate}");
+        } else {
+            $this->info("• Sync Date Range: FULL Year");
+        }
         $this->info("=================================================\n");
 
         $totalPushedAllYears = 0;
@@ -73,7 +122,11 @@ class SyncMssqlToCloudCommand extends Command
 
             // 1. Check MS SQL Table
             try {
-                $countRes = DB::connection('sqlsrv')->select("SELECT COUNT(*) as total FROM sl_txn{$yearSuffix} TXN INNER JOIN sl_head{$yearSuffix} HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0");
+                $checkQuery = "SELECT COUNT(*) as total FROM sl_txn{$yearSuffix} TXN INNER JOIN sl_head{$yearSuffix} HD ON TXN.vouch_code = HD.vouch_code AND HD.Deleted = 0";
+                if ($startDate) {
+                    $checkQuery .= " WHERE HD.vouch_date >= '{$startDate}'";
+                }
+                $countRes = DB::connection('sqlsrv')->select($checkQuery);
                 $rowCount = $countRes[0]->total ?? 0;
                 $this->info("✅ Found {$rowCount} records in MS SQL for FY {$formattedYear}");
             } catch (\Exception $e) {
@@ -82,7 +135,7 @@ class SyncMssqlToCloudCommand extends Command
             }
 
             if ($rowCount === 0) {
-                $this->warn("No records found for FY {$formattedYear}.");
+                $this->warn("No matching records found for FY {$formattedYear}.");
                 continue;
             }
 
@@ -156,6 +209,10 @@ class SyncMssqlToCloudCommand extends Command
             LEFT JOIN 	
                 AccountGroups AS ACG ON ACT.Grp_Code1=ACG.grp_code";
 
+            if ($startDate) {
+                $query .= " WHERE HD.vouch_date >= '{$startDate}'";
+            }
+
             $startTime = microtime(true);
             $this->comment("Fetching rows from MS SQL for FY {$formattedYear}...");
             $rows = DB::connection('sqlsrv')->select($query);
@@ -170,7 +227,7 @@ class SyncMssqlToCloudCommand extends Command
             $endpoint = "{$cloudUrl}/api/sync/mssql-sales";
 
             foreach ($chunks as $index => $chunk) {
-                $truncateOnThisBatch = ($isFirstBatchOverall && $index === 0);
+                $truncateOnThisBatch = ($shouldTruncate && $index === 0);
                 $payload = [
                     'token'          => $token,
                     'truncate'       => $truncateOnThisBatch,
@@ -184,6 +241,11 @@ class SyncMssqlToCloudCommand extends Command
                         return $arr;
                     }, $chunk),
                 ];
+
+                if (!$shouldTruncate && $index === 0 && $startDate) {
+                    $payload['delete_range_from'] = $startDate;
+                    $payload['delete_range_to'] = $endDate;
+                }
 
                 $success = false;
                 $attempts = 0;

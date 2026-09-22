@@ -106,6 +106,8 @@
                     'mobile_costing_purchase' => ['bg' => 'bg-emerald-600', 'text' => 'text-white', 'shadow' => 'shadow-emerald-250'],
                     'mobile_costing_pricelist' => ['bg' => 'bg-pink-500', 'text' => 'text-white', 'shadow' => 'shadow-pink-200'],
                     'mobile_costing_pricelist_update' => ['bg' => 'bg-sky-500', 'text' => 'text-white', 'shadow' => 'shadow-sky-200'],
+                    'mobile_sales_report' => ['bg' => 'bg-blue-600', 'text' => 'text-white', 'shadow' => 'shadow-blue-200'],
+                    'mobile_sales_360' => ['bg' => 'bg-green-600', 'text' => 'text-white', 'shadow' => 'shadow-green-200'],
                     'mobile_purchase_report' => ['bg' => 'bg-red-500', 'text' => 'text-white', 'shadow' => 'shadow-red-200'],
                     'mobile_collection' => ['bg' => 'bg-emerald-600', 'text' => 'text-white', 'shadow' => 'shadow-emerald-200'],
                     'mobile_agent_targets' => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
@@ -113,6 +115,8 @@
                 ];
 
                 $newFeatures = [
+                    'mobile.sales-360',
+                    'mobile.sales-report',
                     'mobile.agent-targets.index',
                     'mobile.collection-report',
                     'mobile.purchase-report',

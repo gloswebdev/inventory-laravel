@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Branch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class SettingController extends Controller
 {
@@ -17,6 +18,82 @@ class SettingController extends Controller
         $settings = AppSetting::all()->keyBy('key');
 
         return view('settings.branches', compact('branches', 'settings'));
+    }
+
+    /**
+     * Test ERP Push connection with provided or saved credentials.
+     */
+    public function testErpPushConnection(Request $request)
+    {
+        $baseUrl  = rtrim($request->input('erp_push_base_url') ?: AppSetting::get('erp_push_base_url', 'http://logic.gloswebdev.in'), '/');
+        $username = $request->input('erp_push_username') ?: AppSetting::get('erp_push_username', 'SALapi');
+        $password = $request->input('erp_push_password') ?: AppSetting::get('erp_push_password', 'SAL@api@123');
+
+        $url = "{$baseUrl}/SaveIssueStock";
+
+        // Minimal test payload to verify authorization and endpoint reachability
+        $payload = [
+            'Branch_Code'  => 2,
+            'Doc_Prefix'   => 'IS',
+            'IssueTo'      => 'DAMAGE',
+            'GodownName'   => 'MAIN',
+            'ReceivedFrom' => '',
+            'Remarks'      => 'Connection Test from Inventory Suite',
+            'ListItems'    => [
+                [
+                    'EANCode'            => '',
+                    'ItemCode'           => '8900001',
+                    'LotNo'              => null,
+                    'Quantity'           => 0.0,
+                    'Rate'               => 0.0,
+                    'Mrp'                => 0.0,
+                    'Manufacturing_Date' => null,
+                    'Expiry_Date'        => null,
+                    'LotProductionUnit'  => '',
+                ]
+            ],
+        ];
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withBasicAuth($username, $password)
+                ->timeout(12)
+                ->connectTimeout(6)
+                ->post($url, $payload);
+
+            $status = $response->status();
+            $body = $response->json();
+
+            if ($status === 401 || $status === 403) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Authentication Failed (HTTP {$status})! Please check your Username and Password.",
+                    'details' => $body ?? $response->body(),
+                ]);
+            }
+
+            if ($status === 200 || (is_array($body) && isset($body['Status']))) {
+                $docNo = $body['LastSavedDocNo'] ?? null;
+                $msg   = $body['Message'] ?? 'Connected successfully';
+                return response()->json([
+                    'success' => true,
+                    'message' => "Logic ERP API Connected Successfully! [Response: {$msg}]",
+                    'details' => $body,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => "Server responded with HTTP {$status}: " . ($body['Message'] ?? $response->body()),
+                'details' => $body,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => "Connection error: " . $e->getMessage(),
+            ]);
+        }
     }
 
     /**
