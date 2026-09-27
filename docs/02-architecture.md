@@ -70,7 +70,7 @@ Sizes as of 2026-09-15 (a rough proxy for "how much logic lives here" / refactor
 | `SystemController` | 728 | Backup/restore/update/cache; admin-only, checked in-method. |
 | `UserController` | 514 | Users + the permission matrix with granular feature flags (including `branch_lock`). |
 | `CostingBomController` | 495 | BOM Master CRUD (multi-step wizard backend). |
-| `ProductionController` | ~580 | Finished goods batch creation, stock deductions, Logic ERP stock push (`SaveReceiptStock`, `SaveIssueStock`), single retry (`retryErpPush`), and bulk retry (`bulkRetryErpPush`). |
+| `ProductionController` | ~850 | Finished goods batch creation, edit/update with packaging and formulation toggles, stock ledger deductions, Logic ERP stock push (`SaveReceiptStock`, `SaveIssueStock`), single retry (`retryErpPush`), bulk retry (`bulkRetryErpPush`), and modern Alpine.js feedback modal. |
 | `IndentController` | 413 | |
 | `Api\BridgeApiController` | 338 | Query-executor bridge's poll/submit/push-sync/heartbeat. |
 | `PlanningController` | ~240 | MRP calculator (Packaging BOM + Chemical Formulation toggle, Excel export). |

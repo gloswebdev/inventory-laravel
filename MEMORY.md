@@ -23,6 +23,21 @@ Question" gets answered, move the answer to the right `docs/` file and delete it
 
 ## Recent incidents / fixes (newest first)
 
+- **2026-09-22 — Production Module Packaging Toggle Fix, Logic ERP Sync Error Handling, & Modern Modal Overhaul.**
+  1. **Packaging Toggle in Batch Update**:
+     - `ProductionController::update()` previously omitted the 4th parameter `$includePackaging` when resolving BOM via `BomResolverService::resolve()`, causing it to always default to `true` (deducting packaging materials even when the toggle was switched OFF in the Edit/Modify modal).
+     - Fixed `update()` to read `$includePackagingBatch` and `$itemIncludePackaging` and correctly pass `$includePackaging` to `$resolver->resolve($product, $quantityBoxes, $includeFormulation, $includePackaging)`.
+     - Added ERP sync trigger in `update()` when `erp_push_enabled === '1'`.
+     - Updated `resources/views/production/index.blade.php` to append batch-level hidden inputs (`include_packaging`, `include_formulation`) on submit, and restored previous deduction toggle state when opening the Edit modal.
+  2. **Logic ERP Push Error Clarity & Misleading Message Resolution**:
+     - When Packaging is toggled OFF (and chemical formulation is OFF), 0 materials are deducted, so Material Issue (`pushIssueStock`) is skipped (`success => true`).
+     - Previously, the default message was `'No raw materials'`. When Receipt failed (e.g. ERP server returned HTTP 503), the combined message formatted as `"Issue=No raw materials | Receipt=HTTP 503"`, falsely leading users to believe the issue failure was caused by turning off packaging.
+     - Updated `pushProductionToErp()` default message to `'Skipped (None Required)'`.
+     - Updated `retryErpPush()`, `store()`, and `update()` to only list components that actually failed, and clarified HTTP 503 as `'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in'`.
+  3. **UI Alert / Modal Modernization**:
+     - Removed all native browser `alert()` and `confirm()` popups ("localhost says") across `resources/views/production/index.blade.php`.
+     - Introduced modern, glassmorphic Alpine.js `feedbackModal` (`notify()` & `confirmAction()`) with status badges (Rose for Error, Emerald for Success, Amber for Warning, Indigo for Confirm/Info), smooth enter/leave animations, formatted text boxes with custom scrollbars, and styled gradient buttons.
+
 - **2026-09-22 — Indent Manager & Pricelist Module Support for "100% SOLUBLE IN WATER".**
   1. **Indent Manager Dynamic Item Type Filter**:
      - Converted the static "Finished Good" badge in `resources/views/indent/index.blade.php` to an interactive `<select id="item_type_filter">` supporting: *All Types*, *Finished Good* (default selected), and *100% SOLUBLE IN WATER*.

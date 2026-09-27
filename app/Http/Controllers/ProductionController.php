@@ -76,6 +76,10 @@ class ProductionController extends Controller
             ];
         });
 
+        $hasPacking = $issueItems->contains('type', 'packing');
+        $hasFormulation = $issueItems->contains('type', 'formulation');
+        $hasDeductions = $deductions->isNotEmpty();
+
         // Extract ERP Doc numbers if available
         $receiptDoc = null;
         $issueDoc = null;
@@ -94,6 +98,9 @@ class ProductionController extends Controller
             'issue_items' => $issueItems,
             'receipt_doc_no' => $receiptDoc,
             'issue_doc_no' => $issueDoc,
+            'has_packing' => $hasPacking,
+            'has_formulation' => $hasFormulation,
+            'has_deductions' => $hasDeductions,
         ]);
     }
 
@@ -338,9 +345,29 @@ class ProductionController extends Controller
             $receiptDoc = $result['receipt_doc'];
             $issueDoc   = $result['issue_doc'];
 
-            $erpMsg = $result['success']
-                ? " ERP Synced ✓ [Receipt Doc: {$receiptDoc} | Issue Doc: {$issueDoc}]"
-                : ' ERP Push Failed: Issue=' . ($result['issue_result']['message'] ?? 'Error') . ' | Receipt=' . ($result['receipt_result']['message'] ?? 'Error');
+            if ($result['success']) {
+                $docInfo = [];
+                if ($receiptDoc) $docInfo[] = "Receipt Doc: {$receiptDoc}";
+                if ($issueDoc) $docInfo[] = "Issue Doc: {$issueDoc}";
+                $erpMsg = " ERP Synced ✓ [" . implode(' | ', $docInfo) . "]";
+            } else {
+                $failures = [];
+                if (!$result['receipt_result']['success']) {
+                    $rMsg = $result['receipt_result']['message'] ?? 'Error';
+                    if ($rMsg === 'HTTP 503') {
+                        $rMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+                    }
+                    $failures[] = "Receipt: {$rMsg}";
+                }
+                if (!$result['issue_result']['success']) {
+                    $iMsg = $result['issue_result']['message'] ?? 'Error';
+                    if ($iMsg === 'HTTP 503') {
+                        $iMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+                    }
+                    $failures[] = "Issue: {$iMsg}";
+                }
+                $erpMsg = ' ERP Push Failed (' . implode(' | ', $failures) . ')';
+            }
 
             return redirect()->route('production.index')
                 ->with('success', 'Production entry saved successfully in Branch 2.' . $erpMsg);
@@ -432,8 +459,8 @@ class ProductionController extends Controller
         }
 
         $erp = new ErpStockPushService();
-        $issueResult   = ['success' => true, 'message' => 'No raw materials', 'response' => []];
-        $receiptResult = ['success' => true, 'message' => 'No FG items',      'response' => []];
+        $issueResult   = ['success' => true, 'message' => 'Skipped (None Required)', 'response' => []];
+        $receiptResult = ['success' => true, 'message' => 'Skipped (None Required)', 'response' => []];
 
         if (!empty($receiptItems)) {
             $receiptResult = $erp->pushReceiptStock($production, $receiptItems);
@@ -473,9 +500,29 @@ class ProductionController extends Controller
 
         $result = $this->pushProductionToErp($production);
 
-        $msg = $result['success']
-            ? "Production #BATCH-{$production->id} synced to ERP successfully! [Receipt Doc: {$result['receipt_doc']} | Issue Doc: {$result['issue_doc']}]"
-            : "Retry failed for #BATCH-{$production->id}: Issue=" . ($result['issue_result']['message'] ?? 'Error') . " | Receipt=" . ($result['receipt_result']['message'] ?? 'Error');
+        if ($result['success']) {
+            $docInfo = [];
+            if ($result['receipt_doc']) $docInfo[] = "Receipt Doc: {$result['receipt_doc']}";
+            if ($result['issue_doc']) $docInfo[] = "Issue Doc: {$result['issue_doc']}";
+            $msg = "Production #BATCH-{$production->id} synced to ERP successfully! [" . implode(' | ', $docInfo) . "]";
+        } else {
+            $failures = [];
+            if (!$result['receipt_result']['success']) {
+                $rMsg = $result['receipt_result']['message'] ?? 'Error';
+                if ($rMsg === 'HTTP 503') {
+                    $rMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+                }
+                $failures[] = "Receipt: {$rMsg}";
+            }
+            if (!$result['issue_result']['success']) {
+                $iMsg = $result['issue_result']['message'] ?? 'Error';
+                if ($iMsg === 'HTTP 503') {
+                    $iMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+                }
+                $failures[] = "Issue: {$iMsg}";
+            }
+            $msg = "Retry failed for #BATCH-{$production->id}: " . implode(' | ', $failures);
+        }
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -557,9 +604,11 @@ class ProductionController extends Controller
         ]);
 
         $branch = Branch::where('code', $request->branch_code)->first();
+        $includePackagingBatch = filter_var($request->input('include_packaging', true), FILTER_VALIDATE_BOOLEAN);
+        $includeFormulationBatch = filter_var($request->input('include_formulation', false), FILTER_VALIDATE_BOOLEAN);
         $resolver = app(BomResolverService::class);
 
-        DB::transaction(function () use ($request, $production, $branch, $resolver) {
+        DB::transaction(function () use ($request, $production, $branch, $resolver, $includePackagingBatch, $includeFormulationBatch) {
             // Revert previous deductions via StockLedger (exact record of what was deducted)
             $deductLedgers = StockLedger::where('transaction_id', $production->id)
                 ->where('transaction_type', 'production_deduct')
@@ -647,7 +696,12 @@ class ProductionController extends Controller
             foreach ($request->items as $itemData) {
                 $product = Product::find($itemData['product_id']);
                 $quantityBoxes = (float)$itemData['quantity'];
-                $includeFormulation = !empty($itemData['include_formulation']) && filter_var($itemData['include_formulation'], FILTER_VALIDATE_BOOLEAN);
+                $includePackaging = isset($itemData['include_packaging'])
+                    ? filter_var($itemData['include_packaging'], FILTER_VALIDATE_BOOLEAN)
+                    : $includePackagingBatch;
+                $includeFormulation = isset($itemData['include_formulation'])
+                    ? filter_var($itemData['include_formulation'], FILTER_VALIDATE_BOOLEAN)
+                    : $includeFormulationBatch;
 
                 $unitPerBox = (float)($product->unit_box ?: 1);
                 $totalUnits = $quantityBoxes * $unitPerBox;
@@ -672,7 +726,7 @@ class ProductionController extends Controller
                     'new_stock' => $product->current_stock,
                 ]);
 
-                $bom = $resolver->resolve($product, $quantityBoxes, $includeFormulation);
+                $bom = $resolver->resolve($product, $quantityBoxes, $includeFormulation, $includePackaging);
                 foreach ($bom['all_materials'] as $mat) {
                     if (!empty($mat['id'])) {
                         $rawMaterial = Product::find($mat['id']);
@@ -692,6 +746,42 @@ class ProductionController extends Controller
             }
         });
 
+        // ── ERP PUSH (non-blocking) ────────────────────────────────────────
+        if (AppSetting::get('erp_push_enabled', '0') === '1') {
+            $result = $this->pushProductionToErp($production);
+
+            $receiptDoc = $result['receipt_doc'];
+            $issueDoc   = $result['issue_doc'];
+
+            if ($result['success']) {
+                $docInfo = [];
+                if ($receiptDoc) $docInfo[] = "Receipt Doc: {$receiptDoc}";
+                if ($issueDoc) $docInfo[] = "Issue Doc: {$issueDoc}";
+                $erpMsg = " ERP Synced ✓ [" . implode(' | ', $docInfo) . "]";
+            } else {
+                $failures = [];
+                if (!$result['receipt_result']['success']) {
+                    $rMsg = $result['receipt_result']['message'] ?? 'Error';
+                    if ($rMsg === 'HTTP 503') {
+                        $rMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+                    }
+                    $failures[] = "Receipt: {$rMsg}";
+                }
+                if (!$result['issue_result']['success']) {
+                    $iMsg = $result['issue_result']['message'] ?? 'Error';
+                    if ($iMsg === 'HTTP 503') {
+                        $iMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+                    }
+                    $failures[] = "Issue: {$iMsg}";
+                }
+                $erpMsg = ' ERP Push Failed (' . implode(' | ', $failures) . ')';
+            }
+
+            return redirect()->route('production.index')
+                ->with('success', 'Production entry updated successfully in Branch 2.' . $erpMsg);
+        }
+
+        $production->update(['erp_push_status' => 'skipped']);
         return redirect()->route('production.index')->with('success', 'Production entry updated successfully.');
     }
 

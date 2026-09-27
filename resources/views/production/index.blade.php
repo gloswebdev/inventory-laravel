@@ -859,6 +859,98 @@
                 </div>
         </div>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- PRETTY FEEDBACK & CONFIRMATION MODAL -->
+    <!-- ============================================================ -->
+    <div x-show="feedbackModal.show" 
+         x-cloak
+         class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
+         x-transition:enter="transition ease-out duration-250"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @keydown.escape.window="if(!feedbackModal.isConfirm) feedbackModal.show = false">
+        
+        <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-7 overflow-hidden text-center transform"
+             @click.away="if(!feedbackModal.isConfirm) feedbackModal.show = false"
+             x-transition:enter="transition ease-out duration-250"
+             x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+             x-transition:leave-end="opacity-0 scale-95 translate-y-2">
+             
+            <!-- Background subtle glow -->
+            <div class="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-40"
+                 :class="{
+                     'bg-rose-300': feedbackModal.type === 'error',
+                     'bg-emerald-300': feedbackModal.type === 'success',
+                     'bg-amber-300': feedbackModal.type === 'warning',
+                     'bg-indigo-300': feedbackModal.type === 'confirm' || feedbackModal.type === 'info'
+                 }"></div>
+
+            <!-- Icon Header -->
+            <div class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 relative shadow-sm border"
+                 :class="{
+                     'bg-rose-50 border-rose-200 text-rose-500 shadow-rose-100': feedbackModal.type === 'error',
+                     'bg-emerald-50 border-emerald-200 text-emerald-500 shadow-emerald-100': feedbackModal.type === 'success',
+                     'bg-amber-50 border-amber-200 text-amber-500 shadow-amber-100': feedbackModal.type === 'warning',
+                     'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-indigo-100': feedbackModal.type === 'confirm' || feedbackModal.type === 'info'
+                 }">
+                <i class="text-2xl fas"
+                   :class="{
+                       'fa-circle-xmark animate-pulse': feedbackModal.type === 'error',
+                       'fa-circle-check': feedbackModal.type === 'success',
+                       'fa-triangle-exclamation': feedbackModal.type === 'warning',
+                       'fa-circle-question': feedbackModal.type === 'confirm',
+                       'fa-circle-info': feedbackModal.type === 'info'
+                   }"></i>
+            </div>
+
+            <!-- Title -->
+            <h3 class="text-base sm:text-lg font-black text-slate-800 tracking-tight" x-text="feedbackModal.title"></h3>
+
+            <!-- Message Box -->
+            <div class="mt-3.5 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-semibold text-slate-600 leading-relaxed text-left max-h-56 overflow-y-auto custom-scrollbar break-words whitespace-pre-line"
+                 x-text="feedbackModal.message">
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-5">
+                <template x-if="feedbackModal.isConfirm">
+                    <div class="flex items-center gap-3">
+                        <button type="button" 
+                                @click="feedbackModal.show = false; if(feedbackModal.onCancel) feedbackModal.onCancel();"
+                                class="flex-1 py-3 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider transition active:scale-95">
+                            <span x-text="feedbackModal.cancelText || 'Cancel'"></span>
+                        </button>
+                        <button type="button" 
+                                @click="const cb = feedbackModal.onConfirm; feedbackModal.show = false; if(cb) cb();"
+                                class="flex-1 py-3 px-4 rounded-xl text-white text-xs font-bold uppercase tracking-wider shadow-md transition active:scale-95"
+                                :class="feedbackModal.type === 'error' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : (feedbackModal.type === 'warning' ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200')">
+                            <span x-text="feedbackModal.confirmText || 'Confirm'"></span>
+                        </button>
+                    </div>
+                </template>
+                <template x-if="!feedbackModal.isConfirm">
+                    <button type="button" 
+                            @click="const cb = feedbackModal.onConfirm; feedbackModal.show = false; if(cb) cb();"
+                            class="w-full py-3.5 px-5 rounded-xl text-xs font-black uppercase tracking-wider text-white shadow-lg transition active:scale-98 flex items-center justify-center gap-2"
+                            :class="{
+                                'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-rose-200': feedbackModal.type === 'error',
+                                'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-200': feedbackModal.type === 'success',
+                                'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-200': feedbackModal.type === 'warning',
+                                'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 shadow-indigo-200': feedbackModal.type === 'confirm' || feedbackModal.type === 'info'
+                            }">
+                        <span x-text="feedbackModal.confirmText || 'OK'"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Forms for Submission -->
@@ -916,67 +1008,117 @@ function productionManager() {
         selectedIssueDoc: '',
         loadingDetail: false,
 
+        // Feedback Modal & Confirmation state
+        feedbackModal: {
+            show: false,
+            isConfirm: false,
+            type: 'info',
+            title: '',
+            message: '',
+            confirmText: 'OK',
+            cancelText: 'Cancel',
+            onConfirm: null,
+            onCancel: null
+        },
+
+        notify(title, message, type = 'info', onConfirm = null) {
+            this.feedbackModal.show = true;
+            this.feedbackModal.isConfirm = false;
+            this.feedbackModal.type = type;
+            this.feedbackModal.title = title;
+            this.feedbackModal.message = message;
+            this.feedbackModal.confirmText = 'OK';
+            this.feedbackModal.onConfirm = onConfirm;
+        },
+
+        confirmAction(title, message, onConfirm, confirmText = 'Confirm', type = 'confirm') {
+            this.feedbackModal.show = true;
+            this.feedbackModal.isConfirm = true;
+            this.feedbackModal.type = type;
+            this.feedbackModal.title = title;
+            this.feedbackModal.message = message;
+            this.feedbackModal.confirmText = confirmText;
+            this.feedbackModal.cancelText = 'Cancel';
+            this.feedbackModal.onConfirm = onConfirm;
+            this.feedbackModal.onCancel = null;
+        },
+
         // Retry states
         retryingId: null,
         bulkRetrying: false,
 
-        async retrySingleErp(id) {
+        retrySingleErp(id) {
             if (this.retryingId) return;
-            if (!confirm(`Are you sure you want to retry pushing Production #BATCH-${String(id).padStart(5, '0')} to ERP?`)) return;
-
-            this.retryingId = id;
-            try {
-                const response = await fetch(`{{ url('production') }}/${id}/retry-erp`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            this.confirmAction(
+                'Retry ERP Sync',
+                `Are you sure you want to retry pushing Production #BATCH-${String(id).padStart(5, '0')} to Logic ERP?`,
+                async () => {
+                    this.retryingId = id;
+                    try {
+                        const response = await fetch(`{{ url('production') }}/${id}/retry-erp`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.notify('ERP Sync Successful', data.message, 'success', () => {
+                                location.reload();
+                            });
+                        } else {
+                            this.notify('ERP Sync Failed', data.message, 'error');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        this.notify('Network Error', 'Communication error with server while retrying ERP push.', 'error');
+                    } finally {
+                        this.retryingId = null;
                     }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    alert('✓ ' + data.message);
-                    location.reload();
-                } else {
-                    alert('✗ ' + data.message);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Communication error with server while retrying ERP push.');
-            } finally {
-                this.retryingId = null;
-            }
+                },
+                'Push to ERP',
+                'confirm'
+            );
         },
 
-        async bulkRetryErp() {
+        bulkRetryErp() {
             if (this.bulkRetrying) return;
-            if (!confirm('Are you sure you want to retry pushing ALL failed production batches to ERP?')) return;
-
-            this.bulkRetrying = true;
-            try {
-                const response = await fetch(`{{ route('production.bulk-retry-erp') }}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            this.confirmAction(
+                'Bulk ERP Sync',
+                'Are you sure you want to retry pushing ALL failed & pending production batches to Logic ERP?',
+                async () => {
+                    this.bulkRetrying = true;
+                    try {
+                        const response = await fetch(`{{ route('production.bulk-retry-erp') }}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.notify('Bulk Sync Complete', data.message, 'success', () => {
+                                location.reload();
+                            });
+                        } else {
+                            this.notify('Bulk Sync Notice', data.message, 'warning', () => {
+                                location.reload();
+                            });
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        this.notify('Network Error', 'Communication error with server while performing bulk retry.', 'error');
+                    } finally {
+                        this.bulkRetrying = false;
                     }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    alert('✓ ' + data.message);
-                    location.reload();
-                } else {
-                    alert('Notice: ' + data.message);
-                    location.reload();
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Communication error with server while performing bulk retry.');
-            } finally {
-                this.bulkRetrying = false;
-            }
+                },
+                'Sync All Batches',
+                'confirm'
+            );
         },
 
         init() {
@@ -1067,11 +1209,17 @@ function productionManager() {
         closeModal() {
             const hasData = this.items.some(i => i.product_id || i.quantity || i.batch_number);
             if (hasData) {
-                if (confirm('Discard changes and close modal?')) {
-                    this.showModal = false;
-                    this.isEditing = false;
-                    this.items = [];
-                }
+                this.confirmAction(
+                    'Discard Changes',
+                    'Are you sure you want to discard your changes and close the window?',
+                    () => {
+                        this.showModal = false;
+                        this.isEditing = false;
+                        this.items = [];
+                    },
+                    'Discard',
+                    'warning'
+                );
             } else {
                 this.showModal = false;
                 this.isEditing = false;
@@ -1196,17 +1344,24 @@ function productionManager() {
 
         goToPreview() {
             if (!this.productionDate) {
-                alert('Please select Production Date');
+                this.notify('Validation Error', 'Please select Production Date before proceeding.', 'warning');
                 return;
             }
             if (this.items.some(i => !i.product_id || !i.quantity || !i.batch_number || !i.mfg_date || !i.exp_date)) {
-                alert('Please ensure all required fields (Product, Yield Box, Batch No, MFG Date, EXP Date) are filled.');
+                this.notify('Required Fields Missing', 'Please ensure all required fields (Product, Yield Box, Batch No, MFG Date, EXP Date) are filled.', 'warning');
                 return;
             }
             if (this.hasShortfall) {
-                if (!confirm('Warning: There is a stock shortfall for some materials in Branch 2 (Factory). Do you still want to proceed to preview?')) {
-                    return;
-                }
+                this.confirmAction(
+                    'Material Shortfall Warning',
+                    'Warning: There is a stock shortfall for some materials in Branch 2 (Factory). Do you still want to proceed to preview?',
+                    () => {
+                        this.step = 2;
+                    },
+                    'Proceed to Preview',
+                    'warning'
+                );
+                return;
             }
             this.step = 2;
         },
@@ -1222,8 +1377,8 @@ function productionManager() {
                         this.branchCode = p.branch_code || '2';
                         this.productionDate = p.production_date;
                         this.typeFilter = '';
-                        this.includePackaging = true;
-                        this.includeFormulation = false;
+                        this.includePackaging = data.has_deductions ? data.has_packing : true;
+                        this.includeFormulation = data.has_deductions ? data.has_formulation : false;
                         this.items = p.items.map(i => ({
                             product_id: i.product_id,
                             product_name: i.product ? i.product.name : '',
@@ -1245,16 +1400,22 @@ function productionManager() {
                 })
                 .catch(err => {
                     console.error(err);
-                    alert('Failed to load production for editing');
+                    this.notify('Load Error', 'Failed to load production for editing.', 'error');
                 });
         },
 
         deleteProduction(id) {
-            if (confirm('Are you sure you want to delete this production entry? Stock will be reverted back.')) {
-                const form = document.getElementById('deleteForm');
-                form.action = `{{ url('production') }}/${id}`;
-                form.submit();
-            }
+            this.confirmAction(
+                'Delete Production Entry',
+                'Are you sure you want to delete this production entry? Finished goods stock will be reverted and consumed raw materials will be added back.',
+                () => {
+                    const form = document.getElementById('deleteForm');
+                    form.action = `{{ url('production') }}/${id}`;
+                    form.submit();
+                },
+                'Yes, Delete Entry',
+                'error'
+            );
         },
 
         viewDetail(id) {
@@ -1277,7 +1438,7 @@ function productionManager() {
                 })
                 .catch(err => {
                     console.error(err);
-                    alert('Failed to load batch details');
+                    this.notify('Load Error', 'Failed to load batch details.', 'error');
                 })
                 .finally(() => {
                     this.loadingDetail = false;
@@ -1320,6 +1481,18 @@ function productionManager() {
             
             const itemsContainer = document.getElementById('form_items');
             itemsContainer.innerHTML = '';
+
+            const packBatchInput = document.createElement('input');
+            packBatchInput.type = 'hidden';
+            packBatchInput.name = 'include_packaging';
+            packBatchInput.value = this.includePackaging ? '1' : '0';
+            itemsContainer.appendChild(packBatchInput);
+
+            const formBatchInput = document.createElement('input');
+            formBatchInput.type = 'hidden';
+            formBatchInput.name = 'include_formulation';
+            formBatchInput.value = this.includeFormulation ? '1' : '0';
+            itemsContainer.appendChild(formBatchInput);
             
             this.items.forEach((item, index) => {
                 const prefix = `items[${index}]`;
