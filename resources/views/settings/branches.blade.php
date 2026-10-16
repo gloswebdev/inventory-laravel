@@ -816,6 +816,118 @@
         </div>
     </div>
 
+    {{-- ============================
+         GODOWN MAPPINGS
+         ============================ --}}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6 mt-6">
+        <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+            <h3 class="text-white font-bold flex items-center">
+                <i class="fas fa-warehouse mr-2"></i> Add New Godown Mapping
+            </h3>
+            <span class="text-xs bg-emerald-500/40 text-emerald-100 font-bold px-2.5 py-0.5 rounded-full border border-emerald-400/30">
+                ERP Stock Godowns
+            </span>
+        </div>
+        <form action="{{ route('settings.godowns.store') }}" method="POST" class="p-6">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Godown Code</label>
+                    <input type="text" name="code" id="godown_code_input" placeholder="e.g. 1" class="w-full border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-emerald-500 outline-none transition font-mono" required>
+                </div>
+                <div class="md:col-span-2 flex gap-3 items-end">
+                    <div class="flex-grow">
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Godown Name</label>
+                        <input type="text" name="name" id="godown_name_input" placeholder="e.g. Main Finished Goods Godown" class="w-full border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-emerald-500 outline-none transition" required>
+                    </div>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg hover:shadow-emerald-100 transition transform active:scale-95 flex items-center">
+                        <i class="fas fa-plus mr-2"></i> Add
+                    </button>
+                </div>
+            </div>
+
+            @if(!empty($discoveredGodowns))
+            <div class="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
+                <span class="text-[10px] font-black text-gray-400 uppercase tracking-wider">ERP Detected Godown Codes:</span>
+                @foreach($discoveredGodowns as $dCode)
+                    @php
+                        $isMapped = $godowns->contains('code', (string)$dCode);
+                    @endphp
+                    <button type="button" 
+                            onclick="document.getElementById('godown_code_input').value='{{ $dCode }}'; document.getElementById('godown_name_input').focus();"
+                            class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 {{ $isMapped ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 hover:bg-emerald-100 text-gray-700 hover:text-emerald-800 border border-gray-200' }}"
+                            title="{{ $isMapped ? 'Mapped (' . $godowns->firstWhere('code', (string)$dCode)->name . ')' : 'Click to map Godown Code ' . $dCode }}">
+                        <span>Code {{ $dCode }}</span>
+                        @if($isMapped)
+                            <span class="text-[9px] bg-emerald-200/70 text-emerald-800 px-1 rounded font-sans font-normal">{{ Str::limit($godowns->firstWhere('code', (string)$dCode)->name, 14) }}</span>
+                            <i class="fas fa-check text-[9px] text-emerald-600"></i>
+                        @else
+                            <i class="fas fa-plus text-[9px] text-gray-400"></i>
+                        @endif
+                    </button>
+                @endforeach
+                <span class="text-[10px] text-gray-400 italic ml-1">(click code badge to quick-fill)</span>
+            </div>
+            @endif
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 class="text-gray-700 font-bold flex items-center">
+                <i class="fas fa-boxes-stacked mr-2 text-emerald-600"></i> Existing Godown Mappings
+            </h3>
+            <span class="text-xs bg-gray-200 text-gray-700 font-bold px-2.5 py-0.5 rounded-full">
+                {{ $godowns->count() }} Mapped
+            </span>
+        </div>
+        <div class="p-0">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-100">
+                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest w-36">Godown Code</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Display Name</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right w-24">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($godowns as $godown)
+                    <tr class="hover:bg-emerald-50/30 transition">
+                        <td class="px-6 py-4">
+                            <span class="bg-emerald-100 text-emerald-800 font-black px-2.5 py-1 rounded-lg text-xs font-mono">
+                                Code {{ $godown->code }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <form action="{{ route('settings.godowns.update') }}" method="POST" class="flex items-center gap-2 group">
+                                @csrf
+                                <input type="hidden" name="godowns[0][code]" value="{{ $godown->code }}">
+                                <input type="text" name="godowns[0][name]" value="{{ $godown->name }}" class="bg-transparent border-none focus:ring-0 font-bold text-gray-700 w-full p-0 focus:bg-white focus:border focus:border-emerald-300 focus:rounded-lg focus:px-2 focus:py-1 transition">
+                                <button type="submit" title="Save changes" class="opacity-0 group-hover:opacity-100 text-emerald-600 hover:text-emerald-800 transition p-1">
+                                    <i class="fas fa-save"></i>
+                                </button>
+                            </form>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <form action="{{ route('settings.godowns.destroy', $godown) }}" method="POST" onsubmit="return confirm('Delete this godown mapping?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-red-300 hover:text-red-500 transition" title="Delete mapping">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="3" class="px-6 py-10 text-center text-gray-400 italic">No godown mappings found. Add one above to give names to godowns in Live Stock and other reports.</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="mt-6 bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-4">
         <div class="text-amber-500 text-xl"><i class="fas fa-info-circle"></i></div>
         <div class="text-amber-800 text-sm">

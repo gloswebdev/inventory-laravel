@@ -118,7 +118,7 @@ class ProductController extends Controller
                         $stockMap = [];
                         foreach ($data['resultdata'] as $item) {
                             $iCode = $item['User_Code'];
-                            $stockMap[$iCode] = (float) $item['ClosingQty'];
+                            $stockMap[$iCode] = ($stockMap[$iCode] ?? 0) + (float) $item['ClosingQty'];
                         }
                         return $stockMap;
                     }

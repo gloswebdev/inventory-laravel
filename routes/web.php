@@ -142,6 +142,7 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::get('reports/sales-report', [ReportController::class, 'salesReport'])->name('reports.sales-report');
     Route::get('reports/sales-report/drilldown', [ReportController::class, 'salesDrilldown'])->name('reports.sales-report.drilldown');
     Route::post('reports/sales-report/clean-data', [ReportController::class, 'cleanSalesData'])->name('reports.sales-report.clean-data');
+    Route::post('reports/sales-report/clean-query-jobs', [ReportController::class, 'cleanQueryJobs'])->name('reports.sales-report.clean-query-jobs');
     Route::post('reports/sales-report/execute', [ReportController::class, 'executeSalesQuery'])->name('reports.sales-report.execute');
     Route::post('reports/sales-report/export', [ReportController::class, 'exportSalesQuery'])->name('reports.sales-report.export');
     Route::post('reports/sales-report/sync', [ReportController::class, 'syncSalesReport'])->name('reports.sales-report.sync');
@@ -174,6 +175,9 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::post('settings/branches/store', [App\Http\Controllers\SettingController::class, 'storeBranch'])->name('settings.branches.store');
     Route::post('settings/branches/update', [App\Http\Controllers\SettingController::class, 'updateBranches'])->name('settings.branches.update');
     Route::delete('settings/branches/{branch}', [App\Http\Controllers\SettingController::class, 'deleteBranch'])->name('settings.branches.destroy');
+    Route::post('settings/godowns/store', [App\Http\Controllers\SettingController::class, 'storeGodown'])->name('settings.godowns.store');
+    Route::post('settings/godowns/update', [App\Http\Controllers\SettingController::class, 'updateGodowns'])->name('settings.godowns.update');
+    Route::delete('settings/godowns/{godown}', [App\Http\Controllers\SettingController::class, 'deleteGodown'])->name('settings.godowns.destroy');
 });
 
 // Shared Settings (Accessible by both interfaces)

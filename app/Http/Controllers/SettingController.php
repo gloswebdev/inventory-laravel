@@ -4,20 +4,32 @@ namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
 use App\Models\Branch;
+use App\Models\Godown;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class SettingController extends Controller
 {
     public function index()
     {
-        $branches = Branch::orderBy('code')->get();
+        $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
+        $godowns  = Schema::hasTable('godowns')
+            ? Godown::orderBy('sort_order')->orderBy('code')->get()
+            : collect();
 
         // Load all API settings from DB
         $settings = AppSetting::all()->keyBy('key');
 
-        return view('settings.branches', compact('branches', 'settings'));
+        // Discovered Godowns from ERP API
+        $discoveredGodowns = [];
+        try {
+            $reportCtrl = new ReportController();
+            $discoveredGodowns = $reportCtrl->getAvailableGodowns();
+        } catch (\Exception $e) {}
+
+        return view('settings.branches', compact('branches', 'godowns', 'settings', 'discoveredGodowns'));
     }
 
     /**
@@ -183,6 +195,7 @@ class SettingController extends Controller
 
         // Bust the stock cache so new settings take effect immediately
         Cache::forget('external_stock_data_grouped');
+        Cache::forget('external_stock_raw_api_data');
         Cache::forget('external_stock_branch2');
         Cache::forget('party_master_map'); // Also clear party master cache on save
 
@@ -243,5 +256,48 @@ class SettingController extends Controller
     {
         $branch->delete();
         return redirect()->back()->with('success', 'Branch mapping deleted.');
+    }
+
+    public function storeGodown(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|unique:godowns,code',
+            'name' => 'required|string',
+        ]);
+
+        Godown::create([
+            'code' => trim($request->code),
+            'name' => trim($request->name),
+        ]);
+
+        Cache::forget('godown_name_map');
+
+        return redirect()->back()->with('success', 'Godown mapping added successfully!');
+    }
+
+    public function updateGodowns(Request $request)
+    {
+        $request->validate([
+            'godowns.*.code' => 'required|string',
+            'godowns.*.name' => 'required|string',
+        ]);
+
+        foreach ($request->godowns as $godownData) {
+            Godown::updateOrCreate(
+                ['code' => trim($godownData['code'])],
+                ['name' => trim($godownData['name'])]
+            );
+        }
+
+        Cache::forget('godown_name_map');
+
+        return redirect()->back()->with('success', 'Godown mappings updated successfully!');
+    }
+
+    public function deleteGodown(Godown $godown)
+    {
+        $godown->delete();
+        Cache::forget('godown_name_map');
+        return redirect()->back()->with('success', 'Godown mapping deleted.');
     }
 }

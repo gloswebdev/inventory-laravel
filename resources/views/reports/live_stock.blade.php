@@ -34,6 +34,15 @@
     <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
         <h3 class="text-xl font-bold text-gray-700">Live Inventory Across Branches</h3>
         <div class="flex items-center gap-2">
+            @if(!empty($selectedGodowns))
+                @php
+                    $mappedLabels = array_map(fn($c) => $godownNames[$c] ?? ('Godown ' . $c), $selectedGodowns);
+                @endphp
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-sm" title="Filtered Godowns: {{ implode(', ', $mappedLabels) }}">
+                    <i class="fas fa-warehouse text-amber-600"></i>
+                    Godown: {{ implode(', ', $mappedLabels) }}
+                </span>
+            @endif
             <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
             <span class="text-sm font-bold text-green-600 uppercase tracking-wider">Live from Algebra ERP</span>
         </div>
@@ -42,7 +51,8 @@
     {{-- Filter Bar --}}
     <div class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <form action="{{ route('reports.live-stock') }}" method="GET" id="liveStockFilterForm">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <input type="hidden" name="godown_filter_applied" value="1">
+            <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
                 @if(Auth::user()->hasFeature('reports', 'search'))
                 <div>
                     <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Search Product</label>
@@ -78,6 +88,70 @@
                     </select>
                 </div>
                 @endif
+
+                {{-- Godown Multiselect Filter --}}
+                <div class="relative" id="godownFilterWrapper">
+                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1 flex justify-between items-center">
+                        <span>Godown</span>
+                        <span id="godownCountBadge" class="text-[10px] font-bold px-1.5 py-0.2 rounded-full {{ !empty($selectedGodowns) ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-600' }}">
+                            {{ !empty($selectedGodowns) ? count($selectedGodowns) . ' active' : 'All' }}
+                        </span>
+                    </label>
+                    <button type="button" id="godownDropdownBtn" onclick="toggleGodownDropdown()" 
+                            class="w-full rounded border border-gray-300 bg-white shadow-sm py-2 px-3 text-sm flex items-center justify-between text-left focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-400 transition-colors">
+                        <span class="truncate flex items-center gap-1.5 font-medium text-gray-700" id="godownBtnText">
+                            <i class="fas fa-warehouse text-gray-400 text-xs"></i>
+                            @if(empty($selectedGodowns))
+                                All Godowns
+                            @elseif(count($selectedGodowns) == 1)
+                                {{ $godownNames[$selectedGodowns[0]] ?? ('Godown ' . $selectedGodowns[0]) }}
+                            @else
+                                {{ count($selectedGodowns) }} Godowns
+                            @endif
+                        </span>
+                        <i class="fas fa-chevron-down text-gray-400 text-xs ml-1 transition-transform duration-200" id="godownChevron"></i>
+                    </button>
+
+                    {{-- Dropdown Menu --}}
+                    <div id="godownDropdownMenu" class="hidden absolute right-0 md:left-0 mt-1 w-64 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 p-2.5">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 text-xs">
+                            <span class="font-bold text-gray-600 uppercase tracking-wider text-[10px]">Filter by Godown</span>
+                            <div class="flex gap-2 text-[11px]">
+                                <button type="button" onclick="selectAllGodowns()" class="text-blue-600 hover:text-blue-800 font-semibold hover:underline">Select All</button>
+                                <span class="text-gray-300">|</span>
+                                <button type="button" onclick="clearAllGodowns()" class="text-gray-500 hover:text-gray-700 font-semibold hover:underline">Clear</button>
+                            </div>
+                        </div>
+
+                        <div class="max-h-56 overflow-y-auto space-y-1 pr-1 custom-scroll" id="godownCheckboxesList">
+                            @forelse($availableGodowns as $gCode)
+                            @php
+                                $gDisplayName = $godownNames[$gCode] ?? ('Godown ' . $gCode);
+                            @endphp
+                            <label class="flex items-center gap-2.5 px-2 py-1.5 hover:bg-blue-50 rounded cursor-pointer transition-colors text-gray-700 text-xs font-semibold select-none">
+                                <input type="checkbox" name="godown_codes[]" value="{{ $gCode }}" 
+                                       class="godown-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                       {{ in_array((string)$gCode, array_map('strval', $selectedGodowns)) ? 'checked' : '' }}
+                                       onchange="onGodownCheckboxChange()">
+                                <span class="flex-grow flex items-center justify-between gap-1">
+                                    <span class="truncate">{{ $gDisplayName }}</span>
+                                    <span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono shrink-0">Code {{ $gCode }}</span>
+                                </span>
+                            </label>
+                            @empty
+                            <div class="text-xs text-gray-400 text-center py-2">No Godowns found in API</div>
+                            @endforelse
+                        </div>
+
+                        <div class="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-[10px] text-gray-400 italic">Unchecked = All</span>
+                            <button type="button" onclick="closeGodownDropdown()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-xs shadow-sm">
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Per Page</label>
                     <select name="per_page" class="w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border text-sm">
@@ -126,8 +200,10 @@
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded shadow text-sm flex items-center gap-1">
                             <i class="fas fa-filter"></i> Filter
                         </button>
-                        @if(request()->anyFilled(['search', 'type_id', 'rm_type', 'display_unit', 'per_page', 'stock_filter']) || request()->filled('product_ids'))
-                            <a href="{{ route('reports.live-stock') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center gap-1">
+                        @if(request()->anyFilled(['search', 'type_id', 'rm_type', 'display_unit', 'per_page', 'stock_filter']) || request()->filled('product_ids') || !empty($selectedGodowns))
+                            <a href="{{ route('reports.live-stock', ['clear' => 1]) }}" 
+                               onclick="try { localStorage.removeItem('invoflow_live_stock_godowns'); } catch(e) {}"
+                               class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center gap-1">
                                 <i class="fas fa-times"></i> Clear
                             </a>
                         @endif
@@ -145,19 +221,25 @@
             </button>
             @endif
             <a href="{{ route('reports.live-stock', array_merge(request()->query(), ['refresh' => 1])) }}" 
-               onclick="this.classList.add('pointer-events-none', 'opacity-60'); this.querySelector('i').classList.add('fa-spin');"
-               class="bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold py-2 px-4 rounded shadow-sm text-sm flex items-center transition-colors">
+                onclick="this.classList.add('pointer-events-none', 'opacity-60'); this.querySelector('i').classList.add('fa-spin');"
+                class="bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold py-2 px-4 rounded shadow-sm text-sm flex items-center transition-colors">
                 <i class="fas fa-sync-alt mr-2"></i> Sync Stock Now
             </a>
         </div>
+        @php
+            $exportParams = request()->query();
+            if (!empty($selectedGodowns)) {
+                $exportParams['godown_codes'] = $selectedGodowns;
+            }
+        @endphp
         <div class="flex gap-2">
             @if(Auth::user()->hasPermission('reports', 'excel'))
-            <a href="{{ route('reports.live-stock.excel', request()->query()) }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
+            <a href="{{ route('reports.live-stock.excel', $exportParams) }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
                 <i class="fas fa-file-excel mr-2"></i> EXCEL
             </a>
             @endif
             @if(Auth::user()->hasPermission('reports', 'pdf'))
-            <a href="{{ route('reports.live-stock.pdf', request()->query()) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
+            <a href="{{ route('reports.live-stock.pdf', $exportParams) }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow text-sm flex items-center">
                 <i class="fas fa-file-pdf mr-2"></i> PDF
             </a>
             @endif
@@ -566,6 +648,144 @@
                 pmsLoadType(this.value, null);
             });
         }
+    });
+</script>
+
+{{-- Godown Multiselect & Persistence Script --}}
+<script>
+    const GODOWN_LS_KEY = 'invoflow_live_stock_godowns';
+    const GODOWN_NAME_MAP = @json($godownNames ?? []);
+
+    function toggleGodownDropdown() {
+        const menu = document.getElementById('godownDropdownMenu');
+        const chevron = document.getElementById('godownChevron');
+        if (!menu) return;
+        const isHidden = menu.classList.contains('hidden');
+        if (isHidden) {
+            menu.classList.remove('hidden');
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        } else {
+            closeGodownDropdown();
+        }
+    }
+
+    function closeGodownDropdown() {
+        const menu = document.getElementById('godownDropdownMenu');
+        const chevron = document.getElementById('godownChevron');
+        if (menu && !menu.classList.contains('hidden')) {
+            menu.classList.add('hidden');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function getSelectedGodowns() {
+        const checkboxes = document.querySelectorAll('.godown-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    function updateGodownSummary() {
+        const selected = getSelectedGodowns();
+        const btnText = document.getElementById('godownBtnText');
+        const countBadge = document.getElementById('godownCountBadge');
+
+        if (btnText) {
+            let label = 'All Godowns';
+            if (selected.length === 1) {
+                const sCode = String(selected[0]);
+                label = GODOWN_NAME_MAP[sCode] || ('Godown ' + sCode);
+            } else if (selected.length > 1) {
+                label = selected.length + ' Godowns';
+            }
+            btnText.innerHTML = `<i class="fas fa-warehouse text-gray-400 text-xs"></i> ${label}`;
+        }
+
+        if (countBadge) {
+            if (selected.length > 0) {
+                countBadge.innerText = selected.length + ' active';
+                countBadge.className = 'text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800';
+            } else {
+                countBadge.innerText = 'All';
+                countBadge.className = 'text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-gray-200 text-gray-600';
+            }
+        }
+    }
+
+    function onGodownCheckboxChange() {
+        updateGodownSummary();
+        const selected = getSelectedGodowns();
+        try {
+            if (selected.length > 0) {
+                localStorage.setItem(GODOWN_LS_KEY, JSON.stringify(selected));
+            } else {
+                localStorage.removeItem(GODOWN_LS_KEY);
+            }
+        } catch(e) {}
+    }
+
+    function selectAllGodowns() {
+        document.querySelectorAll('.godown-checkbox').forEach(cb => cb.checked = true);
+        onGodownCheckboxChange();
+    }
+
+    function clearAllGodowns() {
+        document.querySelectorAll('.godown-checkbox').forEach(cb => cb.checked = false);
+        onGodownCheckboxChange();
+    }
+
+    // Close on click outside
+    document.addEventListener('click', function(e) {
+        const wrapper = document.getElementById('godownFilterWrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            closeGodownDropdown();
+        }
+    });
+
+    // Form submission saves to localStorage
+    document.getElementById('liveStockFilterForm')?.addEventListener('submit', function() {
+        const selected = getSelectedGodowns();
+        try {
+            if (selected.length > 0) {
+                localStorage.setItem(GODOWN_LS_KEY, JSON.stringify(selected));
+            } else {
+                localStorage.removeItem(GODOWN_LS_KEY);
+            }
+        } catch(e) {}
+    });
+
+    // On Load: dual-layer memory sync
+    document.addEventListener('DOMContentLoaded', function() {
+        const serverSelected = @json($selectedGodowns);
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (urlParams.get('clear') === '1') {
+            try { localStorage.removeItem(GODOWN_LS_KEY); } catch(e) {}
+            return;
+        }
+
+        if (Array.isArray(serverSelected) && serverSelected.length > 0) {
+            try { localStorage.setItem(GODOWN_LS_KEY, JSON.stringify(serverSelected)); } catch(e) {}
+        } else if (!urlParams.has('godown_filter_applied') && !urlParams.has('clear')) {
+            try {
+                const saved = localStorage.getItem(GODOWN_LS_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        let changed = false;
+                        document.querySelectorAll('.godown-checkbox').forEach(cb => {
+                            if (parsed.includes(cb.value) || parsed.includes(Number(cb.value))) {
+                                cb.checked = true;
+                                changed = true;
+                            }
+                        });
+                        if (changed) {
+                            updateGodownSummary();
+                            document.getElementById('liveStockFilterForm')?.submit();
+                        }
+                    }
+                }
+            } catch(e) {}
+        }
+        updateGodownSummary();
     });
 </script>
 

@@ -396,10 +396,10 @@
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
-             class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+             class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+             @click.self="closeModal()">
                 
-                <div class="bg-white w-full max-w-6xl h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col"
-                     @click.outside="closeModal()">
+                <div class="bg-white w-full max-w-6xl h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col">
                     
                     <!-- Modal Header -->
                     <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-700 p-6 text-white relative">
@@ -577,10 +577,10 @@
                                                             <input type="text" x-model="item.batch_number" @input="item.batch_number = $event.target.value.toUpperCase()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-[10px] font-bold text-slate-800 placeholder:text-slate-300 uppercase focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="BATCH NO">
                                                         </td>
                                                         <td class="py-3 align-middle pl-2 pr-2">
-                                                            <input type="date" x-model="item.mfg_date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-[9px] font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+                                                            <input type="date" min="2000-01-01" max="2099-12-31" x-model="item.mfg_date" @change="sanitizeItemDates(index)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-[9px] font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                                                         </td>
                                                         <td class="py-3 align-middle pl-2 pr-2">
-                                                            <input type="date" x-model="item.exp_date" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-[9px] font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+                                                            <input type="date" min="2000-01-01" max="2099-12-31" x-model="item.exp_date" @change="sanitizeItemDates(index)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-[9px] font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                                                         </td>
                                                         <td class="py-3 align-middle text-right">
                                                             <button type="button" @click="removeItem(index)" class="text-slate-300 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition" title="Remove row">
@@ -872,10 +872,10 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         @keydown.escape.window="if(!feedbackModal.isConfirm) feedbackModal.show = false">
+         @click.self="feedbackModal.show = false; if(feedbackModal.onCancel) feedbackModal.onCancel();"
+         @keydown.escape.window="if(feedbackModal.show) { feedbackModal.show = false; if(feedbackModal.onCancel) feedbackModal.onCancel(); }">
         
         <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-7 overflow-hidden text-center transform"
-             @click.away="if(!feedbackModal.isConfirm) feedbackModal.show = false"
              x-transition:enter="transition ease-out duration-250"
              x-transition:enter-start="opacity-0 scale-95 translate-y-2"
              x-transition:enter-end="opacity-100 scale-100 translate-y-0"
@@ -1031,14 +1031,14 @@ function productionManager() {
             this.feedbackModal.onConfirm = onConfirm;
         },
 
-        confirmAction(title, message, onConfirm, confirmText = 'Confirm', type = 'confirm') {
+        confirmAction(title, message, onConfirm, confirmText = 'Confirm', type = 'confirm', cancelText = 'Cancel') {
             this.feedbackModal.show = true;
             this.feedbackModal.isConfirm = true;
             this.feedbackModal.type = type;
             this.feedbackModal.title = title;
             this.feedbackModal.message = message;
             this.feedbackModal.confirmText = confirmText;
-            this.feedbackModal.cancelText = 'Cancel';
+            this.feedbackModal.cancelText = cancelText;
             this.feedbackModal.onConfirm = onConfirm;
             this.feedbackModal.onCancel = null;
         },
@@ -1207,6 +1207,8 @@ function productionManager() {
         },
 
         closeModal() {
+            if (this.feedbackModal.show) return;
+
             const hasData = this.items.some(i => i.product_id || i.quantity || i.batch_number);
             if (hasData) {
                 this.confirmAction(
@@ -1217,8 +1219,9 @@ function productionManager() {
                         this.isEditing = false;
                         this.items = [];
                     },
-                    'Discard',
-                    'warning'
+                    'Discard & Exit',
+                    'warning',
+                    'Keep Editing'
                 );
             } else {
                 this.showModal = false;
@@ -1259,10 +1262,10 @@ function productionManager() {
                 item.pack_size = p.pack_name || 'N/A';
                 item.unit_box = p.unit_box || 1;
                 
-                // Set default EXP date to 1 year out
+                // Set default EXP date to 2 years out
                 if (item.mfg_date) {
                     const mfg = new Date(item.mfg_date);
-                    mfg.setFullYear(mfg.getFullYear() + 1);
+                    mfg.setFullYear(mfg.getFullYear() + 2);
                     item.exp_date = mfg.toISOString().split('T')[0];
                 }
             } else {
@@ -1271,6 +1274,42 @@ function productionManager() {
                 item.unit_box = 1;
             }
             this.fetchConsolidatedRequirements();
+        },
+
+        sanitizeItemDates(index) {
+            const item = this.items[index];
+            if (!item) return;
+
+            // Auto-correct 0026 -> 2026 or 2-digit year for mfg_date
+            if (item.mfg_date) {
+                if (item.mfg_date.startsWith('00')) {
+                    item.mfg_date = '20' + item.mfg_date.slice(2);
+                }
+                const parts = item.mfg_date.split('-');
+                if (parts[0] && parseInt(parts[0], 10) < 100) {
+                    item.mfg_date = (2000 + parseInt(parts[0], 10)) + '-' + parts.slice(1).join('-');
+                }
+            }
+
+            // Auto-correct 0028 -> 2028 or 2-digit year for exp_date
+            if (item.exp_date) {
+                if (item.exp_date.startsWith('00')) {
+                    item.exp_date = '20' + item.exp_date.slice(2);
+                }
+                const parts = item.exp_date.split('-');
+                if (parts[0] && parseInt(parts[0], 10) < 100) {
+                    item.exp_date = (2000 + parseInt(parts[0], 10)) + '-' + parts.slice(1).join('-');
+                }
+            }
+
+            // If exp_date is empty but mfg_date is set, auto-set exp_date = mfg_date + 2 years
+            if (item.mfg_date && !item.exp_date) {
+                const mfg = new Date(item.mfg_date);
+                if (!isNaN(mfg.getTime())) {
+                    mfg.setFullYear(mfg.getFullYear() + 2);
+                    item.exp_date = mfg.toISOString().split('T')[0];
+                }
+            }
         },
 
         updateQuantity(index) {

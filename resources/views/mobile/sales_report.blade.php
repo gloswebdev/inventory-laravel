@@ -1025,7 +1025,12 @@ function mobileSalesReport() {
                     .forEach(l => params.delete(typeof l === 'string' ? l : l.key));
                 this.path.forEach(c => params.set(c.key, c.value));
 
-                const res = await fetch("{{ route('mobile.sales-report.drilldown') }}?" + params.toString());
+                const res = await fetch("{{ route('mobile.sales-report.drilldown') }}?" + params.toString(), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 const data = await res.json();
 
                 // Ignore a slower earlier request finishing after a newer one.

@@ -409,7 +409,9 @@ class IndentController extends Controller
                     if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
                         $stockMap = [];
                         foreach ($data['resultdata'] as $item) {
-                            $stockMap[(int)$item['Branch_Code']][$item['User_Code']] = (float)$item['ClosingQty'];
+                            $b = (int)$item['Branch_Code'];
+                            $i = $item['User_Code'];
+                            $stockMap[$b][$i] = ($stockMap[$b][$i] ?? 0) + (float)$item['ClosingQty'];
                         }
                         return $stockMap;
                     }

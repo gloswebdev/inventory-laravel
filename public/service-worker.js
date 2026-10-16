@@ -6,7 +6,7 @@
  * whose name is not the current one -- so every user's old cache is wiped on their next visit.
  * Leaving it unchanged means users keep whatever they cached, however old.
  */
-const CACHE_VERSION = 11;
+const CACHE_VERSION = 12;
 const CACHE_NAME = `invoflow-v${CACHE_VERSION}`;
 const OFFLINE_PAGE = '/offline.html';
 
@@ -77,8 +77,14 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // API / JSON requests → Network Only (no cache), show nothing on fail
-    if (event.request.url.includes('/api/') || event.request.headers.get('Accept')?.includes('application/json')) {
+    // API / JSON / Drilldown / Report requests → Network Only (no cache), show nothing on fail
+    if (
+        event.request.url.includes('/api/') ||
+        event.request.url.includes('drilldown') ||
+        event.request.url.includes('/sales-') ||
+        event.request.url.includes('/reports/') ||
+        event.request.headers.get('Accept')?.includes('application/json')
+    ) {
         event.respondWith(fetch(event.request));
         return;
     }

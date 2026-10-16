@@ -15,8 +15,14 @@
 <body>
     <div class="header">
         <h2>Live Stock Report</h2>
-        <p>Generated on: {{ now()->format('d M, Y H:i:s') }}</p>
-        <p>Unit: {{ $displayUnit === 'kg' ? 'kg / Ltr' : 'Units / Pcs' }}</p>
+        @php
+            $godownText = 'All Godowns';
+            if (!empty($selectedGodowns)) {
+                $labels = array_map(fn($c) => $godownNames[$c] ?? ('Godown ' . $c), $selectedGodowns);
+                $godownText = implode(', ', $labels);
+            }
+        @endphp
+        <p>Unit: {{ $displayUnit === 'kg' ? 'kg / Ltr' : 'Units / Pcs' }} | Godown: {{ $godownText }}</p>
     </div>
 
     <table>

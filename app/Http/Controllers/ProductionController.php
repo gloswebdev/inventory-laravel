@@ -243,7 +243,7 @@ class ProductionController extends Controller
                         foreach ($data['resultdata'] as $item) {
                             $bCode = (int)$item['Branch_Code'];
                             $iCode = $item['User_Code'];
-                            $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
+                            $stockMap[$bCode][$iCode] = ($stockMap[$bCode][$iCode] ?? 0) + (float)$item['ClosingQty'];
                         }
                         return $stockMap;
                     }
@@ -301,8 +301,8 @@ class ProductionController extends Controller
                     'pack_size' => $product->pack_name,
                     'quantity_box' => $quantityBoxes,
                     'batch_number' => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
-                    'mfg_date' => $itemData['mfg_date'] ?? null,
-                    'exp_date' => $itemData['exp_date'] ?? null,
+                    'mfg_date' => $this->sanitizeInputDate($itemData['mfg_date'] ?? null),
+                    'exp_date' => $this->sanitizeInputDate($itemData['exp_date'] ?? null),
                 ]);
 
                 $product->increment('current_stock', $totalUnits);
@@ -353,17 +353,11 @@ class ProductionController extends Controller
             } else {
                 $failures = [];
                 if (!$result['receipt_result']['success']) {
-                    $rMsg = $result['receipt_result']['message'] ?? 'Error';
-                    if ($rMsg === 'HTTP 503') {
-                        $rMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
-                    }
+                    $rMsg = $this->cleanErpErrorMessage($result['receipt_result']['message'] ?? 'Error');
                     $failures[] = "Receipt: {$rMsg}";
                 }
                 if (!$result['issue_result']['success']) {
-                    $iMsg = $result['issue_result']['message'] ?? 'Error';
-                    if ($iMsg === 'HTTP 503') {
-                        $iMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
-                    }
+                    $iMsg = $this->cleanErpErrorMessage($result['issue_result']['message'] ?? 'Error');
                     $failures[] = "Issue: {$iMsg}";
                 }
                 $erpMsg = ' ERP Push Failed (' . implode(' | ', $failures) . ')';
@@ -508,17 +502,11 @@ class ProductionController extends Controller
         } else {
             $failures = [];
             if (!$result['receipt_result']['success']) {
-                $rMsg = $result['receipt_result']['message'] ?? 'Error';
-                if ($rMsg === 'HTTP 503') {
-                    $rMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
-                }
+                $rMsg = $this->cleanErpErrorMessage($result['receipt_result']['message'] ?? 'Error');
                 $failures[] = "Receipt: {$rMsg}";
             }
             if (!$result['issue_result']['success']) {
-                $iMsg = $result['issue_result']['message'] ?? 'Error';
-                if ($iMsg === 'HTTP 503') {
-                    $iMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
-                }
+                $iMsg = $this->cleanErpErrorMessage($result['issue_result']['message'] ?? 'Error');
                 $failures[] = "Issue: {$iMsg}";
             }
             $msg = "Retry failed for #BATCH-{$production->id}: " . implode(' | ', $failures);
@@ -713,8 +701,8 @@ class ProductionController extends Controller
                     'pack_size' => $product->pack_name,
                     'quantity_box' => $quantityBoxes,
                     'batch_number' => isset($itemData['batch_number']) ? strtoupper($itemData['batch_number']) : null,
-                    'mfg_date' => $itemData['mfg_date'] ?? null,
-                    'exp_date' => $itemData['exp_date'] ?? null,
+                    'mfg_date' => $this->sanitizeInputDate($itemData['mfg_date'] ?? null),
+                    'exp_date' => $this->sanitizeInputDate($itemData['exp_date'] ?? null),
                 ]);
 
                 $product->increment('current_stock', $totalUnits);
@@ -761,17 +749,11 @@ class ProductionController extends Controller
             } else {
                 $failures = [];
                 if (!$result['receipt_result']['success']) {
-                    $rMsg = $result['receipt_result']['message'] ?? 'Error';
-                    if ($rMsg === 'HTTP 503') {
-                        $rMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
-                    }
+                    $rMsg = $this->cleanErpErrorMessage($result['receipt_result']['message'] ?? 'Error');
                     $failures[] = "Receipt: {$rMsg}";
                 }
                 if (!$result['issue_result']['success']) {
-                    $iMsg = $result['issue_result']['message'] ?? 'Error';
-                    if ($iMsg === 'HTTP 503') {
-                        $iMsg = 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
-                    }
+                    $iMsg = $this->cleanErpErrorMessage($result['issue_result']['message'] ?? 'Error');
                     $failures[] = "Issue: {$iMsg}";
                 }
                 $erpMsg = ' ERP Push Failed (' . implode(' | ', $failures) . ')';
@@ -883,5 +865,44 @@ class ProductionController extends Controller
                     ->orWhereNull('rm_type')
                     ->orWhere('rm_type', '');
             });
+    }
+
+    private function sanitizeInputDate(?string $date): ?string
+    {
+        if (empty($date)) return null;
+        $date = trim($date);
+        if (preg_match('/^00(\d{2})-(.*)$/', $date, $matches)) {
+            $date = '20' . $matches[1] . '-' . $matches[2];
+        }
+        try {
+            $p = \Carbon\Carbon::parse($date);
+            if ($p->year < 100) {
+                $p->year += 2000;
+            } elseif ($p->year < 1753) {
+                $p->year = (int) date('Y');
+            }
+            return $p->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return $date;
+        }
+    }
+
+    private function cleanErpErrorMessage(string $msg): string
+    {
+        if (str_contains($msg, 'SqlDateTime overflow') || str_contains($msg, 'Must be between 1/1/1753') || str_contains($msg, 'SqlTypeException')) {
+            return "Invalid Date: Please enter a valid date between 2000 and 2099.";
+        }
+        if ($msg === 'HTTP 503') {
+            return 'ERP Server Unavailable (HTTP 503) - check logic.gloswebdev.in';
+        }
+        if (str_contains($msg, 'at Logic') || str_contains($msg, 'in E:\\') || str_contains($msg, 'in D:\\')) {
+            $lines = preg_split("/\r\n|\n|\r/", $msg);
+            $first = trim($lines[0] ?? '');
+            if (preg_match('/Exception:\s*(.*)/', $first, $m)) {
+                return trim($m[1]);
+            }
+            return $first ?: "ERP Server Processing Error";
+        }
+        return $msg;
     }
 }

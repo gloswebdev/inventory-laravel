@@ -49,6 +49,18 @@
                     <span>Clean / Reset Data</span>
                 </button>
 
+                <button type="button" @click="openCleanJobsModal()"
+                    class="px-4 py-2.5 rounded-2xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/40 text-purple-200 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-sm"
+                    title="Clean temporary MSSQL sync query jobs to free up disk space">
+                    <i class="fas fa-broom text-purple-300"></i>
+                    <span>Clean Query Jobs</span>
+                    @if(isset($queryJobsSizeMb) && $queryJobsSizeMb > 0)
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-400/30 text-purple-100 font-black border border-purple-300/30">
+                            {{ $queryJobsSizeMb }} MB
+                        </span>
+                    @endif
+                </button>
+
                 <a href="{{ route('reports.query-executor.index') }}"
                     class="px-4 py-2.5 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 text-amber-300 text-xs font-bold transition flex items-center gap-2">
                     <i class="fas fa-bolt text-amber-400"></i>
@@ -1007,6 +1019,20 @@
 
             {{-- Options List --}}
             <div class="space-y-3">
+                {{-- Recommended Safe Option: Query Jobs --}}
+                <label class="flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition"
+                       :class="selectedCleanYear === 'query_jobs' ? 'border-purple-600 bg-purple-50/50 ring-2 ring-purple-600/20' : 'border-purple-200 hover:border-purple-300 bg-purple-50/20'">
+                    <input type="radio" name="clean_year" value="query_jobs" x-model="selectedCleanYear" class="text-purple-600 focus:ring-purple-500">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-black text-purple-900 flex items-center gap-2">
+                            <span>⚡ Clean Query Jobs & Temp Cache</span>
+                            <span class="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Frees ~{{ $queryJobsSizeMb ?? 385 }} MB</span>
+                            <span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">100% Safe</span>
+                        </div>
+                        <p class="text-[11px] text-purple-600/80 mt-0.5">Frees up database disk space immediately. All 102,413 sales records remain 100% safe.</p>
+                    </div>
+                </label>
+
                 <label class="flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition"
                        :class="selectedCleanYear === '20262027' ? 'border-indigo-600 bg-indigo-50/40 ring-2 ring-indigo-600/20' : 'border-slate-200 hover:border-indigo-300 bg-slate-50/50'">
                     <input type="radio" name="clean_year" value="20262027" x-model="selectedCleanYear" class="text-indigo-600 focus:ring-indigo-500">
@@ -1059,6 +1085,95 @@
                     class="px-5 py-2.5 rounded-xl text-xs font-black text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 transition flex items-center gap-2 shadow-lg shadow-rose-600/20">
                     <i class="fas fa-trash-can" :class="cleaning ? 'fa-spin' : ''"></i>
                     <span x-text="cleaning ? 'Cleaning Data...' : 'Confirm & Delete'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- CLEAN QUERY JOBS MODAL --}}
+    <div x-show="cleanJobsModalOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5"
+             @click.outside="if(!cleaningJobs) cleanJobsModalOpen = false">
+            
+            {{-- Header --}}
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shadow-inner border border-purple-100">
+                        <i class="fas fa-broom"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-slate-800 tracking-tight">Clean Query Jobs</h3>
+                        <p class="text-xs text-slate-400 font-medium">Free up database space without deleting sales data</p>
+                    </div>
+                </div>
+                <button @click="cleanJobsModalOpen = false" :disabled="cleaningJobs" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center text-xs transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            {{-- Metrics Card --}}
+            <div class="grid grid-cols-2 gap-3">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div class="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Query Jobs</div>
+                    <div class="text-lg font-black text-slate-700 mt-0.5">{{ number_format($queryJobsCount ?? 0) }} Jobs</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-purple-50 border border-purple-100">
+                    <div class="text-[10px] font-black uppercase tracking-wider text-purple-600">Storage Reclaimable</div>
+                    <div class="text-lg font-black text-purple-700 mt-0.5">~{{ $queryJobsSizeMb ?? 0 }} MB</div>
+                </div>
+            </div>
+
+            {{-- Safe notice --}}
+            <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 flex items-start gap-3">
+                <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                    <i class="fas fa-shield-halved"></i>
+                </div>
+                <div class="text-xs text-emerald-900 leading-relaxed">
+                    <strong class="font-bold text-emerald-800">100% Safe:</strong> Query jobs only hold temporary JSON sync payloads from ERP background fetches. Clearing them will <strong>NOT</strong> delete any sales records, bills, or party data.
+                </div>
+            </div>
+
+            {{-- Action Selection --}}
+            <div class="space-y-2.5">
+                <label class="flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition"
+                       :class="cleanJobsMode === 'truncate' ? 'border-purple-600 bg-purple-50/40 ring-2 ring-purple-600/20' : 'border-slate-200 hover:border-purple-300 bg-slate-50/50'">
+                    <input type="radio" name="clean_jobs_mode" value="truncate" x-model="cleanJobsMode" class="text-purple-600 focus:ring-purple-500">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-black text-slate-800 flex items-center gap-2">
+                            <span>🚀 Full Cleanup & Reset (Recommended)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Deletes all query jobs and completely frees up ~{{ $queryJobsSizeMb ?? 0 }} MB disk space.</p>
+                    </div>
+                </label>
+
+                <label class="flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition"
+                       :class="cleanJobsMode === 'clear_cache' ? 'border-purple-600 bg-purple-50/40 ring-2 ring-purple-600/20' : 'border-slate-200 hover:border-purple-300 bg-slate-50/50'">
+                    <input type="radio" name="clean_jobs_mode" value="clear_cache" x-model="cleanJobsMode" class="text-purple-600 focus:ring-purple-500">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-black text-slate-800">🧹 Clear Cache Only</div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Clears heavy result JSON while keeping job history and timestamps.</p>
+                    </div>
+                </label>
+            </div>
+
+            {{-- Actions --}}
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button type="button" @click="cleanJobsModalOpen = false" :disabled="cleaningJobs"
+                    class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                    Cancel
+                </button>
+                <button type="button" @click="executeCleanQueryJobs()" :disabled="cleaningJobs"
+                    class="px-5 py-2.5 rounded-xl text-xs font-black text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition flex items-center gap-2 shadow-lg shadow-purple-600/25">
+                    <i class="fas fa-broom" :class="cleaningJobs ? 'fa-spin' : ''"></i>
+                    <span x-text="cleaningJobs ? 'Cleaning Space...' : 'Clear Query Jobs Now'"></span>
                 </button>
             </div>
         </div>
@@ -1137,7 +1252,10 @@ function desktopSalesReport() {
     return {
         modalOpen: false,
         cleanModalOpen: false,
+        cleanJobsModalOpen: false,
         cleaning: false,
+        cleaningJobs: false,
+        cleanJobsMode: 'truncate',
         selectedCleanYear: '20262027',
         loading: false,
         activeBranch: '',
@@ -1164,8 +1282,47 @@ function desktopSalesReport() {
             this.cleanModalOpen = true;
         },
 
+        openCleanJobsModal() {
+            this.cleanJobsModalOpen = true;
+        },
+
+        async executeCleanQueryJobs() {
+            if (!confirm('Are you sure you want to clean Query Jobs? This will free up database storage and will NOT touch your sales records.')) {
+                return;
+            }
+
+            this.cleaningJobs = true;
+            try {
+                const res = await fetch("{{ route('reports.sales-report.clean-query-jobs') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        mode: this.cleanJobsMode
+                    })
+                });
+
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Clean jobs error:', err);
+                alert('Network error while cleaning query jobs: ' + err.message);
+            } finally {
+                this.cleaningJobs = false;
+                this.cleanJobsModalOpen = false;
+            }
+        },
+
         async executeCleanData() {
             const labels = {
+                'query_jobs': 'Query Jobs & Temp Sync Cache (~385 MB Storage)',
                 '20262027': 'FY 2026-2027 (Current Year)',
                 '20252026': 'FY 2025-2026 (Previous Year)',
                 '20242025': 'FY 2024-2025 (Historical)',

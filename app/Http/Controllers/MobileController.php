@@ -1179,7 +1179,7 @@ class MobileController extends Controller implements HasMiddleware
                         foreach ($data['resultdata'] as $item) {
                             $bCode = (int)$item['Branch_Code'];
                             $iCode = $item['User_Code'];
-                            $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
+                            $stockMap[$bCode][$iCode] = ($stockMap[$bCode][$iCode] ?? 0) + (float)$item['ClosingQty'];
                         }
                         return $stockMap;
                     }

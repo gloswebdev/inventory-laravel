@@ -56,9 +56,33 @@ class ReportController extends Controller
     {
         if ($request->has('refresh')) {
             Cache::forget('external_stock_data_grouped');
+            Cache::forget('external_stock_raw_api_data');
             return redirect()->route('reports.live-stock', $request->except('refresh'))
                              ->with('success', 'Live stock data synced successfully from Algebra ERP!');
         }
+
+        if ($request->has('clear')) {
+            session()->forget('live_stock_godowns');
+            return redirect()->route('reports.live-stock');
+        }
+
+        // Available Godowns from raw API response
+        $availableGodowns = $this->getAvailableGodowns();
+
+        // Handle Godown filter with persistence/memory (single or multi-select)
+        $selectedGodowns = [];
+        if ($request->has('godown_filter_applied') || $request->has('godown_codes')) {
+            $raw = $request->input('godown_codes', []);
+            if (is_string($raw)) {
+                $selectedGodowns = array_filter(array_map('trim', explode(',', $raw)), fn($v) => $v !== '');
+            } elseif (is_array($raw)) {
+                $selectedGodowns = array_values(array_filter($raw, fn($v) => $v !== '' && $v !== null));
+            }
+            session(['live_stock_godowns' => $selectedGodowns]);
+        } else {
+            $selectedGodowns = session('live_stock_godowns', []);
+        }
+        $selectedGodowns = array_values(array_map('strval', (array)$selectedGodowns));
 
         $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
         $types = ProductType::orderBy('type_name')->get();
@@ -99,7 +123,8 @@ class ReportController extends Controller
             $products = $query->paginate($perPage)->withQueryString();
         }
 
-        $externalStock = $this->getExternalStock();
+        // Get external stock with Godown filter applied (summing godowns per branch)
+        $externalStock = $this->getFilteredStockMap($selectedGodowns);
 
         $reportData = [];
         foreach ($products as $product) {
@@ -142,7 +167,9 @@ class ReportController extends Controller
         $this->applyTypeFilters($allProductsQuery);
         $allProducts = $allProductsQuery->get();
 
-        return view('reports.live_stock', compact('reportData', 'products', 'branches', 'types', 'rmTypes', 'displayUnit', 'allProducts'));
+        $godownNames = $this->getGodownNameMap();
+
+        return view('reports.live_stock', compact('reportData', 'products', 'branches', 'types', 'rmTypes', 'displayUnit', 'allProducts', 'availableGodowns', 'selectedGodowns', 'godownNames'));
     }
 
     public function exportLiveStockExcel(Request $request)
@@ -152,7 +179,18 @@ class ReportController extends Controller
         }
 
         $displayUnit = $request->get('display_unit', 'unit');
-        $externalStock = $this->getExternalStock();
+
+        // Resolve Godown filter from request or session memory
+        $selectedGodowns = [];
+        if ($request->has('godown_codes')) {
+            $raw = $request->input('godown_codes');
+            $selectedGodowns = is_array($raw) ? $raw : explode(',', (string)$raw);
+        } else {
+            $selectedGodowns = session('live_stock_godowns', []);
+        }
+        $selectedGodowns = array_values(array_filter(array_map('strval', (array)$selectedGodowns), fn($v) => $v !== ''));
+
+        $externalStock = $this->getFilteredStockMap($selectedGodowns);
         $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
 
         $query = Product::with('type')->orderBy('name');
@@ -201,7 +239,18 @@ class ReportController extends Controller
         }
 
         $displayUnit = $request->get('display_unit', 'unit');
-        $externalStock = $this->getExternalStock();
+
+        // Resolve Godown filter from request or session memory
+        $selectedGodowns = [];
+        if ($request->has('godown_codes')) {
+            $raw = $request->input('godown_codes');
+            $selectedGodowns = is_array($raw) ? $raw : explode(',', (string)$raw);
+        } else {
+            $selectedGodowns = session('live_stock_godowns', []);
+        }
+        $selectedGodowns = array_values(array_filter(array_map('strval', (array)$selectedGodowns), fn($v) => $v !== ''));
+
+        $externalStock = $this->getFilteredStockMap($selectedGodowns);
         $branches = Branch::orderBy('sort_order')->orderBy('code')->get();
 
         $query = Product::with('type')->orderBy('name');
@@ -255,22 +304,34 @@ class ReportController extends Controller
             ];
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.live_stock_pdf', compact('reportData', 'branches', 'displayUnit'))
+        $godownNames = $this->getGodownNameMap();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.live_stock_pdf', compact('reportData', 'branches', 'displayUnit', 'selectedGodowns', 'godownNames'))
                   ->setPaper('a4', 'landscape');
         
         return $pdf->download("Live_Stock_Report_" . now()->format('Y-m-d_His') . ".pdf");
     }
 
-    private function getExternalStock()
+    public function getGodownNameMap()
     {
-        return Cache::remember('external_stock_data_grouped', 3600, function () {
+        return Cache::remember('godown_name_map', 3600, function () {
+            try {
+                return \App\Models\Godown::pluck('name', 'code')->toArray();
+            } catch (\Exception $e) {
+                return [];
+            }
+        });
+    }
+
+    public function getRawExternalStock()
+    {
+        return Cache::remember('external_stock_raw_api_data', 3600, function () {
             try {
                 $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
                 $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
                 $branch  = AppSetting::get('inventory_api_branch', 'ALL');
                 $item    = AppSetting::get('inventory_api_item', 'ALL');
 
-                Log::info('External Stock API Call', ['url' => $baseUrl, 'branch' => $branch]);
+                Log::info('External Stock API Call (Raw)', ['url' => $baseUrl, 'branch' => $branch]);
 
                 $response = Http::withoutVerifying()
                     ->timeout(60)
@@ -286,14 +347,8 @@ class ReportController extends Controller
                 if ($response->successful()) {
                     $data = $response->json();
                     if (isset($data['response']) && $data['response'] === 'success' && isset($data['resultdata'])) {
-                        $stockMap = [];
-                        foreach ($data['resultdata'] as $item) {
-                            $bCode = $item['Branch_Code'];
-                            $iCode = $item['User_Code'];
-                            $stockMap[$bCode][$iCode] = (float)$item['ClosingQty'];
-                        }
-                        Log::info('External Stock loaded', ['items' => count($stockMap)]);
-                        return $stockMap;
+                        Log::info('External Stock Raw Records loaded', ['count' => count($data['resultdata'])]);
+                        return $data['resultdata'];
                     }
                     Log::warning('External Stock API bad response', ['body' => $response->body()]);
                 } else {
@@ -306,6 +361,52 @@ class ReportController extends Controller
                 ]);
             }
             return [];
+        });
+    }
+
+    public function getAvailableGodowns()
+    {
+        $rawData = $this->getRawExternalStock();
+        $godowns = [];
+        foreach ($rawData as $item) {
+            if (isset($item['Godown_Code']) && $item['Godown_Code'] !== null && $item['Godown_Code'] !== '') {
+                $code = (string)$item['Godown_Code'];
+                $godowns[$code] = $code;
+            }
+        }
+        ksort($godowns, SORT_NATURAL);
+        return array_values($godowns);
+    }
+
+    public function getFilteredStockMap(array $selectedGodowns = [])
+    {
+        $rawData = $this->getRawExternalStock();
+        $stockMap = [];
+        $selectedGodowns = array_filter(array_map('strval', $selectedGodowns), fn($v) => $v !== '');
+        $filterActive = !empty($selectedGodowns);
+        $selectedSet = array_flip($selectedGodowns);
+
+        foreach ($rawData as $item) {
+            $gCode = (string)($item['Godown_Code'] ?? '');
+            if ($filterActive && !isset($selectedSet[$gCode])) {
+                continue;
+            }
+
+            $bCode = (string)$item['Branch_Code'];
+            $iCode = (string)$item['User_Code'];
+            $qty   = (float)$item['ClosingQty'];
+
+            // Sum ClosingQty so multiple godowns for the same branch accumulate correctly
+            $stockMap[$bCode][$iCode] = ($stockMap[$bCode][$iCode] ?? 0) + $qty;
+        }
+
+        return $stockMap;
+    }
+
+    private function getExternalStock()
+    {
+        return Cache::remember('external_stock_data_grouped', 3600, function () {
+            return $this->getFilteredStockMap([]);
         });
     }
 
@@ -1859,6 +1960,18 @@ class ReportController extends Controller
         $formattedGrandSales = self::formatIndianCurrency($grandTotalSales);
         $topBranch = count($branchSummary) > 0 ? $branchSummary[0] : null;
 
+        $queryJobsCount = 0;
+        $queryJobsSizeMb = 0;
+        try {
+            if (Schema::hasTable('query_jobs')) {
+                $queryJobsCount = DB::table('query_jobs')->count();
+                if ($queryJobsCount > 0) {
+                    $bytes = DB::table('query_jobs')->sum(DB::raw('LENGTH(result_rows)')) ?? 0;
+                    $queryJobsSizeMb = round($bytes / (1024 * 1024), 1);
+                }
+            }
+        } catch (\Throwable $e) {}
+
         return view('reports.sales_report', compact(
             'branchSummary',
             'grandTotalSales',
@@ -1882,7 +1995,9 @@ class ReportController extends Controller
             'txnTypeOptions',
             'searchQuery',
             'topProducts',
-            'topParties'
+            'topParties',
+            'queryJobsCount',
+            'queryJobsSizeMb'
         ));
     }
 
@@ -3595,6 +3710,12 @@ class ReportController extends Controller
     public function cleanSalesData(Request $request)
     {
         $yearChoice = $request->input('year_choice', '20262027');
+
+        // Allow cleaning query jobs via cleanSalesData as well
+        if ($yearChoice === 'query_jobs') {
+            return $this->cleanQueryJobs($request);
+        }
+
         $deletedCount = 0;
 
         if (!Schema::hasTable('mssql_sales_records')) {
@@ -3623,6 +3744,49 @@ class ReportController extends Controller
                 'status'        => 'success',
                 'deleted_count' => $deletedCount,
                 'message'       => "🎉 Successfully cleaned {$deletedCount} records for {$label}."
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Clean / Truncate Query Jobs & Temp Cache (~385 MB Storage)
+     * Keeps sales records 100% intact.
+     */
+    public function cleanQueryJobs(Request $request)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->role !== 'admin' && !$user->hasPermission('reports', 'manage')) {
+            return response()->json(['status' => 'error', 'message' => 'Admin permission required.'], 403);
+        }
+
+        if (!Schema::hasTable('query_jobs')) {
+            return response()->json(['status' => 'error', 'message' => "Table 'query_jobs' does not exist."], 404);
+        }
+
+        try {
+            $mode = $request->input('mode', 'truncate');
+            $count = DB::table('query_jobs')->count();
+            $bytes = DB::table('query_jobs')->sum(DB::raw('LENGTH(result_rows)')) ?? 0;
+            $freedMb = round($bytes / (1024 * 1024), 1);
+
+            if ($mode === 'clear_cache') {
+                DB::table('query_jobs')->update([
+                    'result_rows'    => null,
+                    'result_columns' => null,
+                ]);
+                $message = "🎉 Cache cleared for {$count} query jobs! Freed approximately {$freedMb} MB storage. Sales records are 100% safe.";
+            } else {
+                DB::table('query_jobs')->truncate();
+                $message = "🎉 Successfully deleted all {$count} query jobs! Freed approximately {$freedMb} MB database storage. Sales records are 100% safe.";
+            }
+
+            return response()->json([
+                'status'        => 'success',
+                'deleted_count' => $count,
+                'freed_mb'      => $freedMb,
+                'message'       => $message
             ]);
         } catch (\Throwable $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
