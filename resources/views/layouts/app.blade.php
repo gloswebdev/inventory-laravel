@@ -425,6 +425,11 @@
                         <span class="sub-dot"></span> Purchase Report
                     </a>
                     @endif
+                    @if(Auth::user()->hasPermission('debtors_ageing', 'view') || Auth::user()->hasPermission('reports', 'view') || Auth::user()->role === 'admin')
+                    <a href="{{ route('reports.debtors-ageing') }}" class="sub-nav-link {{ request()->routeIs('reports.debtors-ageing*') ? 'active' : '' }}">
+                        <span class="sub-dot"></span> Debtors Ageing
+                    </a>
+                    @endif
                     @if(Auth::user()->hasPermission('collection_report', 'view') || Auth::user()->role === 'admin')
                     <a href="{{ route('reports.collection') }}" class="sub-nav-link {{ request()->routeIs('reports.collection') ? 'active' : '' }}">
                         <span class="sub-dot"></span> Collection Report

@@ -3792,6 +3792,239 @@ class ReportController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Debtors Ageing Report View (Desktop)
+     */
+    public function debtorsAgeing(Request $request)
+    {
+        $user = Auth::user();
+        if ($user->role !== 'admin' && 
+            !$user->hasPermission('debtors_ageing', 'view') && 
+            !$user->hasPermission('reports', 'view') &&
+            !$user->hasPermission('mobile_debtors_ageing', 'view')) {
+            abort(403, 'Unauthorized access to Debtors Ageing Report.');
+        }
+
+        $data = $this->getDebtorsAgeingDataPayload($request);
+
+        return view('reports.debtors_ageing', $data);
+    }
+
+    /**
+     * Export Debtors Ageing Report to Excel
+     */
+    public function exportDebtorsAgeingExcel(Request $request)
+    {
+        $user = Auth::user();
+        if ($user->role !== 'admin' && 
+            !$user->hasPermission('debtors_ageing', 'excel') && 
+            !$user->hasPermission('reports', 'excel') && 
+            !$user->hasPermission('debtors_ageing', 'view') &&
+            !$user->hasPermission('reports', 'view')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $data = $this->getDebtorsAgeingDataPayload($request);
+
+        $filename = 'Debtors_Ageing_Report_' . now()->format('Y-m-d_His') . '.xlsx';
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\DebtorsAgeingExport($data['rows']),
+            $filename
+        );
+    }
+
+    /**
+     * Shared logic to fetch and format Debtors Ageing Data from ERP API
+     */
+    public function getDebtorsAgeingDataPayload(Request $request): array
+    {
+        $user = Auth::user();
+        $baseUrl = rtrim(AppSetting::get('erp_api_base_url', 'https://logicapi.algebraerp.com/API/SYNWOOD'), '/');
+        $apiKey  = AppSetting::get('erp_api_key', 'e2a4fuye2a4fuy9swssw122sbkn0m82y83g14');
+
+        // FY calculation (Default current Indian Financial Year Apr 1 - Mar 31)
+        $now = now();
+        $fyStartYear = $now->month >= 4 ? $now->year : ($now->year - 1);
+        $fyEndYear = $fyStartYear + 1;
+        $defaultFromDate = "{$fyStartYear}-04-01";
+        $defaultToDate = "{$fyEndYear}-03-31";
+
+        $fromDate = $request->input('from_date', $defaultFromDate);
+        $toDate   = $request->input('to_date', $defaultToDate);
+
+        // Derive FinYear
+        $startYear = (int) date('Y', strtotime($fromDate));
+        $startMonth = (int) date('n', strtotime($fromDate));
+        $calcFyStart = $startMonth >= 4 ? $startYear : ($startYear - 1);
+        $calcFyEnd = $calcFyStart + 1;
+        $finYear = $request->input('fin_year', "{$calcFyStart}{$calcFyEnd}");
+
+        // Branch mapping & permissions
+        $permittedBranchCodes = $user->getPermittedBranchCodes();
+        $branches = Branch::orderBy('sort_order')->orderBy('name')->get();
+        $branchMap = $branches->pluck('name', 'code')->toArray();
+        $branchMap['0'] = 'HO / Head Office';
+        $branchMap[0] = 'HO / Head Office';
+
+        $branchOptions = $branches->filter(function($b) use ($permittedBranchCodes, $user) {
+            return $user->role === 'admin' || in_array((string)$b->code, array_map('strval', $permittedBranchCodes));
+        });
+
+        $selectedBranch = $request->input('branch', 'ALL');
+        if ($user->role !== 'admin' && $selectedBranch !== 'ALL' && !in_array((string)$selectedBranch, array_map('strval', $permittedBranchCodes))) {
+            $selectedBranch = !empty($permittedBranchCodes) ? $permittedBranchCodes[0] : 'ALL';
+        }
+
+        $selectedActCode = trim($request->input('act_code', 'all')) ?: 'all';
+        $forceRefresh = $request->boolean('refresh');
+
+        $cacheKey = "debtors_ageing_{$finYear}_{$selectedBranch}_{$selectedActCode}_{$fromDate}_{$toDate}";
+        if ($forceRefresh) {
+            Cache::forget($cacheKey);
+        }
+
+        $reportData = [];
+        $error = null;
+
+        try {
+            $reportData = Cache::remember($cacheKey, 1800, function () use ($baseUrl, $apiKey, $finYear, $selectedBranch, $selectedActCode, $fromDate, $toDate) {
+                $payload = [
+                    'apikey'   => $apiKey,
+                    'FinYear'  => $finYear,
+                    'Branch'   => $selectedBranch,
+                    'ActCode'  => $selectedActCode,
+                    'FromDate' => $fromDate,
+                    'ToDate'   => $toDate,
+                ];
+
+                Log::info('Debtors Ageing API Call', ['url' => "{$baseUrl}/LogicLedgerAgeing", 'payload' => $payload]);
+
+                $response = Http::withoutVerifying()
+                    ->timeout(60)
+                    ->connectTimeout(15)
+                    ->post("{$baseUrl}/LogicLedgerAgeing", $payload);
+
+                if ($response->successful()) {
+                    $json = $response->json();
+                    if (isset($json['response']) && $json['response'] === 'success' && isset($json['resultdata'])) {
+                        return $json['resultdata'];
+                    } elseif (isset($json['resultdata'])) {
+                        return $json['resultdata'];
+                    }
+                }
+                Log::warning('Debtors Ageing API Non-200 / empty response', ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
+                return [];
+            });
+        } catch (\Throwable $e) {
+            Log::error('Debtors Ageing Exception: ' . $e->getMessage());
+            $error = 'Error connecting to ERP API: ' . $e->getMessage();
+            $reportData = [];
+        }
+
+        $rows = [];
+        $partyOptions = [];
+        $seenParties = [];
+        $totals = [
+            'count'          => 0,
+            'opening'        => 0.0,
+            'debit'          => 0.0,
+            'credit'         => 0.0,
+            'bucket_0_30'    => 0.0,
+            'bucket_31_60'   => 0.0,
+            'bucket_61_90'   => 0.0,
+            'bucket_over_90' => 0.0,
+            'closing'        => 0.0,
+            'overdue_count'  => 0,
+        ];
+
+        if (is_array($reportData)) {
+            foreach ($reportData as $item) {
+                $bCode = (string)($item['Branch_Code'] ?? '0');
+
+                // Enforce user branch restriction if branch=ALL
+                if ($user->role !== 'admin' && !empty($permittedBranchCodes)) {
+                    if (!in_array($bCode, array_map('strval', $permittedBranchCodes)) && $bCode !== '0') {
+                        continue;
+                    }
+                }
+
+                $actCode = trim((string)($item['ACT_CODE'] ?? ''));
+                $actName = trim((string)($item['act_name'] ?? ''));
+                if ($actName === '') {
+                    $actName = "Account #" . $actCode;
+                }
+
+                if ($actCode !== '' && !isset($seenParties[$actCode])) {
+                    $seenParties[$actCode] = true;
+                    $partyOptions[] = [
+                        'code' => $actCode,
+                        'name' => $actName,
+                    ];
+                }
+
+                $creditLimit = isset($item['Credit_Limit']) && $item['Credit_Limit'] !== '' ? (float)$item['Credit_Limit'] : 0.0;
+                $opening     = (float)($item['OpeningBalance'] ?? 0);
+                $debit       = (float)($item['TotalDebit'] ?? 0);
+                $credit      = (float)($item['TotalCredit'] ?? 0);
+                $b0_30       = (float)($item['0-30Days'] ?? 0);
+                $b31_60      = (float)($item['31-60Days'] ?? 0);
+                $b61_90      = (float)($item['61-90Days'] ?? 0);
+                $bOver90     = (float)($item['Over90Days'] ?? 0);
+                $closing     = (float)($item['ClosingBalance'] ?? 0);
+
+                $branchName = $branchMap[$bCode] ?? ($bCode === '0' ? 'HO / Unassigned' : "Branch {$bCode}");
+
+                $row = [
+                    'Branch_Code'    => $bCode,
+                    'Branch_Name'    => $branchName,
+                    'ACT_CODE'       => $actCode,
+                    'act_name'       => $actName,
+                    'Credit_Limit'   => $creditLimit,
+                    'OpeningBalance' => $opening,
+                    'TotalDebit'     => $debit,
+                    'TotalCredit'    => $credit,
+                    '0-30Days'       => $b0_30,
+                    '31-60Days'      => $b31_60,
+                    '61-90Days'      => $b61_90,
+                    'Over90Days'     => $bOver90,
+                    'ClosingBalance' => $closing,
+                ];
+
+                $rows[] = $row;
+
+                $totals['count']++;
+                $totals['opening']        += $opening;
+                $totals['debit']          += $debit;
+                $totals['credit']         += $credit;
+                $totals['bucket_0_30']    += $b0_30;
+                $totals['bucket_31_60']   += $b31_60;
+                $totals['bucket_61_90']   += $b61_90;
+                $totals['bucket_over_90'] += $bOver90;
+                $totals['closing']        += $closing;
+                if ($bOver90 > 0) {
+                    $totals['overdue_count']++;
+                }
+            }
+        }
+
+        usort($partyOptions, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+
+        return [
+            'rows'           => $rows,
+            'totals'         => $totals,
+            'branchOptions'  => $branchOptions,
+            'branchMap'      => $branchMap,
+            'partyOptions'   => $partyOptions,
+            'selectedBranch' => $selectedBranch,
+            'selectedActCode'=> $selectedActCode,
+            'fromDate'       => $fromDate,
+            'toDate'         => $toDate,
+            'finYear'        => $finYear,
+            'error'          => $error,
+            'lastCachedAt'   => now()->format('d M, Y h:i A'),
+        ];
+    }
 }
 
 

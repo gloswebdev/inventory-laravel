@@ -25,6 +25,7 @@ class UserController extends Controller
         'sales_report' => 'Branch-Wise Sales Report',
         'purchase_report' => 'Purchase Report',
         'collection_report' => 'Collection Report & Analyzer',
+        'debtors_ageing' => 'Debtors Ageing Report',
         'teams_setup' => 'Teams Hierarchy & Setup',
         'agent_targets' => 'Agent Targets Manager',
         'adjustments' => 'Stock Adjustments',
@@ -43,6 +44,7 @@ class UserController extends Controller
         'mobile_sales_report' => 'Mobile: Sales Report',
         'mobile_sales_360' => 'Mobile: 360° Sales Report',
         'mobile_purchase_report' => 'Mobile: Purchase Report',
+        'mobile_debtors_ageing' => 'Mobile: Debtors Ageing',
         'mobile_collection' => 'Mobile: Collection Report',
         'mobile_teams_setup' => 'Mobile: Teams Setup',
         'mobile_agent_targets' => 'Mobile: Agent Targets',
@@ -284,6 +286,19 @@ class UserController extends Controller
             'category_filter' => 'Category Filter',
             'agent_filter'    => 'Agent Filter',
             'product_filter'  => 'Product Filter',
+        ],
+        'debtors_ageing' => [
+            'view'          => 'View Debtors Ageing Report',
+            'branch_filter' => 'Branch Filter',
+            'party_filter'  => 'Party (ActCode) Filter',
+            'date_filter'   => 'Date / Financial Year Filter',
+            'excel'         => 'Export to Excel',
+        ],
+        'mobile_debtors_ageing' => [
+            'view'          => 'View Debtors Ageing',
+            'branch_filter' => 'Branch Filter',
+            'party_filter'  => 'Party Search Filter',
+            'date_filter'   => 'Date Filter',
         ],
     ];
 

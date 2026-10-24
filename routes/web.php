@@ -135,6 +135,8 @@ Route::middleware(['auth', 'interface:desktop'])->group(function () {
     Route::get('reports/live-stock/excel', [ReportController::class, 'exportLiveStockExcel'])->name('reports.live-stock.excel');
     Route::get('reports/live-stock/pdf', [ReportController::class, 'exportLiveStockPdf'])->name('reports.live-stock.pdf');
     Route::get('reports/purchase', [ReportController::class, 'purchaseReport'])->name('reports.purchase');
+    Route::get('reports/debtors-ageing', [ReportController::class, 'debtorsAgeing'])->name('reports.debtors-ageing');
+    Route::get('reports/debtors-ageing/excel', [ReportController::class, 'exportDebtorsAgeingExcel'])->name('reports.debtors-ageing.excel');
     Route::get('reports/collection', [ReportController::class, 'collectionReport'])->name('reports.collection');
     Route::get('reports/teams/setup', [ReportController::class, 'teamsSetup'])->name('reports.teams.setup');
     Route::post('reports/teams/setup/save', [ReportController::class, 'saveTeamsSetup'])->name('reports.teams.setup.save');
@@ -246,6 +248,9 @@ Route::prefix('mobile')->middleware(['auth', 'interface:mobile'])->group(functio
 
     // Purchase Report
     Route::get('/purchase-report', [App\Http\Controllers\MobileController::class, 'purchaseReport'])->name('mobile.purchase-report');
+
+    // Debtors Ageing Report
+    Route::get('/debtors-ageing', [App\Http\Controllers\MobileController::class, 'debtorsAgeing'])->name('mobile.debtors-ageing');
 
     // Sales Report
     Route::get('/sales-report', [App\Http\Controllers\MobileController::class, 'salesReport'])->name('mobile.sales-report');

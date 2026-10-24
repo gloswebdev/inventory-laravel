@@ -107,6 +107,7 @@ class MobileController extends Controller implements HasMiddleware
                     'mobile.costing.pricelist-update.push' => 'mobile_costing_pricelist_update',
                     'mobile.costing.pricelist-update.history' => 'mobile_costing_pricelist_update',
                     'mobile.purchase-report'        => 'mobile_purchase_report',
+                    'mobile.debtors-ageing'         => 'mobile_debtors_ageing',
                     'mobile.sales-report'           => 'mobile_sales_report',
                     
                     // Collection Report & Targets
@@ -259,6 +260,13 @@ class MobileController extends Controller implements HasMiddleware
                 'route'      => 'mobile.purchase-report',
                 'color'      => 'bg-orange-500',
                 'permission' => 'mobile_purchase_report'
+            ],
+            [
+                'name'       => 'Debtors Ageing',
+                'icon'       => 'fas fa-calendar-days',
+                'route'      => 'mobile.debtors-ageing',
+                'color'      => 'bg-rose-600',
+                'permission' => 'mobile_debtors_ageing'
             ],
             [
                 'name'       => 'Sales Report',
@@ -3355,5 +3363,15 @@ class MobileController extends Controller implements HasMiddleware
     public function sales360Parties(Request $request)
     {
         return (new ReportController())->sales360Parties($request);
+    }
+
+    /**
+     * Mobile: Debtors Ageing Report
+     */
+    public function debtorsAgeing(Request $request)
+    {
+        $reportController = new ReportController();
+        $data = $reportController->getDebtorsAgeingDataPayload($request);
+        return view('mobile.debtors_ageing', $data);
     }
 }

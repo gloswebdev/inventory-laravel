@@ -112,9 +112,11 @@
                     'mobile_collection' => ['bg' => 'bg-emerald-600', 'text' => 'text-white', 'shadow' => 'shadow-emerald-200'],
                     'mobile_agent_targets' => ['bg' => 'bg-indigo-600', 'text' => 'text-white', 'shadow' => 'shadow-indigo-200'],
                     'mobile_teams_setup' => ['bg' => 'bg-violet-600', 'text' => 'text-white', 'shadow' => 'shadow-violet-200'],
+                    'mobile_debtors_ageing' => ['bg' => 'bg-rose-600', 'text' => 'text-white', 'shadow' => 'shadow-rose-200'],
                 ];
 
                 $newFeatures = [
+                    'mobile.debtors-ageing',
                     'mobile.sales-360',
                     'mobile.sales-report',
                     'mobile.agent-targets.index',
